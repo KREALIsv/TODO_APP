@@ -1,0 +1,219 @@
+import 'package:flutter/material.dart';
+
+import 'app_colors.dart';
+import 'color_scheme.dart';
+import 'tokens.dart';
+
+const String _fontFamily = 'Inter';
+
+const Set<WidgetState> _interactiveStates = <WidgetState>{
+  WidgetState.pressed,
+  WidgetState.hovered,
+  WidgetState.focused,
+};
+
+class AppThemes {
+  static const InputDecorationTheme inputDecorationTheme = InputDecorationTheme(
+    filled: true,
+    fillColor: AppColors.neutral00,
+    floatingLabelStyle: TextStyle(
+      color: AppColors.primary,
+      fontWeight: FontWeight.w600,
+      fontFamily: _fontFamily,
+    ),
+    labelStyle: TextStyle(
+      color: AppColors.neutral60,
+      fontWeight: FontWeight.w400,
+      fontFamily: _fontFamily,
+    ),
+    hintStyle: TextStyle(
+      color: AppColors.neutral40,
+      fontWeight: FontWeight.w400,
+      fontFamily: _fontFamily,
+    ),
+    errorStyle: TextStyle(
+      color: AppColors.error,
+      fontWeight: FontWeight.w400,
+      fontFamily: _fontFamily,
+    ),
+    contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: ThemeTokens.borderRadius,
+      borderSide: BorderSide(
+        color: AppColors.neutral20,
+        width: ThemeTokens.outlineWidth,
+      ),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: ThemeTokens.borderRadius,
+      borderSide: BorderSide(
+        color: AppColors.primary,
+        width: ThemeTokens.outlineInputFocusedWidth,
+      ),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: ThemeTokens.borderRadius,
+      borderSide: BorderSide(color: AppColors.error),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: ThemeTokens.borderRadius,
+      borderSide: BorderSide(
+        color: AppColors.error,
+        width: ThemeTokens.outlineInputFocusedWidth,
+      ),
+    ),
+    disabledBorder: OutlineInputBorder(
+      borderRadius: ThemeTokens.borderRadius,
+      borderSide: BorderSide(color: AppColors.neutral20),
+    ),
+    iconColor: AppColors.neutral60,
+    prefixIconColor: AppColors.neutral60,
+    suffixIconColor: AppColors.neutral60,
+  );
+
+  static final lightTheme = ThemeData(
+    useMaterial3: true,
+    colorScheme: appColorScheme,
+    fontFamily: _fontFamily,
+    splashColor: Colors.transparent,
+    highlightColor: Colors.transparent,
+    brightness: Brightness.light,
+    primaryColor: AppColors.primary,
+    scaffoldBackgroundColor: AppColors.white,
+    dividerColor: AppColors.neutral20,
+    appBarTheme: const AppBarTheme(
+      surfaceTintColor: Colors.transparent,
+      backgroundColor: AppColors.white,
+      elevation: 0,
+      iconTheme: IconThemeData(color: AppColors.black),
+      titleTextStyle: TextStyle(
+        color: AppColors.black,
+        fontFamily: _fontFamily,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    inputDecorationTheme: inputDecorationTheme,
+    filledButtonTheme: FilledButtonThemeData(
+      style: ButtonStyle(
+        minimumSize: WidgetStateProperty.all<Size>(const Size(100, 48)),
+        backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return AppColors.neutral20;
+          }
+          return AppColors.primary;
+        }),
+        foregroundColor: WidgetStateProperty.all<Color>(AppColors.white),
+        shape: WidgetStateProperty.all<OutlinedBorder>(ThemeTokens.buttonsShape),
+      ),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ButtonStyle(
+        minimumSize: WidgetStateProperty.all<Size>(const Size(100, 48)),
+        backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return AppColors.neutral20;
+          }
+          if (states.any(_interactiveStates.contains)) {
+            return AppColors.secondary;
+          }
+          return AppColors.primary;
+        }),
+        foregroundColor: WidgetStateProperty.all<Color>(AppColors.white),
+        shape: WidgetStateProperty.all<OutlinedBorder>(ThemeTokens.buttonsShape),
+        elevation: WidgetStateProperty.all<double>(0),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: ButtonStyle(
+        minimumSize: WidgetStateProperty.all<Size>(const Size(100, 48)),
+        foregroundColor: WidgetStateProperty.all<Color>(AppColors.primary),
+        side: WidgetStateProperty.all<BorderSide>(
+          const BorderSide(color: AppColors.primary),
+        ),
+        shape: WidgetStateProperty.all<OutlinedBorder>(ThemeTokens.buttonsShape),
+      ),
+    ),
+    checkboxTheme: CheckboxThemeData(
+      checkColor: WidgetStateProperty.all<Color>(AppColors.white),
+      fillColor: WidgetStateProperty.resolveWith<Color?>((states) {
+        if (states.contains(WidgetState.selected)) {
+          return AppColors.primary;
+        }
+        return AppColors.white;
+      }),
+      side: const BorderSide(color: AppColors.neutral40),
+    ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.white,
+    ),
+    cardTheme: CardThemeData(
+      elevation: 0,
+      color: AppColors.neutral00,
+      shape: RoundedRectangleBorder(
+        borderRadius: ThemeTokens.borderRadius,
+        side: const BorderSide(color: AppColors.neutral20),
+      ),
+    ),
+    textTheme: const TextTheme(
+      // Headline
+      headlineLarge: TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 32,
+        fontWeight: FontWeight.w700,
+        color: AppColors.black,
+      ),
+      headlineMedium: TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+        color: AppColors.black,
+      ),
+      headlineSmall: TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        color: AppColors.black,
+      ),
+      // Body
+      bodyLarge: TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 16,
+        fontWeight: FontWeight.w400,
+        color: AppColors.black,
+      ),
+      bodyMedium: TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        color: AppColors.neutral80,
+      ),
+      bodySmall: TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        color: AppColors.neutral60,
+      ),
+      // Label
+      labelLarge: TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: AppColors.black,
+      ),
+      labelMedium: TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: AppColors.neutral80,
+      ),
+      labelSmall: TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        color: AppColors.neutral60,
+      ),
+    ),
+  );
+}
