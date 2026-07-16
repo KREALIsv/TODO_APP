@@ -1,0 +1,103 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
+
+import 'package:todos_app/features/notes/data/notes_repository.dart';
+import 'package:todos_app/features/notes/domain/note_item.dart';
+
+void main() {
+  late Directory tempDir;
+  late NotesRepository repo;
+
+  setUp(() async {
+    tempDir = await Directory.systemTemp.createTemp('notes_repo_test_');
+    Hive.init(tempDir.path);
+    final box = await Hive.openBox<Map>('notes_test_${DateTime.now().microsecondsSinceEpoch}');
+    repo = NotesRepository.instance;
+    await repo.initWithBox(box);
+    await repo.clear();
+  });
+
+  tearDown(() async {
+    await Hive.deleteFromDisk();
+    if (tempDir.existsSync()) {
+      await tempDir.delete(recursive: true);
+    }
+  });
+
+  NoteItem buildItem({
+    String id = '1',
+    NoteType type = NoteType.note,
+    bool pinned = false,
+    bool completed = false,
+    DateTime? updatedAt,
+  }) {
+    final now = DateTime(2026, 7, 16, 12);
+    return NoteItem(
+      id: id,
+      type: type,
+      title: 'Title $id',
+      body: 'Body $id',
+      pinned: pinned,
+      completed: completed,
+      createdAt: now,
+      updatedAt: updatedAt ?? now,
+    );
+  }
+
+  test('add and getAll returns items sorted by updatedAt desc', () async {
+    await repo.add(buildItem(id: 'old', updatedAt: DateTime(2026, 7, 1)));
+    await repo.add(buildItem(id: 'new', updatedAt: DateTime(2026, 7, 15)));
+
+    final all = repo.getAll();
+    expect(all.map((e) => e.id).toList(), ['new', 'old']);
+  });
+
+  test('update replaces existing item', () async {
+    await repo.add(buildItem(id: '1'));
+    await repo.update(buildItem(id: '1').copyWith(title: 'Updated'));
+
+    expect(repo.getById('1')?.title, 'Updated');
+  });
+
+  test('delete removes item', () async {
+    await repo.add(buildItem(id: '1'));
+    await repo.delete('1');
+    expect(repo.getById('1'), isNull);
+    expect(repo.getAll(), isEmpty);
+  });
+
+  test('togglePinned flips pinned flag', () async {
+    await repo.add(buildItem(id: '1', pinned: false));
+    await repo.togglePinned('1');
+    expect(repo.getById('1')?.pinned, isTrue);
+    await repo.togglePinned('1');
+    expect(repo.getById('1')?.pinned, isFalse);
+  });
+
+  test('toggleCompleted only works for tasks', () async {
+    await repo.add(buildItem(id: 'note', type: NoteType.note));
+    await repo.add(buildItem(id: 'task', type: NoteType.task));
+
+    await repo.toggleCompleted('note');
+    await repo.toggleCompleted('task');
+
+    expect(repo.getById('note')?.completed, isFalse);
+    expect(repo.getById('task')?.completed, isTrue);
+  });
+
+  test('toMap and fromMap roundtrip', () {
+    final original = buildItem(id: 'round', type: NoteType.task, pinned: true);
+    final restored = NoteItem.fromMap(original.toMap());
+
+    expect(restored.id, original.id);
+    expect(restored.type, original.type);
+    expect(restored.title, original.title);
+    expect(restored.body, original.body);
+    expect(restored.pinned, original.pinned);
+    expect(restored.completed, original.completed);
+    expect(restored.createdAt, original.createdAt);
+    expect(restored.updatedAt, original.updatedAt);
+  });
+}
