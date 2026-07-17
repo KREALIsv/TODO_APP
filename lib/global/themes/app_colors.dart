@@ -30,7 +30,7 @@ class AppColors {
   static const Color tertiary15 = Color(0xFFE8FCE9);
 
   // Neutral shades
-  static const Color neutral00 = Color(0xFFF6F7F8);
+  static const Color neutral00 = Color(0xFFF4F6F8);
   static const Color neutral20 = Color(0xFFD0D4D9);
   static const Color neutral40 = Color(0xFFA0A8B0);
   static const Color neutral60 = Color(0xFF636C76);

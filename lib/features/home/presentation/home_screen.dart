@@ -83,13 +83,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void _toggleSearch() {
     setState(() {
       _isSearchExpanded = !_isSearchExpanded;
-      if (_isSearchExpanded) {
-        _searchFocusNode.requestFocus();
-      } else {
+      if (!_isSearchExpanded) {
         _searchController.clear();
         _searchFocusNode.unfocus();
       }
     });
+
+    if (_isSearchExpanded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _searchFocusNode.requestFocus();
+      });
+    }
   }
 
   String _formatHeaderDate(DateTime date) {
@@ -170,181 +174,201 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  PreferredSizeWidget _buildAppBarBottom(String searchQuery) {
+    if (_isSearchExpanded) {
+      return PreferredSize(
+        preferredSize: const Size.fromHeight(65),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                textInputAction: TextInputAction.search,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Buscar notas…',
+                  isDense: true,
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: searchQuery.trim().isNotEmpty
+                      ? IconButton(
+                          tooltip: 'Limpiar',
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                          icon: const Icon(Icons.clear),
+                        )
+                      : null,
+                ),
+              ),
+            ),
+            Container(height: 1, color: AppColors.neutral20),
+          ],
+        ),
+      );
+    }
+
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(1),
+      child: Container(height: 1, color: AppColors.neutral20),
+    );
+  }
+
+  Widget _buildSliverAppBar(TextTheme textTheme, String searchQuery) {
+    final today = _formatHeaderDate(DateTime.now());
+
+    return SliverAppBar(
+      pinned: true,
+      floating: false,
+      titleSpacing: 16,
+      backgroundColor: AppColors.white,
+      surfaceTintColor: Colors.transparent,
+      title: Row(
+        children: [
+          const CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.primary00,
+            child: Icon(
+              Icons.person_outline,
+              color: AppColors.primary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            today,
+            style: textTheme.labelLarge?.copyWith(
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          tooltip: _isSearchExpanded ? 'Cerrar búsqueda' : 'Buscar',
+          onPressed: _toggleSearch,
+          icon: Icon(
+            _isSearchExpanded ? Icons.close : Icons.search,
+            color: _isSearchExpanded
+                ? AppColors.primary
+                : AppColors.neutral60,
+          ),
+        ),
+        if (!_isSearchExpanded)
+          IconButton(
+            tooltip: 'Ajustes',
+            onPressed: () {},
+            icon: const Icon(
+              Icons.settings_outlined,
+              color: AppColors.neutral60,
+            ),
+          ),
+      ],
+      bottom: _buildAppBarBottom(searchQuery),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final today = _formatHeaderDate(DateTime.now());
     final searchQuery = _searchController.text;
 
     return Scaffold(
-      body: SafeArea(
-        child: ValueListenableBuilder<Box<Map>>(
-          valueListenable: _repo.listenable(),
-          builder: (context, box, child) {
-            final all = _repo.getAll();
-            final useSectioned = NotesQuery.useSectionedLayout(
-              filter: _activeFilter,
-              searchQuery: searchQuery,
-            );
-            final filtered = NotesQuery.apply(
-              items: all,
-              filter: _activeFilter,
-              searchQuery: searchQuery,
-            );
-            final pinned = NotesQuery.pinnedFrom(filtered);
-            final recent = NotesQuery.recentFrom(filtered);
-            final emptyMessage = NotesQuery.emptyMessage(
-              filter: _activeFilter,
-              searchQuery: searchQuery,
-              hasAnyItems: all.isNotEmpty,
-            );
+      body: ValueListenableBuilder<Box<Map>>(
+        valueListenable: _repo.listenable(),
+        builder: (context, box, child) {
+          final all = _repo.getAll();
+          final useSectioned = NotesQuery.useSectionedLayout(
+            filter: _activeFilter,
+            searchQuery: searchQuery,
+          );
+          final filtered = NotesQuery.apply(
+            items: all,
+            filter: _activeFilter,
+            searchQuery: searchQuery,
+          );
+          final pinned = NotesQuery.pinnedFrom(filtered);
+          final recent = NotesQuery.recentFrom(filtered);
+          final emptyMessage = NotesQuery.emptyMessage(
+            filter: _activeFilter,
+            searchQuery: searchQuery,
+            hasAnyItems: all.isNotEmpty,
+          );
 
-            return CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
-                    child: Row(
-                      children: [
-                        const CircleAvatar(
-                          radius: 18,
-                          backgroundColor: AppColors.primary00,
-                          child: Icon(
-                            Icons.person_outline,
-                            color: AppColors.primary,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            today,
-                            style: textTheme.labelLarge?.copyWith(
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: _isSearchExpanded
-                              ? 'Cerrar búsqueda'
-                              : 'Buscar',
-                          onPressed: _toggleSearch,
-                          icon: Icon(
-                            _isSearchExpanded
-                                ? Icons.close
-                                : Icons.search,
-                            color: _isSearchExpanded
-                                ? AppColors.primary
-                                : AppColors.neutral60,
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Ajustes',
-                          onPressed: () {},
-                          icon: const Icon(
-                            Icons.settings_outlined,
-                            color: AppColors.neutral60,
-                          ),
-                        ),
-                      ],
-                    ),
+          return CustomScrollView(
+            slivers: [
+              _buildSliverAppBar(textTheme, searchQuery),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: QuickCaptureField(repository: _repo),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: FilterChipsBar(
+                    activeFilter: _activeFilter,
+                    onFilterChanged: (filter) {
+                      setState(() => _activeFilter = filter);
+                    },
                   ),
                 ),
-                if (_isSearchExpanded)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: TextField(
-                        controller: _searchController,
-                        focusNode: _searchFocusNode,
-                        textInputAction: TextInputAction.search,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: 'Buscar notas…',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: searchQuery.trim().isNotEmpty
-                              ? IconButton(
-                                  tooltip: 'Limpiar',
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() {});
-                                  },
-                                  icon: const Icon(Icons.clear),
-                                )
-                              : null,
-                        ),
-                      ),
-                    ),
-                  ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: QuickCaptureField(repository: _repo),
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: FilterChipsBar(
-                      activeFilter: _activeFilter,
-                      onFilterChanged: (filter) {
-                        setState(() => _activeFilter = filter);
+              ),
+              if (filtered.isEmpty)
+                _buildEmptyState(emptyMessage, textTheme)
+              else if (useSectioned) ...[
+                if (pinned.isNotEmpty) ...[
+                  _buildSectionHeader('Fijadas', textTheme),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverList.builder(
+                      itemCount: pinned.length,
+                      itemBuilder: (context, index) {
+                        final item = pinned[index];
+                        return NoteCard(
+                          item: item,
+                          repository: _repo,
+                          onTap: () => _openEditor(context, item: item),
+                        );
                       },
                     ),
                   ),
-                ),
-                if (filtered.isEmpty)
-                  _buildEmptyState(emptyMessage, textTheme)
-                else if (useSectioned) ...[
-                  if (pinned.isNotEmpty) ...[
-                    _buildSectionHeader('Fijadas', textTheme),
-                    SliverPadding(
+                ],
+                _buildSectionHeader('Recientes', textTheme),
+                if (recent.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      sliver: SliverList.builder(
-                        itemCount: pinned.length,
-                        itemBuilder: (context, index) {
-                          final item = pinned[index];
-                          return NoteCard(
-                            item: item,
-                            repository: _repo,
-                            onTap: () => _openEditor(context, item: item),
-                          );
-                        },
+                      child: Text(
+                        'No hay notas recientes',
+                        style: textTheme.bodyMedium,
                       ),
                     ),
-                  ],
-                  _buildSectionHeader('Recientes', textTheme),
-                  if (recent.isEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'No hay notas recientes',
-                          style: textTheme.bodyMedium,
-                        ),
-                      ),
-                    )
-                  else
-                    _buildNoteList(
-                      recent,
-                      (item) => _openEditor(context, item: item),
-                    ),
-                ] else ...[
-                  _buildSectionHeader(
-                    searchQuery.trim().isNotEmpty
-                        ? 'Resultados'
-                        : _activeFilter.listHeader,
-                    textTheme,
-                  ),
+                  )
+                else
                   _buildNoteList(
-                    filtered,
+                    recent,
                     (item) => _openEditor(context, item: item),
                   ),
-                ],
+              ] else ...[
+                _buildSectionHeader(
+                  searchQuery.trim().isNotEmpty
+                      ? 'Resultados'
+                      : _activeFilter.listHeader,
+                  textTheme,
+                ),
+                _buildNoteList(
+                  filtered,
+                  (item) => _openEditor(context, item: item),
+                ),
               ],
-            );
-          },
-        ),
+            ],
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCreateMenu(context),

@@ -15,7 +15,7 @@ const Set<WidgetState> _interactiveStates = <WidgetState>{
 class AppThemes {
   static const InputDecorationTheme inputDecorationTheme = InputDecorationTheme(
     filled: true,
-    fillColor: AppColors.neutral00,
+    fillColor: AppColors.white,
     floatingLabelStyle: TextStyle(
       color: AppColors.primary,
       fontWeight: FontWeight.w600,
@@ -79,12 +79,14 @@ class AppThemes {
     highlightColor: Colors.transparent,
     brightness: Brightness.light,
     primaryColor: AppColors.primary,
-    scaffoldBackgroundColor: AppColors.white,
+    scaffoldBackgroundColor: AppColors.neutral00,
     dividerColor: AppColors.neutral20,
     appBarTheme: const AppBarTheme(
       surfaceTintColor: Colors.transparent,
       backgroundColor: AppColors.white,
+      foregroundColor: AppColors.black,
       elevation: 0,
+      scrolledUnderElevation: 0,
       iconTheme: IconThemeData(color: AppColors.black),
       titleTextStyle: TextStyle(
         color: AppColors.black,
@@ -150,7 +152,7 @@ class AppThemes {
     ),
     cardTheme: CardThemeData(
       elevation: 0,
-      color: AppColors.neutral00,
+      color: AppColors.white,
       shape: RoundedRectangleBorder(
         borderRadius: ThemeTokens.borderRadius,
         side: const BorderSide(color: AppColors.neutral20),
