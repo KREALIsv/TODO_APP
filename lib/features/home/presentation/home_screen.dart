@@ -10,6 +10,7 @@ import '../../notes/presentation/note_editor_screen.dart';
 import '../../notes/presentation/widgets/filter_chips_bar.dart';
 import '../../notes/presentation/widgets/note_card.dart';
 import '../../notes/presentation/widgets/quick_capture_field.dart';
+import '../../profile/presentation/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.repository});
@@ -34,6 +35,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _openProfile(BuildContext context) async {
+    final filter = await Navigator.of(context).push<NotesFilter>(
+      MaterialPageRoute(
+        builder: (_) => ProfileScreen(repository: _repo),
+      ),
+    );
+    if (filter != null && mounted) {
+      setState(() => _activeFilter = filter);
+    }
   }
 
   Future<void> _openEditor(
@@ -228,13 +240,20 @@ class _HomeScreenState extends State<HomeScreen> {
       surfaceTintColor: Colors.transparent,
       title: Row(
         children: [
-          const CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.primary00,
-            child: Icon(
-              Icons.person_outline,
-              color: AppColors.primary,
-              size: 20,
+          Tooltip(
+            message: 'Perfil',
+            child: InkWell(
+              onTap: () => _openProfile(context),
+              customBorder: const CircleBorder(),
+              child: const CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.primary00,
+                child: Icon(
+                  Icons.person_outline,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 12),

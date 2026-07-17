@@ -81,12 +81,11 @@ Estructura top → bottom:
 
 1. **Header** — avatar, fecha, settings + acceso a búsqueda
 2. **Captura rápida** — input sticky: “Escribe una nota…”
-3. **Activity compacta** — streak + heatmap colapsable / reducido
-4. **Chips de filtro** — Todas / Fijadas / Notas / Tareas + etiquetas
-5. **Sección Fijadas**
-6. **Sección Recientes** (o lista unificada filtrada)
-7. **FAB expandible** — Nota / Tarea / Foto / Audio
-8. **Bottom nav** — Home · Stats · Profile
+3. **Chips de filtro** — Todas / Fijadas / Notas / Tareas + etiquetas
+4. **Sección Fijadas**
+5. **Sección Recientes** (o lista unificada filtrada)
+6. **FAB expandible** — Nota / Tarea / Foto / Audio
+7. **Acceso a Perfil** — avatar/header abre actividad local y heatmap dedicado
 
 ---
 
@@ -166,11 +165,11 @@ Al pulsar `+`:
 
 Si se mantiene press largo en `+`, abre directamente Nota.
 
-### 6.7 Activity / streak (P0 reducido)
-- Mantener streak + heatmap, pero:
-  - Altura reducida (~40–50% del mock actual), o
-  - Card colapsable (default colapsada tras primera sesión)
+### 6.7 Perfil / actividad local (P0)
+- Home no renderiza el heatmap completo.
+- Avatar/header abre una pantalla Perfil local con streak + heatmap dedicado.
 - Contar actividad por: crear/editar nota, completar tarea.
+- Ver `PRD-perfil-actividad.md`.
 
 ### 6.8 Editor de nota (P0)
 - Pantalla full o bottom sheet expandido
@@ -267,7 +266,7 @@ Instrumentación mínima: `note_created`, `note_opened`, `note_pinned`, `task_co
 - Fijadas / Recientes
 - Filtros básicos + búsqueda texto
 - FAB Nota/Tarea
-- Activity compacta
+- Acceso a Perfil local con actividad
 - Autoguardado
 - Tags básicos
 - Swipe archivar / eliminar con undo
@@ -293,7 +292,7 @@ Instrumentación mínima: `note_created`, `note_opened`, `note_pinned`, `task_co
 | Riesgo | Mitigación |
 |---|---|
 | Usuarios actuales solo quieren tasks | Toggle/filtro “Tareas” + onboarding 1 pantalla |
-| Heatmap pierde engagement | Compacto pero visible; deep-link a Stats |
+| Heatmap pierde engagement | Perfil local accesible desde avatar/header; Home puede mostrar microcopy de racha si hace falta |
 | Lista se vuelve ruido | Fijadas + archivar + search fuertes |
 | Autoguardado confunde | Indicador de estado claro + undo delete |
 
@@ -314,8 +313,8 @@ Instrumentación mínima: `note_created`, `note_opened`, `note_pinned`, `task_co
 - [x] Crear nota < 5 s en flujo feliz
 - [x] Buscar y abrir nota existente
 - [x] Convertir nota ↔ tarea
-- [ ] Completar tarea actualiza UI y actividad (UI ✓ · activity/streak pendiente)
-- [ ] Activity no ocupa más de ~30% del primer viewport
+- [x] Completar tarea actualiza UI y actividad (UI ✓ · activity/streak ✓)
+- [x] Activity sale del primer viewport de Home y se mueve a Perfil local (`PRD-perfil-actividad.md`)
 - [x] Empty states y undo en delete (archive pendiente)
 - [x] Pruebas unitarias del modelo Note/Task + repository
 - [ ] QA manual iOS + Android en viewport pequeño
@@ -328,16 +327,16 @@ Instrumentación mínima: `note_created`, `note_opened`, `note_pinned`, `task_co
 
 | # | Pregunta | Decisión | Evidencia |
 |---|---|---|---|
-| 1 | ¿“Tareas de hoy” como vista dedicada o filtro? | **Solo filtro.** No hay pantalla “Today’s Tasks”; las tareas se filtran desde Home. | Chips de filtro + secciones Fijadas/Recientes |
+| 1 | ¿“Tareas de hoy” como vista dedicada o filtro? | **Enmendada (16 Jul 2026):** filtro con grupos. El chip Tareas muestra grupo **Hoy** (+ badge `X/Y done`), Próximas y Sin fecha. Sigue sin haber pantalla dedicada. Ver `PRD-control-tareas.md`. | Chips de filtro + secciones Fijadas/Recientes |
 | 2 | ¿Pin y Favorito son lo mismo? | **Sí, en v1.** Solo existe `pinned`; no hay star/favorito separado. | Modelo `NoteItem.pinned`, UI de pin |
+| 3 | ¿El heatmap cuenta solo días con captura, o también solo lectura? | **Solo escritura.** Días con create/edit nota o completar tarea (`createdAt` / `updatedAt`). No cuenta opens/lecturas. Vive en Perfil local. Ver `PRD-perfil-actividad.md`. | `ActivityStats` + Perfil local |
 | 5 | ¿Tabs Notas \| Tareas en bottom nav? | **No.** Todo vive en Home; sin bottom nav multi-tab por ahora. | Una sola `HomeScreen` como raíz |
 
 ### Pendientes (bloquean features futuras)
 
 | # | Pregunta | Cuándo decidir |
 |---|---|---|
-| 3 | ¿El heatmap cuenta solo días con captura, o también solo lectura? | Antes de implementar Activity compacta (§6.7) |
-| 4 | ¿Archivar es soft-delete con papelera, o ocultar sin recovery? | Antes de implementar swipe archivar (§6.10) |
+| 4 | ¿Archivar es soft-delete con papelera, o ocultar sin recovery? | **Resuelta (16 Jul 2026):** soft-delete con `archivedAt` + vista Archivadas (restaurar / eliminar definitivo), sin expiración automática. Ver `PRD-control-tareas.md` §6.8 |
 
 ---
 
@@ -354,4 +353,4 @@ Instrumentación mínima: `note_created`, `note_opened`, `note_pinned`, `task_co
 
 **Owner:** Product / Design  
 **Engineering:** Flutter app (`todos_app`)  
-**Próximo paso:** autoguardado en editor → activity compacta → filtro por tag (P1)
+**Próximo paso:** Perfil local (`PRD-perfil-actividad.md`: mover heatmap + cards de actividad) → slice de control de tareas (`PRD-control-tareas.md`: fechas + Hoy + swipe/archivar) → autoguardado en editor → filtro por tag (P1)

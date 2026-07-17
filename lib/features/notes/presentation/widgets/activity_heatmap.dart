@@ -1,0 +1,389 @@
+import 'package:flutter/material.dart';
+
+import '../../../../global/themes/app_colors.dart';
+
+/// Shared layout math for [ActivityHeatmap] height and paint sizing.
+class HeatmapLayout {
+  const HeatmapLayout({
+    required this.cellSize,
+    required this.gridHeight,
+    required this.gridWidth,
+    required this.totalHeight,
+  });
+
+  final double cellSize;
+  final double gridHeight;
+  final double gridWidth;
+  final double totalHeight;
+
+  static const dayLabelGap = 4.0;
+  static const monthToGridGap = 2.0;
+
+  static HeatmapLayout? forConstraints({
+    required double width,
+    required int weeks,
+    double maxHeight = double.infinity,
+    double gap = 2.0,
+    double dayLabelWidth = 12,
+    double monthLabelHeight = 12,
+  }) {
+    if (weeks <= 0 || width <= 0) return null;
+
+    final gridAreaWidth =
+        (width - dayLabelWidth - dayLabelGap).clamp(1.0, double.infinity);
+    final cellByWidth = (gridAreaWidth - gap * (weeks - 1)) / weeks;
+
+    final hasHeightCap = maxHeight.isFinite;
+    final gridBudget = hasHeightCap
+        ? (maxHeight - monthLabelHeight - monthToGridGap).clamp(0.0, maxHeight)
+        : double.infinity;
+    final maxCellByHeight = hasHeightCap
+        ? ((gridBudget - gap * 6) / 7).clamp(0.0, double.infinity)
+        : cellByWidth;
+
+    final cellSize = cellByWidth.clamp(0.0, maxCellByHeight);
+    if (hasHeightCap && maxHeight <= monthLabelHeight + monthToGridGap) {
+      return null;
+    }
+
+    final gridHeight = cellSize * 7 + gap * 6;
+    final gridWidth = cellSize * weeks + gap * (weeks - 1);
+    final naturalHeight = monthLabelHeight + monthToGridGap + gridHeight;
+    final totalHeight = hasHeightCap ? maxHeight : naturalHeight;
+
+    return HeatmapLayout(
+      cellSize: cellSize,
+      gridHeight: gridHeight,
+      gridWidth: gridWidth,
+      totalHeight: totalHeight,
+    );
+  }
+
+  static double heightForWidth({
+    required double width,
+    required int weeks,
+    double gap = 2.0,
+    double dayLabelWidth = 12,
+    double monthLabelHeight = 12,
+  }) {
+    return forConstraints(
+          width: width,
+          weeks: weeks,
+          gap: gap,
+          dayLabelWidth: dayLabelWidth,
+          monthLabelHeight: monthLabelHeight,
+        )?.totalHeight ??
+        monthLabelHeight;
+  }
+
+  /// Prefers [preferredMax], then [preferredMid], then the largest weeks count
+  /// that keeps cells ≥ [minCell].
+  static int weeksForMinCell({
+    required double width,
+    double gap = 3.0,
+    double dayLabelWidth = 12,
+    double minCell = 10,
+    int preferredMax = 26,
+    int preferredMid = 18,
+  }) {
+    for (final weeks in [preferredMax, preferredMid]) {
+      final layout = forConstraints(
+        width: width,
+        weeks: weeks,
+        gap: gap,
+        dayLabelWidth: dayLabelWidth,
+      );
+      if (layout != null && layout.cellSize >= minCell) return weeks;
+    }
+
+    final gridAreaWidth =
+        (width - dayLabelWidth - dayLabelGap).clamp(1.0, double.infinity);
+    final maxWeeks =
+        ((gridAreaWidth + gap) / (minCell + gap)).floor().clamp(1, preferredMid);
+    return maxWeeks;
+  }
+}
+
+/// GitHub-style contribution grid: month labels on top, weekday labels left.
+class ActivityHeatmap extends StatelessWidget {
+  const ActivityHeatmap({
+    super.key,
+    required this.cells,
+    required this.weeks,
+    required this.rangeStart,
+    this.gap = 2.0,
+    this.dayLabelWidth = 12,
+    this.monthLabelHeight = 12,
+    this.showAllWeekdayLabels = false,
+    this.onCellTap,
+    this.semanticsLabel,
+  });
+
+  final List<int> cells;
+  final int weeks;
+  final DateTime rangeStart;
+  final double gap;
+  final double dayLabelWidth;
+  final double monthLabelHeight;
+  /// When true, labels every row (L–D) so each square maps to a weekday.
+  final bool showAllWeekdayLabels;
+  final void Function(DateTime day, int count)? onCellTap;
+  final String? semanticsLabel;
+
+  static const _sparseWeekdayLabels = ['L', '', 'X', '', 'V', '', ''];
+  static const _fullWeekdayLabels = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+  static const _monthLabels = [
+    'Ene',
+    'Feb',
+    'Mar',
+    'Abr',
+    'May',
+    'Jun',
+    'Jul',
+    'Ago',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dic',
+  ];
+
+  static double heightForWidth({
+    required double width,
+    required int weeks,
+    double gap = 2.0,
+    double dayLabelWidth = 12,
+    double monthLabelHeight = 12,
+  }) =>
+      HeatmapLayout.heightForWidth(
+        width: width,
+        weeks: weeks,
+        gap: gap,
+        dayLabelWidth: dayLabelWidth,
+        monthLabelHeight: monthLabelHeight,
+      );
+
+  static Color colorForCount(int count) {
+    if (count <= 0) return AppColors.neutral20;
+    if (count == 1) return AppColors.primary00;
+    if (count == 2) return AppColors.primary20;
+    if (count <= 4) return AppColors.primary40;
+    return AppColors.primary60;
+  }
+
+  List<String?> _monthLabelsForWeeks() {
+    final labels = List<String?>.filled(weeks, null);
+    var lastMonth = -1;
+    for (var week = 0; week < weeks; week++) {
+      final monday = rangeStart.add(Duration(days: week * 7));
+      if (monday.month != lastMonth) {
+        labels[week] = _monthLabels[monday.month - 1];
+        lastMonth = monday.month;
+      }
+    }
+    return labels;
+  }
+
+  (int week, int day)? _cellAt(Offset local, HeatmapLayout layout) {
+    final gridLeft = dayLabelWidth + HeatmapLayout.dayLabelGap;
+    final gridTop = monthLabelHeight + HeatmapLayout.monthToGridGap;
+    final x = local.dx - gridLeft;
+    final y = local.dy - gridTop;
+    if (x < 0 || y < 0 || x > layout.gridWidth || y > layout.gridHeight) {
+      return null;
+    }
+    final step = layout.cellSize + gap;
+    final week = (x / step).floor();
+    final day = (y / step).floor();
+    if (week < 0 || week >= weeks || day < 0 || day >= 7) return null;
+    final inCellX = x - week * step;
+    final inCellY = y - day * step;
+    if (inCellX > layout.cellSize || inCellY > layout.cellSize) return null;
+    return (week, day);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    assert(cells.length == weeks * 7);
+    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AppColors.neutral60,
+          fontSize: 9,
+          height: 1,
+        );
+    final monthLabels = _monthLabelsForWeeks();
+    final weekdayLabels =
+        showAllWeekdayLabels ? _fullWeekdayLabels : _sparseWeekdayLabels;
+    final totalEvents = cells.fold<int>(0, (sum, count) => sum + count);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final maxHeight = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : HeatmapLayout.heightForWidth(
+                width: width,
+                weeks: weeks,
+                gap: gap,
+                dayLabelWidth: dayLabelWidth,
+                monthLabelHeight: monthLabelHeight,
+              );
+
+        final layout = HeatmapLayout.forConstraints(
+          width: width,
+          weeks: weeks,
+          maxHeight: maxHeight,
+          gap: gap,
+          dayLabelWidth: dayLabelWidth,
+          monthLabelHeight: monthLabelHeight,
+        );
+        if (layout == null) return const SizedBox.shrink();
+
+        final cell = layout.cellSize;
+
+        Widget grid = SizedBox(
+          width: width,
+          height: layout.totalHeight,
+          child: Stack(
+            clipBehavior: Clip.hardEdge,
+            children: [
+              for (var week = 0; week < weeks; week++)
+                if (monthLabels[week] != null)
+                  Positioned(
+                    left: dayLabelWidth +
+                        HeatmapLayout.dayLabelGap +
+                        week * (cell + gap),
+                    top: 0,
+                    width: cell * 3 + gap * 2,
+                    height: monthLabelHeight,
+                    child: Text(
+                      monthLabels[week]!,
+                      style: labelStyle,
+                      maxLines: 1,
+                      overflow: TextOverflow.clip,
+                    ),
+                  ),
+              Positioned(
+                top: monthLabelHeight + HeatmapLayout.monthToGridGap,
+                left: 0,
+                right: 0,
+                height: layout.gridHeight,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: dayLabelWidth,
+                      height: layout.gridHeight,
+                      child: Stack(
+                        children: [
+                          for (var day = 0; day < 7; day++)
+                            if (weekdayLabels[day].isNotEmpty)
+                              Positioned(
+                                top: day * (cell + gap),
+                                left: 0,
+                                height: cell,
+                                width: dayLabelWidth,
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    weekdayLabels[day],
+                                    style: labelStyle,
+                                  ),
+                                ),
+                              ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: HeatmapLayout.dayLabelGap),
+                    CustomPaint(
+                      size: Size(layout.gridWidth, layout.gridHeight),
+                      painter: _HeatmapPainter(
+                        cells: cells,
+                        weeks: weeks,
+                        cell: cell,
+                        gap: gap,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+
+        if (onCellTap != null) {
+          grid = GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (details) {
+              final hit = _cellAt(details.localPosition, layout);
+              if (hit == null) return;
+              final (week, day) = hit;
+              final index = week * 7 + day;
+              final date = rangeStart.add(Duration(days: index));
+              onCellTap!(date, cells[index]);
+            },
+            child: grid,
+          );
+        }
+
+        return Semantics(
+          label: semanticsLabel ??
+              'Actividad de las últimas $weeks semanas, $totalEvents registros',
+          child: grid,
+        );
+      },
+    );
+  }
+}
+
+/// Formats a heatmap cell tooltip: "12 Jul · 3 registros" / "Sin actividad".
+String heatmapCellTooltip(DateTime day, int count) {
+  final month = ActivityHeatmap._monthLabels[day.month - 1];
+  final dateLabel = '${day.day} $month';
+  if (count <= 0) return '$dateLabel · Sin actividad';
+  final noun = count == 1 ? 'registro' : 'registros';
+  return '$dateLabel · $count $noun';
+}
+
+class _HeatmapPainter extends CustomPainter {
+  _HeatmapPainter({
+    required this.cells,
+    required this.weeks,
+    required this.cell,
+    required this.gap,
+  });
+
+  final List<int> cells;
+  final int weeks;
+  final double cell;
+  final double gap;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (cell <= 0) return;
+    // Soft corner on each cell; scales with size, stays subtle.
+    final radius = Radius.circular((cell * 0.25).clamp(2.0, 4.0));
+    for (var week = 0; week < weeks; week++) {
+      for (var day = 0; day < 7; day++) {
+        final rect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            week * (cell + gap),
+            day * (cell + gap),
+            cell,
+            cell,
+          ),
+          radius,
+        );
+        final paint = Paint()
+          ..color = ActivityHeatmap.colorForCount(cells[week * 7 + day]);
+        canvas.drawRRect(rect, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeatmapPainter oldDelegate) {
+    return oldDelegate.cells != cells ||
+        oldDelegate.weeks != weeks ||
+        oldDelegate.cell != cell ||
+        oldDelegate.gap != gap;
+  }
+}
