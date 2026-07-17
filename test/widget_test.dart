@@ -27,7 +27,9 @@ void main() {
     }
   });
 
-  testWidgets('Home shows quick capture field', (WidgetTester tester) async {
+  testWidgets('Home shows quick capture field and filter chips', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(repository: NotesRepository.instance),
@@ -37,6 +39,27 @@ void main() {
     expect(find.text('Escribe una nota…'), findsOneWidget);
     expect(find.byType(FloatingActionButton), findsOneWidget);
     expect(find.text('Tu primera nota está a un tap'), findsOneWidget);
+    expect(find.text('Todas'), findsOneWidget);
+    expect(find.text('Fijadas'), findsOneWidget);
+    expect(find.text('Notas'), findsOneWidget);
+    expect(find.text('Tareas'), findsOneWidget);
+  });
+
+  testWidgets('Home expands search field when search icon is tapped', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(repository: NotesRepository.instance),
+      ),
+    );
+
+    expect(find.text('Buscar notas…'), findsNothing);
+
+    await tester.tap(find.byTooltip('Buscar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Buscar notas…'), findsOneWidget);
   });
 
   testWidgets('TodosApp builds', (WidgetTester tester) async {

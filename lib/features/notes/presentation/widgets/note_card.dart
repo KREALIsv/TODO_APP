@@ -4,6 +4,7 @@ import '../../../../global/themes/app_colors.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/note_item.dart';
 import 'relative_time.dart';
+import 'tag_pill.dart';
 
 class NoteCard extends StatelessWidget {
   const NoteCard({
@@ -101,6 +102,25 @@ class NoteCard extends StatelessWidget {
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    if (item.tags.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          ...item.tags.take(3).map(
+                                (tag) => TagPill(label: tag),
+                              ),
+                          if (item.tags.length > 3)
+                            Text(
+                              '+${item.tags.length - 3}',
+                              style: textTheme.labelSmall?.copyWith(
+                                color: AppColors.neutral60,
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                     const SizedBox(height: 6),

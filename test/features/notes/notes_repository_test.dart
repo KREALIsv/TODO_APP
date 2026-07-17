@@ -32,6 +32,7 @@ void main() {
     bool pinned = false,
     bool completed = false,
     DateTime? updatedAt,
+    List<String> tags = const [],
   }) {
     final now = DateTime(2026, 7, 16, 12);
     return NoteItem(
@@ -43,6 +44,7 @@ void main() {
       completed: completed,
       createdAt: now,
       updatedAt: updatedAt ?? now,
+      tags: tags,
     );
   }
 
@@ -88,7 +90,12 @@ void main() {
   });
 
   test('toMap and fromMap roundtrip', () {
-    final original = buildItem(id: 'round', type: NoteType.task, pinned: true);
+    final original = buildItem(
+      id: 'round',
+      type: NoteType.task,
+      pinned: true,
+      tags: const ['Work', 'Personal'],
+    );
     final restored = NoteItem.fromMap(original.toMap());
 
     expect(restored.id, original.id);
@@ -99,5 +106,20 @@ void main() {
     expect(restored.completed, original.completed);
     expect(restored.createdAt, original.createdAt);
     expect(restored.updatedAt, original.updatedAt);
+    expect(restored.tags, original.tags);
+  });
+
+  test('fromMap defaults missing tags to empty list', () {
+    final map = buildItem(id: 'legacy').toMap()..remove('tags');
+    final restored = NoteItem.fromMap(map);
+    expect(restored.tags, isEmpty);
+  });
+
+  test('getAllTags returns unique set', () async {
+    await repo.add(buildItem(id: '1', tags: const ['Work', 'Personal']));
+    await repo.add(buildItem(id: '2', tags: const ['Work', 'Ideas']));
+    await repo.add(buildItem(id: '3', tags: const []));
+
+    expect(repo.getAllTags(), {'Work', 'Personal', 'Ideas'});
   });
 }

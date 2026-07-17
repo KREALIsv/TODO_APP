@@ -10,6 +10,7 @@ class NoteItem {
     required this.completed,
     required this.createdAt,
     required this.updatedAt,
+    this.tags = const [],
   });
 
   final String id;
@@ -20,6 +21,7 @@ class NoteItem {
   final bool completed;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<String> tags;
 
   String get preview {
     final source = title.trim().isNotEmpty ? title : body;
@@ -48,6 +50,7 @@ class NoteItem {
       'completed': completed,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'tags': tags,
     };
   }
 
@@ -64,6 +67,11 @@ class NoteItem {
       completed: (map['completed'] as bool?) ?? false,
       createdAt: DateTime.parse(map['createdAt'] as String),
       updatedAt: DateTime.parse(map['updatedAt'] as String),
+      tags: (map['tags'] as List?)
+              ?.map((e) => e.toString())
+              .where((e) => e.trim().isNotEmpty)
+              .toList() ??
+          const [],
     );
   }
 
@@ -76,6 +84,7 @@ class NoteItem {
     bool? completed,
     DateTime? createdAt,
     DateTime? updatedAt,
+    List<String>? tags,
   }) {
     return NoteItem(
       id: id ?? this.id,
@@ -86,6 +95,7 @@ class NoteItem {
       completed: completed ?? this.completed,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      tags: tags ?? this.tags,
     );
   }
 }

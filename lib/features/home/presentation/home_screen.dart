@@ -4,16 +4,37 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../../global/themes/app_colors.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/note_item.dart';
+import '../../notes/domain/notes_filter.dart';
+import '../../notes/domain/notes_query.dart';
 import '../../notes/presentation/note_editor_screen.dart';
+import '../../notes/presentation/widgets/filter_chips_bar.dart';
 import '../../notes/presentation/widgets/note_card.dart';
 import '../../notes/presentation/widgets/quick_capture_field.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.repository});
 
   final NotesRepository? repository;
 
-  NotesRepository get _repo => repository ?? NotesRepository.instance;
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+
+  NotesFilter _activeFilter = NotesFilter.all;
+  bool _isSearchExpanded = false;
+
+  NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
   Future<void> _openEditor(
     BuildContext context, {
@@ -59,8 +80,19 @@ class HomeScreen extends StatelessWidget {
     await _openEditor(context, initialType: type);
   }
 
+  void _toggleSearch() {
+    setState(() {
+      _isSearchExpanded = !_isSearchExpanded;
+      if (_isSearchExpanded) {
+        _searchFocusNode.requestFocus();
+      } else {
+        _searchController.clear();
+        _searchFocusNode.unfocus();
+      }
+    });
+  }
+
   String _formatHeaderDate(DateTime date) {
-    // Avoid intl dependency — format manually to keep deps minimal.
     const months = [
       'Jan',
       'Feb',
@@ -78,10 +110,71 @@ class HomeScreen extends StatelessWidget {
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
+  Widget _buildEmptyState(String message, TextTheme textTheme) {
+    return SliverFillRemaining(
+      hasScrollBody: false,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _searchController.text.trim().isNotEmpty
+                    ? Icons.search_off_outlined
+                    : Icons.edit_note_outlined,
+                size: 48,
+                color: AppColors.neutral40,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                message,
+                style: textTheme.bodyLarge?.copyWith(
+                  color: AppColors.neutral60,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoteList(
+    List<NoteItem> items,
+    void Function(NoteItem item) onTap,
+  ) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+      sliver: SliverList.builder(
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final item = items[index];
+          return NoteCard(
+            item: item,
+            repository: _repo,
+            onTap: () => onTap(item),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, TextTheme textTheme) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Text(title, style: textTheme.headlineSmall),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final today = _formatHeaderDate(DateTime.now());
+    final searchQuery = _searchController.text;
 
     return Scaffold(
       body: SafeArea(
@@ -89,8 +182,22 @@ class HomeScreen extends StatelessWidget {
           valueListenable: _repo.listenable(),
           builder: (context, box, child) {
             final all = _repo.getAll();
-            final pinned = all.where((item) => item.pinned).toList();
-            final recent = all.where((item) => !item.pinned).toList();
+            final useSectioned = NotesQuery.useSectionedLayout(
+              filter: _activeFilter,
+              searchQuery: searchQuery,
+            );
+            final filtered = NotesQuery.apply(
+              items: all,
+              filter: _activeFilter,
+              searchQuery: searchQuery,
+            );
+            final pinned = NotesQuery.pinnedFrom(filtered);
+            final recent = NotesQuery.recentFrom(filtered);
+            final emptyMessage = NotesQuery.emptyMessage(
+              filter: _activeFilter,
+              searchQuery: searchQuery,
+              hasAnyItems: all.isNotEmpty,
+            );
 
             return CustomScrollView(
               slivers: [
@@ -118,6 +225,20 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                         IconButton(
+                          tooltip: _isSearchExpanded
+                              ? 'Cerrar búsqueda'
+                              : 'Buscar',
+                          onPressed: _toggleSearch,
+                          icon: Icon(
+                            _isSearchExpanded
+                                ? Icons.close
+                                : Icons.search,
+                            color: _isSearchExpanded
+                                ? AppColors.primary
+                                : AppColors.neutral60,
+                          ),
+                        ),
+                        IconButton(
                           tooltip: 'Ajustes',
                           onPressed: () {},
                           icon: const Icon(
@@ -129,47 +250,54 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (_isSearchExpanded)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        textInputAction: TextInputAction.search,
+                        onChanged: (_) => setState(() {}),
+                        decoration: InputDecoration(
+                          hintText: 'Buscar notas…',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: searchQuery.trim().isNotEmpty
+                              ? IconButton(
+                                  tooltip: 'Limpiar',
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {});
+                                  },
+                                  icon: const Icon(Icons.clear),
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ),
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                     child: QuickCaptureField(repository: _repo),
                   ),
                 ),
-                if (all.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.edit_note_outlined,
-                              size: 48,
-                              color: AppColors.neutral40,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Tu primera nota está a un tap',
-                              style: textTheme.bodyLarge?.copyWith(
-                                color: AppColors.neutral60,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: FilterChipsBar(
+                      activeFilter: _activeFilter,
+                      onFilterChanged: (filter) {
+                        setState(() => _activeFilter = filter);
+                      },
                     ),
-                  )
-                else ...[
+                  ),
+                ),
+                if (filtered.isEmpty)
+                  _buildEmptyState(emptyMessage, textTheme)
+                else if (useSectioned) ...[
                   if (pinned.isNotEmpty) ...[
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Text('Fijadas', style: textTheme.headlineSmall),
-                      ),
-                    ),
+                    _buildSectionHeader('Fijadas', textTheme),
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       sliver: SliverList.builder(
@@ -185,12 +313,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                   ],
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: Text('Recientes', style: textTheme.headlineSmall),
-                    ),
-                  ),
+                  _buildSectionHeader('Recientes', textTheme),
                   if (recent.isEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
@@ -202,20 +325,21 @@ class HomeScreen extends StatelessWidget {
                       ),
                     )
                   else
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
-                      sliver: SliverList.builder(
-                        itemCount: recent.length,
-                        itemBuilder: (context, index) {
-                          final item = recent[index];
-                          return NoteCard(
-                            item: item,
-                            repository: _repo,
-                            onTap: () => _openEditor(context, item: item),
-                          );
-                        },
-                      ),
+                    _buildNoteList(
+                      recent,
+                      (item) => _openEditor(context, item: item),
                     ),
+                ] else ...[
+                  _buildSectionHeader(
+                    searchQuery.trim().isNotEmpty
+                        ? 'Resultados'
+                        : _activeFilter.listHeader,
+                    textTheme,
+                  ),
+                  _buildNoteList(
+                    filtered,
+                    (item) => _openEditor(context, item: item),
+                  ),
                 ],
               ],
             );

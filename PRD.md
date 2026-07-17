@@ -310,25 +310,34 @@ Instrumentación mínima: `note_created`, `note_opened`, `note_pinned`, `task_co
 
 ## 14. Criterios de done (MVP)
 
-- [ ] Home muestra captura rápida + fijadas + recientes
-- [ ] Crear nota < 5 s en flujo feliz
-- [ ] Buscar y abrir nota existente
-- [ ] Convertir nota ↔ tarea
-- [ ] Completar tarea actualiza UI y actividad
+- [x] Home muestra captura rápida + fijadas + recientes
+- [x] Crear nota < 5 s en flujo feliz
+- [x] Buscar y abrir nota existente
+- [x] Convertir nota ↔ tarea
+- [ ] Completar tarea actualiza UI y actividad (UI ✓ · activity/streak pendiente)
 - [ ] Activity no ocupa más de ~30% del primer viewport
-- [ ] Empty states y undo en delete/archive
-- [ ] Pruebas unitarias del modelo Note/Task + repository
+- [x] Empty states y undo en delete (archive pendiente)
+- [x] Pruebas unitarias del modelo Note/Task + repository
 - [ ] QA manual iOS + Android en viewport pequeño
 
 ---
 
-## 15. Open questions
+## 15. Decisiones de producto
 
-1. ¿Las “tareas de hoy” siguen siendo una vista dedicada o solo un filtro?
-2. ¿Pin y Favorito son lo mismo o conceptos distintos?
-3. ¿El heatmap cuenta solo días con captura, o también solo lectura?
-4. ¿Archivar es soft-delete con papelera, o ocultar sin recovery?
-5. ¿Queremos tabs Notas | Tareas en bottom nav, o todo vive en Home?
+### Cerradas (v1)
+
+| # | Pregunta | Decisión | Evidencia |
+|---|---|---|---|
+| 1 | ¿“Tareas de hoy” como vista dedicada o filtro? | **Solo filtro.** No hay pantalla “Today’s Tasks”; las tareas se filtran desde Home. | Chips de filtro + secciones Fijadas/Recientes |
+| 2 | ¿Pin y Favorito son lo mismo? | **Sí, en v1.** Solo existe `pinned`; no hay star/favorito separado. | Modelo `NoteItem.pinned`, UI de pin |
+| 5 | ¿Tabs Notas \| Tareas en bottom nav? | **No.** Todo vive en Home; sin bottom nav multi-tab por ahora. | Una sola `HomeScreen` como raíz |
+
+### Pendientes (bloquean features futuras)
+
+| # | Pregunta | Cuándo decidir |
+|---|---|---|
+| 3 | ¿El heatmap cuenta solo días con captura, o también solo lectura? | Antes de implementar Activity compacta (§6.7) |
+| 4 | ¿Archivar es soft-delete con papelera, o ocultar sin recovery? | Antes de implementar swipe archivar (§6.10) |
 
 ---
 
@@ -345,4 +354,4 @@ Instrumentación mínima: `note_created`, `note_opened`, `note_pinned`, `task_co
 
 **Owner:** Product / Design  
 **Engineering:** Flutter app (`todos_app`)  
-**Próximo paso:** validar open questions → wireframes high-fi → sprint MVP
+**Próximo paso:** autoguardado en editor → activity compacta → filtro por tag (P1)

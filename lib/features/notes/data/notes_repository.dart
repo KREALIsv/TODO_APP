@@ -72,6 +72,15 @@ class NotesRepository {
     );
   }
 
+  /// Unique tags across all notes, for autocomplete.
+  Set<String> getAllTags() {
+    final tags = <String>{};
+    for (final item in getAll()) {
+      tags.addAll(item.tags);
+    }
+    return tags;
+  }
+
   @visibleForTesting
   Future<void> clear() async {
     await _box.clear();

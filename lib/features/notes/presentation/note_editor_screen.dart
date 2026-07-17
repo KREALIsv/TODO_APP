@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../global/themes/app_colors.dart';
 import '../data/notes_repository.dart';
 import '../domain/note_item.dart';
+import 'widgets/tags_editor.dart';
 
 class NoteEditorScreen extends StatefulWidget {
   const NoteEditorScreen({
@@ -27,6 +28,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   late NoteType _type;
   late bool _pinned;
   late bool _completed;
+  late List<String> _tags;
   static const _uuid = Uuid();
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
@@ -42,6 +44,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _type = item?.type ?? widget.initialType;
     _pinned = item?.pinned ?? false;
     _completed = item?.completed ?? false;
+    _tags = List<String>.from(item?.tags ?? const []);
   }
 
   @override
@@ -76,6 +79,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           completed: _type == NoteType.task ? _completed : false,
           createdAt: now,
           updatedAt: now,
+          tags: _tags,
         ),
       );
     } else {
@@ -87,6 +91,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           pinned: _pinned,
           completed: _type == NoteType.task ? _completed : false,
           updatedAt: now,
+          tags: _tags,
         ),
       );
     }
@@ -198,6 +203,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               hintText: 'Escribe aquí…',
               alignLabelWithHint: true,
             ),
+          ),
+          const SizedBox(height: 24),
+          TagsEditor(
+            tags: _tags,
+            suggestions: _repo.getAllTags(),
+            onChanged: (tags) => setState(() => _tags = tags),
           ),
         ],
       ),
