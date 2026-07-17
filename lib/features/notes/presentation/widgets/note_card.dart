@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../global/themes/app_colors.dart';
+import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/note_item.dart';
 import 'relative_time.dart';
@@ -25,16 +26,12 @@ class NoteCard extends StatelessWidget {
     await _repo.delete(item.id);
 
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Nota eliminada'),
-        action: SnackBarAction(
-          label: 'Deshacer',
-          onPressed: () => _repo.add(deleted),
-        ),
-        duration: const Duration(seconds: 4),
-      ),
+    await AppAlerts.showWithAction(
+      context,
+      message: 'Nota eliminada',
+      type: AppAlertType.success,
+      actionLabel: 'Deshacer',
+      onAction: () => _repo.add(deleted),
     );
   }
 

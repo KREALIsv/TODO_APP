@@ -79,4 +79,46 @@ void main() {
 
     expect(tags.contains('Work'), isFalse);
   });
+
+  testWidgets('TagsEditor dropdown filters and paginates suggestions', (
+    WidgetTester tester,
+  ) async {
+    final suggestions = {
+      for (var i = 1; i <= 12; i++) 'Cat${i.toString().padLeft(2, '0')}',
+    };
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TagsEditor(
+            tags: const [],
+            suggestions: suggestions,
+            pageSize: 5,
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cat01'), findsOneWidget);
+    expect(find.text('Ver más (7)'), findsOneWidget);
+
+    await tester.tap(find.text('Ver más (7)'));
+    await tester.pumpAndSettle();
+
+    // Segunda página: quedan 2 de 12 con pageSize 5.
+    expect(find.text('Ver más (2)'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'Cat1');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cat10'), findsOneWidget);
+    expect(find.text('Cat11'), findsOneWidget);
+    expect(find.text('Cat12'), findsOneWidget);
+    expect(find.text('Cat02'), findsNothing);
+    expect(find.textContaining('Ver más'), findsNothing);
+  });
 }

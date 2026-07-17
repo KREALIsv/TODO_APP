@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/note_item.dart';
 
@@ -49,11 +50,10 @@ class _QuickCaptureFieldState extends State<QuickCaptureField> {
     _focusNode.unfocus();
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Nota guardada'),
-        duration: Duration(seconds: 2),
-      ),
+    await AppAlerts.show(
+      context,
+      message: 'Nota guardada',
+      type: AppAlertType.success,
     );
   }
 

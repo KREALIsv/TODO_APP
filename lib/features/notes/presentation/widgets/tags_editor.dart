@@ -1,65 +1,57 @@
 import 'package:flutter/material.dart';
 
 import '../../../../global/themes/app_colors.dart';
+import '../../../../global/widgets/app_alerts.dart';
+import '../../../../global/widgets/searchable_dropdown.dart';
 import 'tag_pill.dart';
 
-class TagsEditor extends StatefulWidget {
+/// Editor de etiquetas sobre [SearchableDropdown] compartido.
+class TagsEditor extends StatelessWidget {
   const TagsEditor({
     super.key,
     required this.tags,
     required this.suggestions,
     required this.onChanged,
     this.maxTags = 10,
+    this.pageSize = 8,
   });
 
   final List<String> tags;
   final Set<String> suggestions;
   final ValueChanged<List<String>> onChanged;
   final int maxTags;
+  final int pageSize;
 
-  @override
-  State<TagsEditor> createState() => _TagsEditorState();
-}
-
-class _TagsEditorState extends State<TagsEditor> {
-  int _autocompleteKey = 0;
-
-  void _tryAdd(String raw) {
+  void _tryAdd(BuildContext context, String raw) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return;
 
-    if (widget.tags.length >= widget.maxTags) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Máximo 10 etiquetas')),
+    if (tags.length >= maxTags) {
+      AppAlerts.show(
+        context,
+        message: 'Máximo $maxTags etiquetas',
+        type: AppAlertType.warning,
       );
       return;
     }
 
-    final exists = widget.tags.any(
+    final exists = tags.any(
       (tag) => tag.toLowerCase() == trimmed.toLowerCase(),
     );
-    if (exists) {
-      setState(() => _autocompleteKey++);
-      return;
-    }
+    if (exists) return;
 
-    widget.onChanged([...widget.tags, trimmed]);
-    setState(() => _autocompleteKey++);
+    onChanged([...tags, trimmed]);
   }
 
   void _remove(String tag) {
-    widget.onChanged(widget.tags.where((t) => t != tag).toList());
+    onChanged(tags.where((t) => t != tag).toList());
   }
 
-  Iterable<String> _optionsFor(String query) {
-    final existing = widget.tags.map((t) => t.toLowerCase()).toSet();
-    final q = query.trim().toLowerCase();
-    final list = widget.suggestions
+  Set<String> get _availableSuggestions {
+    final existing = tags.map((t) => t.toLowerCase()).toSet();
+    return suggestions
         .where((s) => !existing.contains(s.toLowerCase()))
-        .where((s) => q.isEmpty || s.toLowerCase().contains(q))
-        .toList()
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    return list;
+        .toSet();
   }
 
   @override
@@ -71,13 +63,13 @@ class _TagsEditorState extends State<TagsEditor> {
       children: [
         Text('Etiquetas', style: textTheme.labelLarge),
         const SizedBox(height: 8),
-        if (widget.tags.isNotEmpty)
+        if (tags.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: widget.tags
+              children: tags
                   .map(
                     (tag) => TagPill(
                       label: tag,
@@ -87,64 +79,17 @@ class _TagsEditorState extends State<TagsEditor> {
                   .toList(),
             ),
           ),
-        Autocomplete<String>(
-          key: ValueKey(_autocompleteKey),
-          optionsBuilder: (textEditingValue) {
-            return _optionsFor(textEditingValue.text);
-          },
-          onSelected: _tryAdd,
-          fieldViewBuilder: (
-            context,
-            textController,
-            focusNode,
-            onFieldSubmitted,
-          ) {
-            return TextField(
-              controller: textController,
-              focusNode: focusNode,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (value) {
-                _tryAdd(value);
-                onFieldSubmitted();
-              },
-              decoration: const InputDecoration(
-                hintText: 'Añadir tag…',
-                prefixIcon: Icon(Icons.sell_outlined),
-                isDense: true,
-              ),
-            );
-          },
-          optionsViewBuilder: (context, onSelected, options) {
-            if (options.isEmpty) return const SizedBox.shrink();
-            return Align(
-              alignment: Alignment.topLeft,
-              child: Material(
-                elevation: 4,
-                borderRadius: BorderRadius.circular(8),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxHeight: 160,
-                    maxWidth: 280,
-                  ),
-                  child: ListView.builder(
-                    padding: EdgeInsets.zero,
-                    shrinkWrap: true,
-                    itemCount: options.length,
-                    itemBuilder: (context, index) {
-                      final option = options.elementAt(index);
-                      return ListTile(
-                        dense: true,
-                        title: Text(option),
-                        onTap: () => onSelected(option),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            );
-          },
+        SearchableDropdown(
+          options: _availableSuggestions,
+          pageSize: pageSize,
+          hintText: 'Buscar o añadir…',
+          emptyMessage: 'No hay más categorías',
+          noResultsMessage: 'Sin resultados',
+          expandTooltip: 'Ver categorías',
+          createLabelBuilder: (query) => 'Crear "$query"',
+          onSelected: (value) => _tryAdd(context, value),
         ),
-        if (widget.tags.isEmpty)
+        if (tags.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(

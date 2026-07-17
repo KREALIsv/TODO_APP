@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../global/themes/app_colors.dart';
+import '../../../global/widgets/app_alerts.dart';
 import '../data/notes_repository.dart';
+import '../data/tags_repository.dart';
 import '../domain/note_item.dart';
 import 'widgets/tags_editor.dart';
 
@@ -12,11 +14,13 @@ class NoteEditorScreen extends StatefulWidget {
     this.item,
     this.initialType = NoteType.note,
     this.repository,
+    this.tagsRepository,
   });
 
   final NoteItem? item;
   final NoteType initialType;
   final NotesRepository? repository;
+  final TagsRepository? tagsRepository;
 
   @override
   State<NoteEditorScreen> createState() => _NoteEditorScreenState();
@@ -32,6 +36,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   static const _uuid = Uuid();
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
+  TagsRepository get _tagsRepo =>
+      widget.tagsRepository ?? TagsRepository.instance;
 
   bool get _isEditing => widget.item != null;
 
@@ -59,14 +65,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final body = _bodyController.text.trim();
 
     if (title.isEmpty && body.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Escribe un título o contenido')),
+      await AppAlerts.show(
+        context,
+        message: 'Escribe un título o contenido',
+        type: AppAlertType.warning,
       );
       return;
     }
 
     final now = DateTime.now();
     final existing = widget.item;
+
+    // El catálogo crece con cada etiqueta nueva al guardar.
+    await _tagsRepo.ensureTags(_tags);
 
     if (existing == null) {
       await _repo.add(
@@ -104,25 +115,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final item = widget.item;
     if (item == null) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Eliminar'),
-        content: const Text('¿Seguro que quieres eliminar esta nota?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
+    final confirmed = await AppAlerts.confirm(
+      context,
+      title: 'Eliminar',
+      message: '¿Seguro que quieres eliminar esta nota?',
+      confirmLabel: 'Eliminar',
+      isDestructive: true,
     );
 
-    if (confirmed != true) return;
+    if (!confirmed) return;
     await _repo.delete(item.id);
     if (!mounted) return;
     Navigator.of(context).pop();
@@ -207,7 +208,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           const SizedBox(height: 24),
           TagsEditor(
             tags: _tags,
-            suggestions: _repo.getAllTags(),
+            suggestions: {
+              ..._tagsRepo.getAllAsSet(),
+              ..._repo.getAllTags(),
+            },
             onChanged: (tags) => setState(() => _tags = tags),
           ),
         ],
