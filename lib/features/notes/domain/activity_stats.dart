@@ -1,8 +1,8 @@
+import 'date_only.dart';
 import 'note_item.dart';
+import 'task_dates.dart';
 
-/// Date-only helper (local calendar day, time zeroed).
-DateTime dateOnly(DateTime value) =>
-    DateTime(value.year, value.month, value.day);
+export 'date_only.dart';
 
 /// Monday of the week containing [value] (local calendar).
 DateTime startOfWeek(DateTime value) {
@@ -11,21 +11,37 @@ DateTime startOfWeek(DateTime value) {
 }
 
 /// Active days and per-day event counts from note write activity.
+/// Archived items are ignored. Completions prefer [completedAt].
 ({Set<DateTime> activeDays, Map<DateTime, int> eventCounts})
     activityMetricsFrom(List<NoteItem> items) {
   final activeDays = <DateTime>{};
   final eventCounts = <DateTime, int>{};
 
+  void bump(DateTime day) {
+    activeDays.add(day);
+    eventCounts[day] = (eventCounts[day] ?? 0) + 1;
+  }
+
   for (final item in items) {
+    if (item.isArchived) continue;
+
     final createdDay = dateOnly(item.createdAt);
-    final updatedDay = dateOnly(item.updatedAt);
+    bump(createdDay);
 
-    activeDays.add(createdDay);
-    activeDays.add(updatedDay);
-
-    eventCounts[createdDay] = (eventCounts[createdDay] ?? 0) + 1;
-    if (updatedDay != createdDay) {
-      eventCounts[updatedDay] = (eventCounts[updatedDay] ?? 0) + 1;
+    if (item.completed && item.completedAt != null) {
+      final completedDay = dateOnly(item.completedAt!);
+      if (completedDay != createdDay) {
+        bump(completedDay);
+      }
+      final updatedDay = dateOnly(item.updatedAt);
+      if (updatedDay != createdDay && updatedDay != completedDay) {
+        bump(updatedDay);
+      }
+    } else {
+      final updatedDay = dateOnly(item.updatedAt);
+      if (updatedDay != createdDay) {
+        bump(updatedDay);
+      }
     }
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../domain/note_item.dart';
+import '../domain/task_dates.dart';
 
 class NotesRepository {
   NotesRepository._();
@@ -24,11 +25,27 @@ class NotesRepository {
 
   ValueListenable<Box<Map>> listenable() => _box.listenable();
 
-  List<NoteItem> getAll() {
-    final items = _box.values
+  List<NoteItem> _readAllRaw() {
+    return _box.values
         .map((raw) => NoteItem.fromMap(Map<dynamic, dynamic>.from(raw)))
         .toList();
+  }
+
+  /// Active (non-archived) items, sorted by [updatedAt] desc.
+  List<NoteItem> getAll() {
+    final items = _readAllRaw().where((item) => !item.isArchived).toList();
     items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return items;
+  }
+
+  /// Archived items sorted by [archivedAt] desc.
+  List<NoteItem> getArchived() {
+    final items = _readAllRaw().where((item) => item.isArchived).toList();
+    items.sort((a, b) {
+      final aAt = a.archivedAt ?? a.updatedAt;
+      final bAt = b.archivedAt ?? b.updatedAt;
+      return bAt.compareTo(aAt);
+    });
     return items;
   }
 
@@ -64,15 +81,53 @@ class NotesRepository {
   Future<void> toggleCompleted(String id) async {
     final current = getById(id);
     if (current == null || current.type != NoteType.task) return;
+    final now = DateTime.now();
+    final nextCompleted = !current.completed;
     await update(
       current.copyWith(
-        completed: !current.completed,
+        completed: nextCompleted,
+        completedAt: nextCompleted ? now : null,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  Future<void> setTodayCommitment(String id, bool on) async {
+    final current = getById(id);
+    if (current == null || current.type != NoteType.task) return;
+    final now = DateTime.now();
+    await update(
+      current.copyWith(
+        todayAt: on ? now : null,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  Future<void> archive(String id) async {
+    final current = getById(id);
+    if (current == null || current.isArchived) return;
+    final now = DateTime.now();
+    await update(
+      current.copyWith(
+        archivedAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  Future<void> restore(String id) async {
+    final current = getById(id);
+    if (current == null || !current.isArchived) return;
+    await update(
+      current.copyWith(
+        archivedAt: null,
         updatedAt: DateTime.now(),
       ),
     );
   }
 
-  /// Unique tags across all notes, for autocomplete.
+  /// Unique tags across active notes, for autocomplete.
   Set<String> getAllTags() {
     final tags = <String>{};
     for (final item in getAll()) {

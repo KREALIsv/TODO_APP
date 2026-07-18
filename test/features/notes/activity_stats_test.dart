@@ -189,6 +189,51 @@ void main() {
     });
   });
 
+  group('archived and completedAt', () {
+    test('archived items are excluded from metrics', () {
+      final items = [
+        note(id: '1', createdAt: DateTime(2026, 7, 16, 10)),
+        NoteItem(
+          id: '2',
+          type: NoteType.task,
+          title: 'Archived',
+          body: '',
+          pinned: false,
+          completed: false,
+          createdAt: DateTime(2026, 7, 16, 11),
+          updatedAt: DateTime(2026, 7, 16, 11),
+          archivedAt: DateTime(2026, 7, 16, 12),
+        ),
+      ];
+      final days = activeDaysFrom(items);
+      expect(days, {DateTime(2026, 7, 16)});
+      // Only the non-archived create event.
+      expect(dayEventCounts(items)[DateTime(2026, 7, 16)], 1);
+    });
+
+    test('completedAt counts as activity day', () {
+      final items = [
+        NoteItem(
+          id: '1',
+          type: NoteType.task,
+          title: 'Task',
+          body: '',
+          pinned: false,
+          completed: true,
+          createdAt: DateTime(2026, 7, 14, 10),
+          updatedAt: DateTime(2026, 7, 16, 10),
+          completedAt: DateTime(2026, 7, 15, 18),
+        ),
+      ];
+      final days = activeDaysFrom(items);
+      expect(days, {
+        DateTime(2026, 7, 14),
+        DateTime(2026, 7, 15),
+        DateTime(2026, 7, 16),
+      });
+    });
+  });
+
   group('contentCounts', () {
     test('counts notes, tasks and pending tasks', () {
       final items = [

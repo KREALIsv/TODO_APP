@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../global/themes/app_colors.dart';
@@ -6,10 +7,13 @@ import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/note_item.dart';
 import '../../notes/domain/notes_filter.dart';
 import '../../notes/domain/notes_query.dart';
+import '../../notes/domain/task_groups.dart';
 import '../../notes/presentation/note_editor_screen.dart';
 import '../../notes/presentation/widgets/filter_chips_bar.dart';
-import '../../notes/presentation/widgets/note_card.dart';
+import '../../notes/presentation/widgets/grouped_tasks_sliver.dart';
 import '../../notes/presentation/widgets/quick_capture_field.dart';
+import '../../notes/presentation/widgets/swipeable_note_card.dart';
+import '../../notes/presentation/widgets/task_section_header.dart';
 import '../../profile/presentation/profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -27,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   NotesFilter _activeFilter = NotesFilter.all;
   bool _isSearchExpanded = false;
+  bool _completedExpanded = false;
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
 
@@ -159,30 +164,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildNoteList(
     List<NoteItem> items,
-    void Function(NoteItem item) onTap,
-  ) {
+    void Function(NoteItem item) onTap, {
+    bool archived = false,
+    double bottomPadding = 88,
+  }) {
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+      padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
       sliver: SliverList.builder(
         itemCount: items.length,
         itemBuilder: (context, index) {
           final item = items[index];
-          return NoteCard(
+          return SwipeableNoteCard(
             item: item,
             repository: _repo,
             onTap: () => onTap(item),
+            enableSwipe: !archived,
+            showArchiveActions: archived,
           );
         },
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, TextTheme textTheme) {
+  Widget _buildSectionHeader(String title) {
     return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: Text(title, style: textTheme.headlineSmall),
-      ),
+      child: TaskSectionHeader(title: title),
     );
   }
 
@@ -299,8 +305,14 @@ class _HomeScreenState extends State<HomeScreen> {
       body: ValueListenableBuilder<Box<Map>>(
         valueListenable: _repo.listenable(),
         builder: (context, box, child) {
-          final all = _repo.getAll();
+          final isArchivedFilter = _activeFilter == NotesFilter.archived;
+          final all =
+              isArchivedFilter ? _repo.getArchived() : _repo.getAll();
           final useSectioned = NotesQuery.useSectionedLayout(
+            filter: _activeFilter,
+            searchQuery: searchQuery,
+          );
+          final useGrouped = NotesQuery.useGroupedTasksLayout(
             filter: _activeFilter,
             searchQuery: searchQuery,
           );
@@ -316,76 +328,90 @@ class _HomeScreenState extends State<HomeScreen> {
             searchQuery: searchQuery,
             hasAnyItems: all.isNotEmpty,
           );
+          final groups = useGrouped
+              ? TaskGroupsQuery.from(filtered)
+              : null;
 
-          return CustomScrollView(
-            slivers: [
-              _buildSliverAppBar(textTheme, searchQuery),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: QuickCaptureField(repository: _repo),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: FilterChipsBar(
-                    activeFilter: _activeFilter,
-                    onFilterChanged: (filter) {
-                      setState(() => _activeFilter = filter);
-                    },
+          return SlidableAutoCloseBehavior(
+            child: CustomScrollView(
+              slivers: [
+                _buildSliverAppBar(textTheme, searchQuery),
+                if (!isArchivedFilter)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: QuickCaptureField(repository: _repo),
+                    ),
                   ),
-                ),
-              ),
-              if (filtered.isEmpty)
-                _buildEmptyState(emptyMessage, textTheme)
-              else if (useSectioned) ...[
-                if (pinned.isNotEmpty) ...[
-                  _buildSectionHeader('Fijadas', textTheme),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverList.builder(
-                      itemCount: pinned.length,
-                      itemBuilder: (context, index) {
-                        final item = pinned[index];
-                        return NoteCard(
-                          item: item,
-                          repository: _repo,
-                          onTap: () => _openEditor(context, item: item),
-                        );
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: FilterChipsBar(
+                      activeFilter: _activeFilter,
+                      onFilterChanged: (filter) {
+                        setState(() {
+                          _activeFilter = filter;
+                          _completedExpanded = false;
+                        });
                       },
                     ),
                   ),
-                ],
-                _buildSectionHeader('Recientes', textTheme),
-                if (recent.isEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'No hay notas recientes',
-                        style: textTheme.bodyMedium,
-                      ),
-                    ),
+                ),
+                if (useGrouped && groups != null && !groups.isEmpty)
+                  ...buildGroupedTasksSlivers(
+                    groups: groups,
+                    onOpen: (item) => _openEditor(context, item: item),
+                    repository: _repo,
+                    textTheme: textTheme,
+                    completedExpanded: _completedExpanded,
+                    onToggleCompleted: () {
+                      setState(
+                        () => _completedExpanded = !_completedExpanded,
+                      );
+                    },
                   )
-                else
-                  _buildNoteList(
-                    recent,
-                    (item) => _openEditor(context, item: item),
+                else if (filtered.isEmpty ||
+                    (useGrouped && groups != null && groups.isEmpty))
+                  _buildEmptyState(emptyMessage, textTheme)
+                else if (useSectioned) ...[
+                  if (pinned.isNotEmpty) ...[
+                    _buildSectionHeader('Fijadas'),
+                    _buildNoteList(
+                      pinned,
+                      (item) => _openEditor(context, item: item),
+                      bottomPadding: 0,
+                    ),
+                  ],
+                  _buildSectionHeader('Recientes'),
+                  if (recent.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'No hay notas recientes',
+                          style: textTheme.bodyMedium,
+                        ),
+                      ),
+                    )
+                  else
+                    _buildNoteList(
+                      recent,
+                      (item) => _openEditor(context, item: item),
+                    ),
+                ] else ...[
+                  _buildSectionHeader(
+                    searchQuery.trim().isNotEmpty
+                        ? 'Resultados'
+                        : _activeFilter.listHeader,
                   ),
-              ] else ...[
-                _buildSectionHeader(
-                  searchQuery.trim().isNotEmpty
-                      ? 'Resultados'
-                      : _activeFilter.listHeader,
-                  textTheme,
-                ),
-                _buildNoteList(
-                  filtered,
-                  (item) => _openEditor(context, item: item),
-                ),
+                  _buildNoteList(
+                    filtered,
+                    (item) => _openEditor(context, item: item),
+                    archived: isArchivedFilter,
+                  ),
+                ],
               ],
-            ],
+            ),
           );
         },
       ),

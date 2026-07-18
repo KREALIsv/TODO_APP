@@ -157,25 +157,30 @@ Con chip **Tareas** activo y sin búsqueda:
 - `0/0`: no se muestra badge.
 - Al llegar a `Y/Y` con `Y ≥ 1`: estado visual de celebración sutil (color pleno; sin confetti).
 
-### 6.4 Switch "Meta de hoy" (P0)
+### 6.4 Compromiso "Hoy" (P0)
 
-**En el editor** (solo si `type == task`):
-- Row: label `Meta de hoy` + `Switch`.
-- ON → `todayAt = now`; OFF → `todayAt = null`.
-- Si `todayAt` existe pero es de un día anterior, el switch se muestra OFF (auto-expiró).
+**En el editor** (solo si `type == task`): selector exclusivo **¿Cuándo?** (ver §6.5). El chip **Hoy** setea `todayAt = now` y limpia `dueAt`. Si `todayAt` existe pero es de un día anterior, el chip no aparece seleccionado (auto-expiró).
+
+Al guardar una tarea que queda en el grupo Hoy: snackbar `Sumada a Hoy · X/Y done` (crear) o `En Hoy · X/Y done` (editar). Completar sigue siendo gesto de lista (checkbox/swipe), no control del editor.
 
 **Desde la card (acceso rápido):**
 - Long-press en card de tarea → menú contextual: `Hacer hoy` / `Quitar de hoy`, `Archivar`, `Eliminar`.
 
-### 6.5 Fecha límite en editor (P0)
+### 6.5 Selector «¿Cuándo?» en editor (P0)
 
-Sección `Fecha límite` en editor (solo tasks):
+Sección tras título/contenido (solo tasks). Chips exclusivos:
 
-- Estado sin fecha: botón `+ Añadir fecha límite`.
-- Tap → `showDatePicker`; tras elegir día, opción `Añadir hora` (opcional) → `showTimePicker` → `dueHasTime = true`.
-- Con fecha: chip con la fecha (`Vence 23 Jul` / `Vence hoy · 10:00 AM`) + icono `×` para **quitar la fecha** (vuelve a sin fecha).
-- Editar fecha: tap en el chip reabre el picker.
+| Chip | Persistencia |
+|---|---|
+| **Hoy** | `todayAt = now`, `dueAt = null`, `dueHasTime = false` |
+| **Mañana** | `dueAt = dateOnly(mañana)`, `todayAt = null` |
+| **Fecha…** | `showDatePicker` → `dueAt`; hora opcional vía `+ Hora` (`dueHasTime = true`); `todayAt = null` |
+| **Algún día** | `dueAt = null`, `todayAt = null` |
+
+- Hidratación al editar: compromiso hoy → Hoy; due mañana sin hora → Mañana; otro `dueAt` → Fecha; else → Algún día.
+- Sin diálogo obligatorio de hora tras elegir día.
 - Sin validaciones de rango: se permiten fechas pasadas (nace vencida, decisión consciente del usuario).
+- Completar no vive en el editor; Archivar + Eliminar sí (AppBar, solo en edición).
 
 ### 6.6 Card de tarea (P0 — rediseño ligero)
 
@@ -187,7 +192,7 @@ Sección `Fecha límite` en editor (solo tasks):
 
 | Estado | Render |
 |---|---|
-| Vencida | `⚠ Vencida · 14 Jul` en color error/rojo suave |
+| Vencida | Tag pill rojo suave: `🕐 14 Jul` (fondo error al 12%, texto/icono error) |
 | Vence hoy sin hora | `Vence hoy` en primary |
 | Vence hoy con hora | `🕐 10:00 AM` en primary |
 | Próxima | `23 Jul` en neutral |
@@ -263,7 +268,7 @@ Sobre cards en cualquier lista (usando `Dismissible`/`Slidable` con backgrounds 
 Home → chip Tareas → long-press en tarea → `Hacer hoy` → sube al grupo Hoy → badge pasa de `2/5` a `2/6`
 
 ### F2 — Deadline
-Abrir tarea → `+ Añadir fecha límite` → elegir día (+ hora opcional) → guardar → card muestra `Vence 23 Jul` → el día 23 aparece en Hoy automáticamente
+Abrir tarea → chip `Fecha…` → elegir día (+ hora opcional) → guardar → card muestra `Vence 23 Jul` → el día 23 aparece en Hoy automáticamente
 
 ### F3 — Despachar
 Vista Tareas → swipe derecha → tachada + `completedAt` → badge `3/6` → toast con Deshacer
@@ -316,7 +321,7 @@ Instrumentación mínima: `task_due_set`, `task_today_toggled`, `task_completed_
 
 ### v1 (este PRD — MVP del slice)
 - Campos `dueAt` / `dueHasTime` / `todayAt` / `completedAt` / `archivedAt`
-- Editor: fecha límite + switch Meta de hoy
+- Editor: selector «¿Cuándo?» (Hoy / Mañana / Fecha / Algún día)
 - Vista Tareas agrupada + badge `X/Y done`
 - Card: badge de fecha, limpieza de botones
 - Swipe completar / archivar con undo
@@ -344,7 +349,7 @@ Instrumentación mínima: `task_due_set`, `task_today_toggled`, `task_completed_
 | Riesgo | Mitigación |
 |---|---|
 | Grupo Hoy se llena de vencidas viejas y desmotiva | Vencidas arriba pero visualmente diferenciadas; v1.1 añade "Reprogramar" en bloque |
-| Confusión switch Hoy vs due hoy | Copy distinto (`Meta de hoy` vs `Vence hoy`) e iconos distintos (☀ vs 🕐/⚠) |
+| Confusión Hoy vs due hoy | Selector exclusivo «¿Cuándo?»; en cards, iconos distintos (☀ vs 🕐/⚠) |
 | Swipe accidental | Umbral estándar + undo 4 s en todas las acciones |
 | Usuario no descubre long-press | Editor mantiene todas las acciones; onboarding tooltip 1 vez en primera tarea |
 | `todayAt` bool-like mal implementado (no expira) | Regla explícita §6.1: cuenta solo si es del día actual; test unitario de expiración |
@@ -365,7 +370,7 @@ Instrumentación mínima: `task_due_set`, `task_today_toggled`, `task_completed_
 ## 14. Criterios de done (v1)
 
 - [ ] Tarea puede crearse sin fecha, con fecha, y con fecha+hora; la fecha puede quitarse
-- [ ] Switch Meta de hoy funciona desde editor y long-press, y expira solo al día siguiente
+- [ ] Chip Hoy del selector «¿Cuándo?» y long-press «Hacer hoy» funcionan, y el compromiso expira solo al día siguiente
 - [ ] Grupo Hoy cumple exactamente §6.2 (incl. vencidas y completadas de hoy) con tests
 - [ ] Badge `X/Y done` correcto en todos los estados (0/0 oculto, Y/Y celebración)
 - [ ] Swipe derecha completa / izquierda archiva, ambos con undo funcional
@@ -410,10 +415,11 @@ Instrumentación mínima: `task_due_set`, `task_today_toggled`, `task_completed_
 |---|---|
 | Grupo | `Hoy` / `Próximas` / `Sin fecha` / `Completadas (N)` |
 | Badge | `2/5 done` (evaluar `2/5 hechas` para ES puro) |
-| Switch editor | `Meta de hoy` |
+| Selector editor | `¿Cuándo?` · `Hoy` / `Mañana` / `Fecha…` / `Algún día` |
 | Long-press | `Hacer hoy` / `Quitar de hoy` / `Archivar` / `Eliminar` |
-| Fecha editor | `+ Añadir fecha límite` / `Vence 23 Jul` / `Añadir hora` |
-| Card vencida | `Vencida · 14 Jul` |
+| Fecha editor | `Vence 23 Jul` / `+ Hora` / `Quitar hora` |
+| Toast compromiso | `Sumada a Hoy · X/Y done` / `En Hoy · X/Y done` |
+| Card vencida | Tag pill `🕐 14 Jul` |
 | Card hoy | `Vence hoy` / `10:00 AM` |
 | Toast completar | `Tarea completada · Deshacer` |
 | Toast archivar | `Tarea archivada · Deshacer` |

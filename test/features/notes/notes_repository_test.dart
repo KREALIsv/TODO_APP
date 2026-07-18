@@ -78,7 +78,7 @@ void main() {
     expect(repo.getById('1')?.pinned, isFalse);
   });
 
-  test('toggleCompleted only works for tasks', () async {
+  test('toggleCompleted only works for tasks and sets completedAt', () async {
     await repo.add(buildItem(id: 'note', type: NoteType.note));
     await repo.add(buildItem(id: 'task', type: NoteType.task));
 
@@ -87,6 +87,31 @@ void main() {
 
     expect(repo.getById('note')?.completed, isFalse);
     expect(repo.getById('task')?.completed, isTrue);
+    expect(repo.getById('task')?.completedAt, isNotNull);
+
+    await repo.toggleCompleted('task');
+    expect(repo.getById('task')?.completed, isFalse);
+    expect(repo.getById('task')?.completedAt, isNull);
+  });
+
+  test('archive hides from getAll and restore brings back', () async {
+    await repo.add(buildItem(id: '1'));
+    await repo.archive('1');
+    expect(repo.getAll(), isEmpty);
+    expect(repo.getArchived().map((e) => e.id), ['1']);
+    expect(repo.getById('1')?.archivedAt, isNotNull);
+
+    await repo.restore('1');
+    expect(repo.getAll().map((e) => e.id), ['1']);
+    expect(repo.getArchived(), isEmpty);
+  });
+
+  test('setTodayCommitment toggles todayAt', () async {
+    await repo.add(buildItem(id: 't', type: NoteType.task));
+    await repo.setTodayCommitment('t', true);
+    expect(repo.getById('t')?.todayAt, isNotNull);
+    await repo.setTodayCommitment('t', false);
+    expect(repo.getById('t')?.todayAt, isNull);
   });
 
   test('toMap and fromMap roundtrip', () {

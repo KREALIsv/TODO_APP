@@ -135,6 +135,32 @@ void main() {
     });
   });
 
+  group('NotesQuery.useGroupedTasksLayout', () {
+    test('true only for tasks filter with empty search', () {
+      expect(
+        NotesQuery.useGroupedTasksLayout(
+          filter: NotesFilter.tasks,
+          searchQuery: '',
+        ),
+        isTrue,
+      );
+      expect(
+        NotesQuery.useGroupedTasksLayout(
+          filter: NotesFilter.tasks,
+          searchQuery: 'x',
+        ),
+        isFalse,
+      );
+      expect(
+        NotesQuery.useGroupedTasksLayout(
+          filter: NotesFilter.all,
+          searchQuery: '',
+        ),
+        isFalse,
+      );
+    });
+  });
+
   group('NotesQuery.emptyMessage', () {
     test('shows onboarding when app has no items', () {
       expect(

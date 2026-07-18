@@ -1,4 +1,4 @@
-enum NotesFilter { all, pinned, notes, tasks }
+enum NotesFilter { all, pinned, notes, tasks, archived }
 
 extension NotesFilterLabels on NotesFilter {
   String get label {
@@ -7,6 +7,7 @@ extension NotesFilterLabels on NotesFilter {
       NotesFilter.pinned => 'Fijadas',
       NotesFilter.notes => 'Notas',
       NotesFilter.tasks => 'Tareas',
+      NotesFilter.archived => 'Archivadas',
     };
   }
 
@@ -16,6 +17,7 @@ extension NotesFilterLabels on NotesFilter {
       NotesFilter.pinned => 'No hay notas fijadas',
       NotesFilter.notes => 'No hay notas',
       NotesFilter.tasks => 'No hay tareas',
+      NotesFilter.archived => 'No hay elementos archivados',
     };
   }
 
@@ -25,6 +27,7 @@ extension NotesFilterLabels on NotesFilter {
       NotesFilter.pinned => 'Fijadas',
       NotesFilter.notes => 'Notas',
       NotesFilter.tasks => 'Tareas',
+      NotesFilter.archived => 'Archivadas',
     };
   }
 }
