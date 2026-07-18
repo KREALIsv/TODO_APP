@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
 
+import 'package:todos_app/features/notes/data/tags_repository.dart';
 import 'package:todos_app/features/notes/domain/note_item.dart';
 import 'package:todos_app/features/notes/presentation/widgets/note_card.dart';
 import 'package:todos_app/features/notes/presentation/widgets/tag_pill.dart';
@@ -8,6 +12,27 @@ import 'package:todos_app/features/notes/presentation/widgets/tags_editor.dart';
 
 void main() {
   final now = DateTime(2026, 7, 16, 12);
+  late Directory tempDir;
+  late TagsRepository tagsRepo;
+
+  setUp(() async {
+    tempDir = await Directory.systemTemp.createTemp('tags_ui_');
+    Hive.init(tempDir.path);
+    final box = await Hive.openBox<dynamic>(
+      'tags_ui_${DateTime.now().microsecondsSinceEpoch}',
+    );
+    tagsRepo = TagsRepository.instance;
+    await tagsRepo.initWithBox(box);
+    await tagsRepo.clear();
+    await tagsRepo.ensureTags(['Work', 'Personal', 'Ideas', 'A', 'B', 'C', 'D']);
+  });
+
+  tearDown(() async {
+    await Hive.deleteFromDisk();
+    if (tempDir.existsSync()) {
+      await tempDir.delete(recursive: true);
+    }
+  });
 
   NoteItem buildNote({List<String> tags = const []}) {
     return NoteItem(
@@ -31,6 +56,7 @@ void main() {
         home: Scaffold(
           body: NoteCard(
             item: buildNote(tags: const ['A', 'B', 'C', 'D']),
+            tagsRepository: tagsRepo,
             onTap: () {},
           ),
         ),
@@ -45,7 +71,28 @@ void main() {
     expect(find.byType(TagPill), findsNWidgets(3));
   });
 
-  testWidgets('TagsEditor can add and remove tags', (WidgetTester tester) async {
+  testWidgets('TagsEditor shows add circle beside tags', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TagsEditor(
+            tags: const ['Work'],
+            suggestions: const {'Personal', 'Ideas'},
+            tagsRepository: tagsRepo,
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Work'), findsOneWidget);
+    expect(find.byIcon(Icons.add), findsOneWidget);
+    expect(find.text('Toca + para buscar o crear etiquetas'), findsNothing);
+  });
+
+  testWidgets('TagsEditor + opens picker to search select and create', (
+    WidgetTester tester,
+  ) async {
     var tags = <String>['Work'];
 
     await tester.pumpWidget(
@@ -56,6 +103,7 @@ void main() {
               return TagsEditor(
                 tags: tags,
                 suggestions: const {'Personal', 'Ideas'},
+                tagsRepository: tagsRepo,
                 onChanged: (next) => setState(() => tags = next),
               );
             },
@@ -64,61 +112,71 @@ void main() {
       ),
     );
 
-    expect(find.text('Work'), findsOneWidget);
-    expect(find.text('Sin etiquetas'), findsNothing);
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.enterText(find.byType(TextField), 'Personal');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pumpAndSettle();
+    expect(find.text('Etiquetas'), findsWidgets);
+    expect(find.text('Buscar etiquetas…'), findsOneWidget);
+    expect(find.text('Crear una etiqueta nueva'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'Per');
+    await tester.pump();
+
+    expect(find.text('Personal'), findsOneWidget);
+    expect(find.text('Ideas'), findsNothing);
+
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump();
 
     expect(tags, contains('Personal'));
-    expect(find.text('Personal'), findsWidgets);
 
-    await tester.tap(find.byIcon(Icons.close).first);
-    await tester.pumpAndSettle();
+    await tester.tap(find.text('Crear una etiqueta nueva'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(tags.contains('Work'), isFalse);
+    expect(find.text('Crear etiqueta'), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back_ios_new), findsOneWidget);
+    expect(find.text('Seleccionar un color'), findsOneWidget);
+    expect(find.text('Opacidad'), findsOneWidget);
+    expect(find.byType(Slider), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsOneWidget);
+
+    // Misma ventana: volver a la lista sin apilar otro modal.
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Buscar etiquetas…'), findsOneWidget);
+    expect(find.text('Crear una etiqueta nueva'), findsOneWidget);
+    expect(find.text('Crear etiqueta'), findsNothing);
   });
 
-  testWidgets('TagsEditor dropdown filters and paginates suggestions', (
+  testWidgets('TagsEditor can remove a selected tag from the row', (
     WidgetTester tester,
   ) async {
-    final suggestions = {
-      for (var i = 1; i <= 12; i++) 'Cat${i.toString().padLeft(2, '0')}',
-    };
+    var tags = <String>['Work', 'Personal'];
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: TagsEditor(
-            tags: const [],
-            suggestions: suggestions,
-            pageSize: 5,
-            onChanged: (_) {},
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              return TagsEditor(
+                tags: tags,
+                suggestions: const {'Ideas'},
+                tagsRepository: tagsRepo,
+                onChanged: (next) => setState(() => tags = next),
+              );
+            },
           ),
         ),
       ),
     );
 
-    await tester.tap(find.byType(TextField));
-    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.close).first);
+    await tester.pump();
 
-    expect(find.text('Cat01'), findsOneWidget);
-    expect(find.text('Ver más (7)'), findsOneWidget);
-
-    await tester.tap(find.text('Ver más (7)'));
-    await tester.pumpAndSettle();
-
-    // Segunda página: quedan 2 de 12 con pageSize 5.
-    expect(find.text('Ver más (2)'), findsOneWidget);
-
-    await tester.enterText(find.byType(TextField), 'Cat1');
-    await tester.pumpAndSettle();
-
-    expect(find.text('Cat10'), findsOneWidget);
-    expect(find.text('Cat11'), findsOneWidget);
-    expect(find.text('Cat12'), findsOneWidget);
-    expect(find.text('Cat02'), findsNothing);
-    expect(find.textContaining('Ver más'), findsNothing);
+    expect(tags.length, 1);
   });
 }

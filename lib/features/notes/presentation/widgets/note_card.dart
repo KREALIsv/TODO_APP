@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../global/themes/app_colors.dart';
 import '../../../../global/themes/tokens.dart';
 import '../../data/notes_repository.dart';
+import '../../data/tags_repository.dart';
 import '../../domain/note_item.dart';
 import 'relative_time.dart';
 import 'tag_pill.dart';
@@ -15,6 +16,7 @@ class NoteCard extends StatelessWidget {
     required this.onTap,
     this.onLongPress,
     this.repository,
+    this.tagsRepository,
     this.showArchiveActions = false,
     this.onRestore,
     this.onDeleteForever,
@@ -25,6 +27,7 @@ class NoteCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final NotesRepository? repository;
+  final TagsRepository? tagsRepository;
   final bool showArchiveActions;
   final VoidCallback? onRestore;
   final VoidCallback? onDeleteForever;
@@ -34,6 +37,8 @@ class NoteCard extends StatelessWidget {
   final bool flat;
 
   NotesRepository get _repo => repository ?? NotesRepository.instance;
+  TagsRepository get _tagsRepo =>
+      tagsRepository ?? TagsRepository.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -125,7 +130,11 @@ class NoteCard extends StatelessWidget {
                       runSpacing: 4,
                       children: [
                         ...item.tags.take(3).map(
-                              (tag) => TagPill(label: tag),
+                              (tag) => TagPill(
+                                label: tag,
+                                colors: _tagsRepo.colorFor(tag),
+                                compact: true,
+                              ),
                             ),
                         if (item.tags.length > 3)
                           Text(

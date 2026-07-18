@@ -5,6 +5,7 @@ import 'package:hive/hive.dart';
 
 import 'package:todos_app/features/notes/data/tags_repository.dart';
 import 'package:todos_app/features/notes/domain/default_tags.dart';
+import 'package:todos_app/features/notes/domain/tag_colors.dart';
 
 void main() {
   late Directory tempDir;
@@ -56,5 +57,41 @@ void main() {
     await repo.ensureDefaults();
     await repo.ensureDefaults();
     expect(repo.getAll().length, kDefaultTags.length);
+  });
+
+  test('ensureTags assigns and remembers colors', () async {
+    await repo.ensureTags(['Gym']);
+    final id = repo.getColorId('Gym');
+    expect(id, isNotNull);
+    expect(repo.colorFor('Gym').background, isNotNull);
+
+    await repo.setColor('Gym', 'brand_pink');
+    expect(repo.getColorId('gym'), 'brand_pink');
+    expect(repo.colorFor('GYM').background, TagColors.brandPink);
+  });
+
+  test('remove clears color assignment', () async {
+    await repo.ensureTag('Temporal', colorId: 'brand_pink');
+    await repo.remove('Temporal');
+    expect(repo.getColorId('Temporal'), isNull);
+  });
+
+  test('remembers opacity and rename keeps style', () async {
+    await repo.ensureTag('Gym', colorId: 'brand_pink', opacity: 0.5);
+    expect(repo.getOpacity('Gym'), 0.5);
+
+    final ok = await repo.rename('Gym', 'Gymnasio');
+    expect(ok, isTrue);
+    expect(repo.getAll(), contains('Gymnasio'));
+    expect(repo.getAll(), isNot(contains('Gym')));
+    expect(repo.getColorId('Gymnasio'), 'brand_pink');
+    expect(repo.getOpacity('Gymnasio'), 0.5);
+  });
+
+  test('rename fails on name conflict', () async {
+    await repo.ensureTags(['Alpha', 'Beta']);
+    final ok = await repo.rename('Alpha', 'Beta');
+    expect(ok, isFalse);
+    expect(repo.getAll(), containsAll(['Alpha', 'Beta']));
   });
 }

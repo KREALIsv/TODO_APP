@@ -1,10 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:todos_app/features/notes/domain/tag_colors.dart';
-import 'package:todos_app/global/themes/app_colors.dart';
 
 void main() {
-  group('TagColors.colorForTag', () {
+  group('TagColors', () {
     test('returns consistent color for the same tag', () {
       final a = TagColors.colorForTag('Work');
       final b = TagColors.colorForTag('Work');
@@ -22,14 +22,28 @@ void main() {
     test('returns a pair from the fixed palette', () {
       final pair = TagColors.colorForTag('Meeting');
       final backgrounds = TagColors.palette.map((p) => p.background).toSet();
-      final foregrounds = TagColors.palette.map((p) => p.foreground).toSet();
       expect(backgrounds.contains(pair.background), isTrue);
-      expect(foregrounds.contains(pair.foreground), isTrue);
     });
 
-    test('palette has six soft color pairs', () {
-      expect(TagColors.palette, hasLength(6));
-      expect(TagColors.palette.first.background, AppColors.primary00);
+    test('palette includes brand pink from favicon', () {
+      expect(TagColors.brandPink, const Color(0xFFF2327D));
+      expect(TagColors.swatches.first.id, 'brand_pink');
+      expect(TagColors.swatches.first.color, TagColors.brandPink);
+      expect(TagColors.swatches.length, greaterThanOrEqualTo(24));
+    });
+
+    test('byId resolves persisted swatch ids', () {
+      final swatch = TagColors.byId('brand_pink');
+      expect(swatch, isNotNull);
+      expect(swatch!.color, TagColors.brandPink);
+      expect(TagColors.byId('missing'), isNull);
+    });
+
+    test('defaultIdForTag is stable', () {
+      expect(
+        TagColors.defaultIdForTag('Urgente'),
+        TagColors.defaultIdForTag('urgente'),
+      );
     });
   });
 }

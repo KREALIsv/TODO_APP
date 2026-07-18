@@ -136,6 +136,44 @@ class NotesRepository {
     return tags;
   }
 
+  /// Renombra una etiqueta en todas las notas (activas y archivadas).
+  Future<void> renameTag(String from, String to) async {
+    final oldKey = from.trim().toLowerCase();
+    final newName = to.trim();
+    if (oldKey.isEmpty || newName.isEmpty) return;
+
+    for (final item in _readAllRaw()) {
+      var changed = false;
+      final next = <String>[];
+      for (final tag in item.tags) {
+        if (tag.toLowerCase() == oldKey) {
+          if (!next.any((t) => t.toLowerCase() == newName.toLowerCase())) {
+            next.add(newName);
+          }
+          changed = true;
+        } else {
+          next.add(tag);
+        }
+      }
+      if (changed) {
+        await update(item.copyWith(tags: next, updatedAt: DateTime.now()));
+      }
+    }
+  }
+
+  /// Quita una etiqueta de todas las notas (activas y archivadas).
+  Future<void> removeTag(String name) async {
+    final key = name.trim().toLowerCase();
+    if (key.isEmpty) return;
+
+    for (final item in _readAllRaw()) {
+      if (!item.tags.any((t) => t.toLowerCase() == key)) continue;
+      final next =
+          item.tags.where((t) => t.toLowerCase() != key).toList(growable: false);
+      await update(item.copyWith(tags: next, updatedAt: DateTime.now()));
+    }
+  }
+
   @visibleForTesting
   Future<void> clear() async {
     await _box.clear();

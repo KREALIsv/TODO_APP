@@ -18,6 +18,8 @@ class SearchableDropdown extends StatefulWidget {
     this.noResultsMessage = 'Sin resultados',
     this.loadMoreLabel = 'Ver más',
     this.createLabelBuilder,
+    this.onCreateRequested,
+    this.optionBuilder,
     this.prefixIcon = const Icon(Icons.search),
     this.expandTooltip = 'Ver opciones',
     this.collapseTooltip = 'Cerrar',
@@ -26,7 +28,7 @@ class SearchableDropdown extends StatefulWidget {
   /// Opciones disponibles (ya filtradas de excluidos por el caller si aplica).
   final Iterable<String> options;
 
-  /// Se llama al elegir una opción, crear una nueva o enviar el campo.
+  /// Se llama al elegir una opción existente o al enviar el campo (si no hay create).
   final ValueChanged<String> onSelected;
 
   final String hintText;
@@ -37,6 +39,13 @@ class SearchableDropdown extends StatefulWidget {
   final String noResultsMessage;
   final String loadMoreLabel;
   final String Function(String query)? createLabelBuilder;
+
+  /// Si se define, "Crear …" y el submit de un nombre nuevo pasan por aquí
+  /// en vez de [onSelected] (p. ej. para abrir un selector de color).
+  final ValueChanged<String>? onCreateRequested;
+
+  /// Builder opcional para cada opción del listado.
+  final Widget Function(BuildContext context, String option)? optionBuilder;
   final Widget? prefixIcon;
   final String expandTooltip;
   final String collapseTooltip;
@@ -85,10 +94,22 @@ class _SearchableDropdownState extends State<SearchableDropdown> {
     return list;
   }
 
-  void _select(String raw) {
+  bool _isExistingOption(String trimmed) {
+    final key = trimmed.toLowerCase();
+    return widget.options.any((s) => s.toLowerCase() == key);
+  }
+
+  void _select(String raw, {required bool fromCreate}) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return;
-    widget.onSelected(trimmed);
+
+    final isNew = fromCreate || !_isExistingOption(trimmed);
+    if (isNew && widget.onCreateRequested != null) {
+      widget.onCreateRequested!(trimmed);
+    } else {
+      widget.onSelected(trimmed);
+    }
+
     _searchController.clear();
     setState(() => _visibleCount = widget.pageSize);
   }
@@ -137,7 +158,7 @@ class _SearchableDropdownState extends State<SearchableDropdown> {
               _open = true;
             });
           },
-          onSubmitted: _select,
+          onSubmitted: (value) => _select(value, fromCreate: false),
           onTap: () {
             if (!_open) setState(() => _open = true);
           },
@@ -194,13 +215,17 @@ class _SearchableDropdownState extends State<SearchableDropdown> {
                                 dense: true,
                                 leading: const Icon(Icons.add, size: 20),
                                 title: Text(_createLabel(query)),
-                                onTap: () => _select(query),
+                                onTap: () =>
+                                    _select(query, fromCreate: true),
                               ),
                             ...visible.map(
                               (option) => ListTile(
                                 dense: true,
-                                title: Text(option),
-                                onTap: () => _select(option),
+                                title: widget.optionBuilder != null
+                                    ? widget.optionBuilder!(context, option)
+                                    : Text(option),
+                                onTap: () =>
+                                    _select(option, fromCreate: false),
                               ),
                             ),
                           ],
