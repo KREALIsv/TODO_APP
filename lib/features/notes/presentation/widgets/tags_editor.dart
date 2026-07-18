@@ -42,6 +42,7 @@ class TagsEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final hasTags = tags.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,55 +61,72 @@ class TagsEditor extends StatelessWidget {
                 onDelete: () => _remove(tag),
               ),
             ),
-            _AddTagButton(onPressed: () => _openPicker(context)),
+            // Con tags: solo ícono (ya hay contexto al lado).
+            // Sin tags: chip con texto, sirve de CTA del empty state.
+            _AddTagButton(
+              onPressed: () => _openPicker(context),
+              compact: hasTags,
+            ),
           ],
         ),
-        if (tags.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              'Toca + para buscar o crear etiquetas',
-              style: textTheme.bodySmall?.copyWith(
-                color: AppColors.neutral40,
-              ),
-            ),
-          ),
       ],
     );
   }
 }
 
 class _AddTagButton extends StatelessWidget {
-  const _AddTagButton({required this.onPressed});
+  const _AddTagButton({required this.onPressed, required this.compact});
 
   final VoidCallback onPressed;
+
+  /// true: solo ícono (hay chips de contexto al lado).
+  /// false: pastilla con texto, usada como CTA cuando no hay etiquetas.
+  final bool compact;
+
+  /// Mismo radio que [TagPill] en el editor (`compact: false` → 10).
+  static final _radius = BorderRadius.circular(10);
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    // Misma caja tipográfica/padding vertical que TagPill (bodyLarge + 8).
-    final lineHeight = (textTheme.bodyLarge?.fontSize ?? 16) * 1.2;
 
-    final height = lineHeight + 16; // padding vertical 8+8
-    return Material(
+    final child = Material(
       color: AppColors.neutral00,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(height / 2),
+        borderRadius: _radius,
         side: const BorderSide(color: AppColors.neutral20),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(height / 2),
+        borderRadius: _radius,
         onTap: onPressed,
-        child: SizedBox(
-          width: height,
-          height: height,
-          child: const Icon(
-            Icons.add,
-            size: 20,
-            color: AppColors.neutral60,
+        child: Padding(
+          // Mismo padding que TagPill (no compact, sin botón delete).
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.add, size: 18, color: AppColors.neutral60),
+              if (!compact) ...[
+                const SizedBox(width: 4),
+                Text(
+                  'Añadir etiqueta',
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: AppColors.neutral60,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
     );
+
+    if (compact) {
+      return Tooltip(message: 'Añadir etiqueta', child: child);
+    }
+    return child;
   }
 }

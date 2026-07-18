@@ -87,7 +87,35 @@ void main() {
 
     expect(find.text('Work'), findsOneWidget);
     expect(find.byIcon(Icons.add), findsOneWidget);
+    // Con tags existentes, el botón es solo el círculo (sin label de texto).
+    expect(find.text('Añadir etiqueta'), findsNothing);
+  });
+
+  testWidgets('TagsEditor shows CTA pill when there are no tags yet', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TagsEditor(
+            tags: const [],
+            suggestions: const {'Personal', 'Ideas'},
+            tagsRepository: tagsRepo,
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Añadir etiqueta'), findsOneWidget);
+    expect(find.byIcon(Icons.add), findsOneWidget);
     expect(find.text('Toca + para buscar o crear etiquetas'), findsNothing);
+
+    await tester.tap(find.text('Añadir etiqueta'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Buscar etiquetas…'), findsOneWidget);
   });
 
   testWidgets('TagsEditor + opens picker to search select and create', (
