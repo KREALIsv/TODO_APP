@@ -302,9 +302,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final searchQuery = _searchController.text;
 
     return Scaffold(
-      body: ValueListenableBuilder<Box<Map>>(
-        valueListenable: _repo.listenable(),
-        builder: (context, box, child) {
+      body: SafeArea(
+        top: false,
+        child: ValueListenableBuilder<Box<Map>>(
+          valueListenable: _repo.listenable(),
+          builder: (context, box, child) {
           final isArchivedFilter = _activeFilter == NotesFilter.archived;
           final all =
               isArchivedFilter ? _repo.getArchived() : _repo.getAll();
@@ -413,7 +415,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           );
-        },
+          },
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCreateMenu(context),

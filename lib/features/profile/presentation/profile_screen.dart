@@ -29,39 +29,42 @@ class ProfileScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         foregroundColor: AppColors.neutral100,
       ),
-      body: ValueListenableBuilder<Box<Map>>(
-        valueListenable: _repo.listenable(),
-        builder: (context, box, child) {
-          final items = _repo.getAll();
-          final counts = contentCounts(items);
-          final metrics = activityMetricsFrom(items);
-          final baseStats = ActivityStats.fromNotes(items, weeks: 1);
-          final isEmpty = items.isEmpty;
+      body: SafeArea(
+        top: false,
+        child: ValueListenableBuilder<Box<Map>>(
+          valueListenable: _repo.listenable(),
+          builder: (context, box, child) {
+            final items = _repo.getAll();
+            final counts = contentCounts(items);
+            final metrics = activityMetricsFrom(items);
+            final baseStats = ActivityStats.fromNotes(items, weeks: 1);
+            final isEmpty = items.isEmpty;
 
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-            children: [
-              _ActivityHero(
-                textTheme: textTheme,
-                eventCounts: metrics.eventCounts,
-                isEmpty: isEmpty,
-              ),
-              const SizedBox(height: 16),
-              _SecondaryStats(
-                textTheme: textTheme,
-                bestStreak: baseStats.bestStreak,
-                activeDayCount: baseStats.activeDayCount,
-              ),
-              const SizedBox(height: 20),
-              _ContentRows(
-                textTheme: textTheme,
-                noteCount: counts.notes,
-                taskCount: counts.tasks,
-                pendingTasks: counts.pendingTasks,
-              ),
-            ],
-          );
-        },
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              children: [
+                _ActivityHero(
+                  textTheme: textTheme,
+                  eventCounts: metrics.eventCounts,
+                  isEmpty: isEmpty,
+                ),
+                const SizedBox(height: 16),
+                _SecondaryStats(
+                  textTheme: textTheme,
+                  bestStreak: baseStats.bestStreak,
+                  activeDayCount: baseStats.activeDayCount,
+                ),
+                const SizedBox(height: 20),
+                _ContentRows(
+                  textTheme: textTheme,
+                  noteCount: counts.notes,
+                  taskCount: counts.tasks,
+                  pendingTasks: counts.pendingTasks,
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

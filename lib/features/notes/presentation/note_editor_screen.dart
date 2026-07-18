@@ -241,9 +241,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
           TextField(
             controller: _titleController,
             focusNode: _titleFocus,
@@ -314,7 +316,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               });
             },
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

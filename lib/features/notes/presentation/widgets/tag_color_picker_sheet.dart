@@ -237,7 +237,12 @@ class _TagColorPickerPanelState extends State<TagColorPickerPanel> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            20 + MediaQuery.viewPaddingOf(context).bottom,
+          ),
           child: widget.allowDelete
               ? Row(
                   children: [

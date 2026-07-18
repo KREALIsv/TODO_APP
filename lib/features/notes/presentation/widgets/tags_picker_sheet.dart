@@ -262,27 +262,35 @@ class _TagsPickerSheetState extends State<_TagsPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.85;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    // Buscar: 65%. Crear/editar: 80%.
+    final sheetHeight = screenHeight *
+        (_page == _TagsPickerPage.list ? 0.65 : 0.80);
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          child: _page == _TagsPickerPage.list
-              ? KeyedSubtree(
-                  key: const ValueKey('tags-list'),
-                  child: _buildListPage(context),
-                )
-              : KeyedSubtree(
-                  key: ValueKey(
-                    'tags-editor-${_editorArgs?.editingTag ?? 'create'}',
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        alignment: Alignment.topCenter,
+        child: SizedBox(
+          height: sheetHeight,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: _page == _TagsPickerPage.list
+                ? KeyedSubtree(
+                    key: const ValueKey('tags-list'),
+                    child: _buildListPage(context),
+                  )
+                : KeyedSubtree(
+                    key: ValueKey(
+                      'tags-editor-${_editorArgs?.editingTag ?? 'create'}',
+                    ),
+                    child: _buildEditorPage(),
                   ),
-                  child: _buildEditorPage(),
-                ),
+          ),
         ),
       ),
     );
@@ -438,7 +446,12 @@ class _TagsPickerSheetState extends State<_TagsPickerSheet> {
                 ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            12,
+            16,
+            20 + MediaQuery.viewPaddingOf(context).bottom,
+          ),
           child: OutlinedButton.icon(
             onPressed: () => _openCreate(),
             icon: const Icon(Icons.add, size: 18),
