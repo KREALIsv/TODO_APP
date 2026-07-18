@@ -97,10 +97,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
 
-    if (title.isEmpty && body.isEmpty) {
+    if (title.isEmpty) {
       await AppAlerts.show(
         context,
-        message: 'Escribe un título o contenido',
+        message: 'Escribe un título',
         type: AppAlertType.warning,
       );
       return;
@@ -251,8 +251,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             focusNode: _titleFocus,
             textCapitalization: TextCapitalization.sentences,
             decoration: const InputDecoration(
-              labelText: 'Título',
-              hintText: 'Opcional',
+              hintText: 'Escribe un título',
             ),
           ),
           const SizedBox(height: 16),
@@ -262,8 +261,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             minLines: 4,
             maxLines: 8,
             decoration: const InputDecoration(
-              labelText: 'Contenido',
-              hintText: 'Escribe aquí…',
+              hintText: 'Añade detalles (opcional)',
               alignLabelWithHint: true,
             ),
           ),
@@ -296,25 +294,31 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             onChanged: (tags) => setState(() => _tags = tags),
           ),
           const SizedBox(height: 24),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text('Es una tarea', style: textTheme.labelLarge),
-            subtitle: Text(
-              'Muestra un checkbox en la lista',
-              style: textTheme.bodySmall,
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
             ),
-            value: isTask,
-            onChanged: (value) {
-              setState(() {
-                _type = value ? NoteType.task : NoteType.note;
-                if (!value) {
-                  _completed = false;
-                  _dueAt = null;
-                  _dueHasTime = false;
-                  _todayOn = false;
-                }
-              });
-            },
+            child: SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              title: Text('Es una tarea', style: textTheme.labelLarge),
+              subtitle: Text(
+                'Muestra un checkbox en la lista',
+                style: textTheme.bodySmall,
+              ),
+              value: isTask,
+              onChanged: (value) {
+                setState(() {
+                  _type = value ? NoteType.task : NoteType.note;
+                  if (!value) {
+                    _completed = false;
+                    _dueAt = null;
+                    _dueHasTime = false;
+                    _todayOn = false;
+                  }
+                });
+              },
+            ),
           ),
           ],
         ),

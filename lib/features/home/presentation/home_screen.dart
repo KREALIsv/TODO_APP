@@ -11,6 +11,7 @@ import '../../notes/domain/task_groups.dart';
 import '../../notes/presentation/note_editor_screen.dart';
 import '../../notes/presentation/widgets/filter_chips_bar.dart';
 import '../../notes/presentation/widgets/grouped_tasks_sliver.dart';
+import '../../notes/presentation/widgets/note_compose_sheet.dart';
 import '../../notes/presentation/widgets/quick_capture_field.dart';
 import '../../notes/presentation/widgets/swipeable_note_card.dart';
 import '../../notes/presentation/widgets/task_section_header.dart';
@@ -53,6 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  bool get _fabCreatesTask => _activeFilter == NotesFilter.tasks;
+
   Future<void> _openEditor(
     BuildContext context, {
     NoteItem? item,
@@ -69,32 +72,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _showCreateMenu(BuildContext context) async {
-    final type = await showModalBottomSheet<NoteType>(
-      context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.sticky_note_2_outlined),
-                title: const Text('Nueva nota'),
-                onTap: () => Navigator.pop(context, NoteType.note),
-              ),
-              ListTile(
-                leading: const Icon(Icons.check_circle_outline),
-                title: const Text('Nueva tarea'),
-                onTap: () => Navigator.pop(context, NoteType.task),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+  Future<void> _openNoteComposeSheet(BuildContext context) {
+    return showNoteComposeSheet(context, repository: _repo);
+  }
 
-    if (type == null || !context.mounted) return;
-    await _openEditor(context, initialType: type);
+  Future<void> _onFabPressed() {
+    if (_fabCreatesTask) {
+      return _openEditor(context, initialType: NoteType.task);
+    }
+    return _openNoteComposeSheet(context);
+  }
+
+  Future<void> _onFabLongPress() {
+    if (_fabCreatesTask) {
+      return _openNoteComposeSheet(context);
+    }
+    return _openEditor(context, initialType: NoteType.task);
   }
 
   void _toggleSearch() {
@@ -418,9 +411,22 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateMenu(context),
-        child: const Icon(Icons.add),
+      floatingActionButton: Tooltip(
+        message: _fabCreatesTask ? 'Nueva tarea' : 'Nueva nota',
+        child: Semantics(
+          button: true,
+          label: _fabCreatesTask ? 'Nueva tarea' : 'Nueva nota',
+          hint: _fabCreatesTask
+              ? 'Mantén pulsado para crear una nota'
+              : 'Mantén pulsado para crear una tarea',
+          child: GestureDetector(
+            onLongPress: _onFabLongPress,
+            child: FloatingActionButton(
+              onPressed: _onFabPressed,
+              child: const Icon(Icons.add),
+            ),
+          ),
+        ),
       ),
     );
   }
