@@ -47,6 +47,7 @@ void main() {
     expect(item.todayAt, isNull);
     expect(item.completedAt, isNull);
     expect(item.archivedAt, isNull);
+    expect(item.reminderMinutesBefore, isNull);
   });
 
   test('roundtrip preserves optional dates', () {
@@ -55,12 +56,13 @@ void main() {
       dueHasTime: true,
       todayAt: DateTime(2026, 7, 16, 9),
       completedAt: DateTime(2026, 7, 16, 11),
-    );
+    ).copyWith(reminderMinutesBefore: 1440);
     final restored = NoteItem.fromMap(original.toMap());
     expect(restored.dueAt, original.dueAt);
     expect(restored.dueHasTime, isTrue);
     expect(restored.todayAt, original.todayAt);
     expect(restored.completedAt, original.completedAt);
+    expect(restored.reminderMinutesBefore, 1440);
   });
 
   test('copyWith can clear nullable dates', () {
@@ -99,6 +101,33 @@ void main() {
     expect(done.isOverdue(today), isFalse);
   });
 
+  test('isOverdue with time uses full timestamp same day', () {
+    final timed = buildItem(
+      dueAt: DateTime(2026, 7, 19, 8, 56),
+      dueHasTime: true,
+    );
+    expect(
+      timed.isOverdue(DateTime(2026, 7, 19, 8, 55)),
+      isFalse,
+    );
+    expect(
+      timed.isOverdue(DateTime(2026, 7, 19, 8, 56)),
+      isTrue,
+    );
+  });
+
+  test('isOverdue without time ignores clock within the day', () {
+    final allDay = buildItem(dueAt: DateTime(2026, 7, 19));
+    expect(
+      allDay.isOverdue(DateTime(2026, 7, 19, 23, 59)),
+      isFalse,
+    );
+    expect(
+      allDay.isOverdue(DateTime(2026, 7, 20, 0, 1)),
+      isTrue,
+    );
+  });
+
   test('clearTaskDates resets business fields', () {
     final item = buildItem(
       dueAt: DateTime(2026, 7, 20),
@@ -106,12 +135,13 @@ void main() {
       todayAt: DateTime(2026, 7, 16),
       completedAt: DateTime(2026, 7, 16),
       completed: true,
-    );
+    ).copyWith(reminderMinutesBefore: 60);
     final cleared = item.clearTaskDates();
     expect(cleared.dueAt, isNull);
     expect(cleared.dueHasTime, isFalse);
     expect(cleared.todayAt, isNull);
     expect(cleared.completedAt, isNull);
     expect(cleared.completed, isFalse);
+    expect(cleared.reminderMinutesBefore, isNull);
   });
 }

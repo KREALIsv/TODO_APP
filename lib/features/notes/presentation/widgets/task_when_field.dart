@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../../global/themes/app_colors.dart';
+import '../../../../global/themes/tokens.dart';
 import '../../domain/date_only.dart';
+import 'task_dates_sheet.dart';
 
 enum TaskWhenKind { today, tomorrow, date, someday }
 
@@ -13,30 +15,33 @@ class TaskWhenField extends StatelessWidget {
     required this.dueHasTime,
     required this.todayOn,
     required this.onChanged,
+    this.reminderMinutesBefore,
   });
 
   final DateTime? dueAt;
   final bool dueHasTime;
   final bool todayOn;
+  final int? reminderMinutesBefore;
   final void Function({
     required bool todayOn,
     DateTime? dueAt,
     bool dueHasTime,
+    int? reminderMinutesBefore,
   }) onChanged;
 
   static const _months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
   ];
 
   /// Resolve UI kind from persisted fields (edit hydration).
@@ -64,97 +69,125 @@ class TaskWhenField extends StatelessWidget {
         dueHasTime: dueHasTime,
       );
 
-  String _formatDateChip(DateTime due, bool hasTime) {
-    final now = DateTime.now();
-    final today = dateOnly(now);
-    final dueDay = dateOnly(due);
-    final dateLabel = dueDay == today
-        ? 'Vence hoy'
-        : 'Vence ${due.day} ${_months[due.month - 1]}';
+  /// Same shape for any calendar day (`19 jul` / `19 jul, 9:00 AM`).
+  static String formatDueLabel(DateTime due, {bool hasTime = false}) {
+    final dateLabel = '${due.day} ${_months[due.month - 1]}';
     if (!hasTime) return dateLabel;
+    return '$dateLabel, ${_formatTime(due)}';
+  }
+
+  static String _formatTime(DateTime due) {
     final hour = due.hour;
     final minute = due.minute.toString().padLeft(2, '0');
     final isPm = hour >= 12;
     final h12 = hour % 12 == 0 ? 12 : hour % 12;
-    final time = '$h12:$minute ${isPm ? 'PM' : 'AM'}';
-    return dueDay == today ? 'Vence hoy · $time' : '$dateLabel · $time';
+    return '$h12:$minute ${isPm ? 'PM' : 'AM'}';
   }
 
+  static bool isOverdueDue({
+    required DateTime dueAt,
+    required bool dueHasTime,
+    DateTime? now,
+  }) {
+    final reference = now ?? DateTime.now();
+    if (dueHasTime) return !dueAt.isAfter(reference);
+    return dateOnly(dueAt).isBefore(dateOnly(reference));
+  }
+
+  String get _fieldLabel {
+    switch (_selected) {
+      case TaskWhenKind.today:
+        return 'Hoy';
+      case TaskWhenKind.someday:
+        return 'Sin fecha';
+      case TaskWhenKind.tomorrow:
+      case TaskWhenKind.date:
+        return formatDueLabel(dueAt!, hasTime: dueHasTime);
+    }
+  }
+
+  bool get _isPlaceholder => _selected == TaskWhenKind.someday;
+
+  bool get _showOverdue =>
+      dueAt != null &&
+      !todayOn &&
+      isOverdueDue(dueAt: dueAt!, dueHasTime: dueHasTime);
+
   void _selectToday() {
-    onChanged(todayOn: true, dueAt: null, dueHasTime: false);
+    onChanged(
+      todayOn: true,
+      dueAt: null,
+      dueHasTime: false,
+      reminderMinutesBefore: null,
+    );
   }
 
   void _selectTomorrow() {
     final tomorrow = dateOnly(DateTime.now()).add(const Duration(days: 1));
-    onChanged(todayOn: false, dueAt: tomorrow, dueHasTime: false);
+    onChanged(
+      todayOn: false,
+      dueAt: tomorrow,
+      dueHasTime: false,
+      reminderMinutesBefore: reminderMinutesBefore,
+    );
   }
 
   void _selectSomeday() {
-    onChanged(todayOn: false, dueAt: null, dueHasTime: false);
+    onChanged(
+      todayOn: false,
+      dueAt: null,
+      dueHasTime: false,
+      reminderMinutesBefore: null,
+    );
   }
 
-  Future<void> _pickDate(BuildContext context) async {
-    final now = DateTime.now();
-    final initial = dueAt ?? now;
-    final pickedDate = await showDatePicker(
-      context: context,
-      initialDate: dateOnly(initial),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+  Future<void> _openConfiguration(BuildContext context) async {
+    final result = await showTaskDatesSheet(
+      context,
+      dueAt: dueAt,
+      dueHasTime: dueHasTime,
+      reminderMinutesBefore: reminderMinutesBefore,
     );
-    if (pickedDate == null || !context.mounted) return;
+    if (result == null || !context.mounted) return;
 
-    if (dueHasTime && dueAt != null) {
+    if (result.clearDate) {
       onChanged(
         todayOn: false,
-        dueAt: DateTime(
-          pickedDate.year,
-          pickedDate.month,
-          pickedDate.day,
-          dueAt!.hour,
-          dueAt!.minute,
-        ),
-        dueHasTime: true,
+        dueAt: null,
+        dueHasTime: false,
+        reminderMinutesBefore: null,
       );
       return;
     }
 
     onChanged(
       todayOn: false,
-      dueAt: DateTime(pickedDate.year, pickedDate.month, pickedDate.day),
-      dueHasTime: false,
+      dueAt: result.dueAt,
+      dueHasTime: result.dueHasTime,
+      reminderMinutesBefore: result.reminderMinutesBefore,
     );
   }
 
-  Future<void> _pickTime(BuildContext context) async {
-    if (dueAt == null) return;
-    final now = DateTime.now();
-    final pickedTime = await showTimePicker(
-      context: context,
-      initialTime: dueHasTime
-          ? TimeOfDay.fromDateTime(dueAt!)
-          : TimeOfDay.fromDateTime(now),
-    );
-    if (pickedTime == null || !context.mounted) return;
-    onChanged(
-      todayOn: false,
-      dueAt: DateTime(
-        dueAt!.year,
-        dueAt!.month,
-        dueAt!.day,
-        pickedTime.hour,
-        pickedTime.minute,
+  Widget _chip({
+    required String label,
+    required bool selected,
+    required VoidCallback onSelected,
+  }) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+      showCheckmark: false,
+      selectedColor: AppColors.primary00,
+      labelStyle: TextStyle(
+        color: selected ? AppColors.primary : AppColors.neutral80,
+        fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
       ),
-      dueHasTime: true,
-    );
-  }
-
-  void _clearTime() {
-    if (dueAt == null) return;
-    onChanged(
-      todayOn: false,
-      dueAt: dateOnly(dueAt!),
-      dueHasTime: false,
+      side: BorderSide(
+        color: selected ? AppColors.primary20 : AppColors.neutral20,
+      ),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
   }
 
@@ -162,7 +195,6 @@ class TaskWhenField extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final selected = _selected;
-    final showDateDetails = selected == TaskWhenKind.date && dueAt != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,68 +205,110 @@ class TaskWhenField extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            ChoiceChip(
-              label: const Text('Hoy'),
+            _chip(
+              label: 'Hoy',
               selected: selected == TaskWhenKind.today,
-              onSelected: (_) => _selectToday(),
-              selectedColor: AppColors.primary00,
-              checkmarkColor: AppColors.primary,
+              onSelected: _selectToday,
             ),
-            ChoiceChip(
-              label: const Text('Mañana'),
+            _chip(
+              label: 'Mañana',
               selected: selected == TaskWhenKind.tomorrow,
-              onSelected: (_) => _selectTomorrow(),
-              selectedColor: AppColors.primary00,
-              checkmarkColor: AppColors.primary,
+              onSelected: _selectTomorrow,
             ),
-            ChoiceChip(
-              label: Text(
-                showDateDetails
-                    ? _formatDateChip(dueAt!, dueHasTime)
-                    : 'Fecha…',
-              ),
+            _chip(
+              label: 'Fecha',
               selected: selected == TaskWhenKind.date,
-              onSelected: (_) => _pickDate(context),
-              selectedColor: AppColors.primary00,
-              checkmarkColor: AppColors.primary,
+              onSelected: () => _openConfiguration(context),
             ),
-            ChoiceChip(
-              label: const Text('Algún día'),
+            _chip(
+              label: 'Algún día',
               selected: selected == TaskWhenKind.someday,
-              onSelected: (_) => _selectSomeday(),
-              selectedColor: AppColors.primary00,
-              checkmarkColor: AppColors.primary,
+              onSelected: _selectSomeday,
             ),
           ],
         ),
-        if (showDateDetails) ...[
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
+        const SizedBox(height: 10),
+        _WhenValueField(
+          label: _fieldLabel,
+          isPlaceholder: _isPlaceholder,
+          showOverdue: _showOverdue,
+          onTap: () => _openConfiguration(context),
+        ),
+      ],
+    );
+  }
+}
+
+/// Input-like value row (same radius/border language as text fields).
+class _WhenValueField extends StatelessWidget {
+  const _WhenValueField({
+    required this.label,
+    required this.isPlaceholder,
+    required this.showOverdue,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isPlaceholder;
+  final bool showOverdue;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Material(
+      color: AppColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: ThemeTokens.borderRadius,
+        side: BorderSide(color: AppColors.neutral20),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: ThemeTokens.borderRadius,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
             children: [
-              TextButton.icon(
-                onPressed: () => _pickDate(context),
-                icon: const Icon(Icons.event_outlined, size: 18),
-                label: const Text('Cambiar fecha'),
-              ),
-              if (!dueHasTime)
-                TextButton.icon(
-                  onPressed: () => _pickTime(context),
-                  icon: const Icon(Icons.schedule_outlined, size: 18),
-                  label: const Text('+ Hora'),
-                )
-              else
-                TextButton.icon(
-                  onPressed: _clearTime,
-                  icon: const Icon(Icons.schedule, size: 18),
-                  label: const Text('Quitar hora'),
+              Expanded(
+                child: Text(
+                  label,
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: isPlaceholder
+                        ? AppColors.neutral40
+                        : AppColors.neutral100,
+                  ),
                 ),
+              ),
+              if (showOverdue) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Plazo vencido',
+                    style: textTheme.labelSmall?.copyWith(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              const Icon(
+                Icons.expand_more,
+                size: 22,
+                color: AppColors.neutral60,
+              ),
             ],
           ),
-        ],
-      ],
+        ),
+      ),
     );
   }
 }

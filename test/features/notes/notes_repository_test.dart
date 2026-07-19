@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 
 import 'package:todos_app/features/notes/data/notes_repository.dart';
+import 'package:todos_app/features/notes/data/task_reminders_service.dart';
 import 'package:todos_app/features/notes/domain/note_item.dart';
 
 void main() {
@@ -11,12 +12,17 @@ void main() {
   late NotesRepository repo;
 
   setUp(() async {
+    TaskRemindersService.enabled = false;
     tempDir = await Directory.systemTemp.createTemp('notes_repo_test_');
     Hive.init(tempDir.path);
     final box = await Hive.openBox<Map>('notes_test_${DateTime.now().microsecondsSinceEpoch}');
     repo = NotesRepository.instance;
     await repo.initWithBox(box);
     await repo.clear();
+  });
+
+  tearDownAll(() {
+    TaskRemindersService.enabled = true;
   });
 
   tearDown(() async {

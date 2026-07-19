@@ -40,6 +40,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   DateTime? _dueAt;
   bool _dueHasTime = false;
   bool _todayOn = false;
+  int? _reminderMinutesBefore;
   static const _uuid = Uuid();
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
@@ -70,6 +71,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _dueAt = item?.dueAt;
     _dueHasTime = item?.dueHasTime ?? false;
     _todayOn = item?.isTodayCommitment() ?? false;
+    _reminderMinutesBefore = item?.reminderMinutesBefore;
 
     if (!_isEditing) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -134,6 +136,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         dueHasTime: isTask ? _dueHasTime : false,
         todayAt: isTask && _todayOn ? now : null,
         completedAt: isTask ? completedAt : null,
+        reminderMinutesBefore:
+            isTask && _dueAt != null ? _reminderMinutesBefore : null,
       );
       await _repo.add(toSave);
     } else {
@@ -153,6 +157,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 : null)
             : null,
         completedAt: isTask ? completedAt : null,
+        reminderMinutesBefore:
+            isTask && _dueAt != null ? _reminderMinutesBefore : null,
       );
       await _repo.update(toSave);
     }
@@ -271,15 +277,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               dueAt: _dueAt,
               dueHasTime: _dueHasTime,
               todayOn: _todayOn,
+              reminderMinutesBefore: _reminderMinutesBefore,
               onChanged: ({
                 required bool todayOn,
                 DateTime? dueAt,
                 bool dueHasTime = false,
+                int? reminderMinutesBefore,
               }) {
                 setState(() {
                   _todayOn = todayOn;
                   _dueAt = dueAt;
                   _dueHasTime = dueHasTime;
+                  _reminderMinutesBefore =
+                      dueAt == null ? null : reminderMinutesBefore;
                 });
               },
             ),
@@ -315,6 +325,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     _dueAt = null;
                     _dueHasTime = false;
                     _todayOn = false;
+                    _reminderMinutesBefore = null;
                   }
                 });
               },

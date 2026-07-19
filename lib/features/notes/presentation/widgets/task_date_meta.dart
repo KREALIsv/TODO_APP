@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../global/themes/app_colors.dart';
 import '../../domain/date_only.dart';
 import '../../domain/note_item.dart';
+import '../../domain/reminder_offset.dart';
 import '../../domain/task_dates.dart';
 import 'relative_time.dart';
 
@@ -65,54 +66,83 @@ class TaskDateMeta extends StatelessWidget {
       );
     }
 
+    Widget withReminder(Widget child) {
+      if (!item.hasReminder) return child;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          child,
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.notifications_none,
+            size: 12,
+            color: AppColors.neutral60,
+          ),
+        ],
+      );
+    }
+
     if (item.isOverdue(reference)) {
       final d = item.dueAt!;
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: AppColors.error.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.schedule,
-              size: 12,
-              color: AppColors.error,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              '${d.day} ${_months[d.month - 1]}',
-              style: textTheme.labelSmall?.copyWith(
+      final label = item.dueHasTime
+          ? (item.isDueToday(reference)
+              ? 'Vencida · ${_formatTime(d)}'
+              : 'Vencida · ${d.day} ${_months[d.month - 1]}')
+          : '${d.day} ${_months[d.month - 1]}';
+      return withReminder(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: AppColors.error.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.schedule,
+                size: 12,
                 color: AppColors.error,
-                fontWeight: FontWeight.w600,
               ),
-            ),
-          ],
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: textTheme.labelSmall?.copyWith(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     if (item.isDueToday(reference)) {
       if (item.dueHasTime) {
-        return meta(
-          text: _formatTime(item.dueAt!),
-          color: AppColors.primary,
-          icon: Icons.schedule,
+        return withReminder(
+          meta(
+            text: _formatTime(item.dueAt!),
+            color: AppColors.primary,
+            icon: Icons.schedule,
+          ),
         );
       }
-      return meta(
-        text: 'Vence hoy',
-        color: AppColors.primary,
+      return withReminder(
+        meta(
+          text: 'Vence hoy',
+          color: AppColors.primary,
+        ),
       );
     }
 
     if (item.dueAt != null && dateOnly(item.dueAt!).isAfter(today)) {
       final d = item.dueAt!;
-      return meta(
-        text: '${d.day} ${_months[d.month - 1]}',
-        color: AppColors.neutral60,
+      return withReminder(
+        meta(
+          text: '${d.day} ${_months[d.month - 1]}',
+          color: AppColors.neutral60,
+        ),
       );
     }
 

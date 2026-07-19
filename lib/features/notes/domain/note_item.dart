@@ -19,6 +19,7 @@ class NoteItem {
     this.todayAt,
     this.completedAt,
     this.archivedAt,
+    this.reminderMinutesBefore,
   });
 
   final String id;
@@ -35,6 +36,10 @@ class NoteItem {
   final DateTime? todayAt;
   final DateTime? completedAt;
   final DateTime? archivedAt;
+
+  /// Minutes before [dueAt] to fire a local reminder.
+  /// `null` = none; `0` = at due time. See [ReminderOffset].
+  final int? reminderMinutesBefore;
 
   String get preview {
     final source = title.trim().isNotEmpty ? title : body;
@@ -69,6 +74,7 @@ class NoteItem {
       'todayAt': todayAt?.toIso8601String(),
       'completedAt': completedAt?.toIso8601String(),
       'archivedAt': archivedAt?.toIso8601String(),
+      'reminderMinutesBefore': reminderMinutesBefore,
     };
   }
 
@@ -81,6 +87,14 @@ class NoteItem {
   }
 
   factory NoteItem.fromMap(Map<dynamic, dynamic> map) {
+    final rawReminder = map['reminderMinutesBefore'];
+    int? reminder;
+    if (rawReminder is int) {
+      reminder = rawReminder;
+    } else if (rawReminder is num) {
+      reminder = rawReminder.toInt();
+    }
+
     return NoteItem(
       id: map['id'] as String,
       type: NoteType.values.firstWhere(
@@ -103,6 +117,7 @@ class NoteItem {
       todayAt: _parseOptionalDate(map['todayAt']),
       completedAt: _parseOptionalDate(map['completedAt']),
       archivedAt: _parseOptionalDate(map['archivedAt']),
+      reminderMinutesBefore: reminder,
     );
   }
 
@@ -121,6 +136,7 @@ class NoteItem {
     Object? todayAt = _unset,
     Object? completedAt = _unset,
     Object? archivedAt = _unset,
+    Object? reminderMinutesBefore = _unset,
   }) {
     return NoteItem(
       id: id ?? this.id,
@@ -141,6 +157,9 @@ class NoteItem {
       archivedAt: identical(archivedAt, _unset)
           ? this.archivedAt
           : archivedAt as DateTime?,
+      reminderMinutesBefore: identical(reminderMinutesBefore, _unset)
+          ? this.reminderMinutesBefore
+          : reminderMinutesBefore as int?,
     );
   }
 }

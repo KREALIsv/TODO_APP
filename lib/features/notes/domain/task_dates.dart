@@ -8,10 +8,18 @@ extension TaskDateHelpers on NoteItem {
     return dateOnly(todayAt!) == dateOnly(now ?? DateTime.now());
   }
 
-  /// Past due date and not completed.
+  /// Past due and not completed.
+  ///
+  /// With [dueHasTime], compares the full timestamp (hora incluida).
+  /// Without time (all-day), overdue starts the day after [dueAt].
   bool isOverdue([DateTime? now]) {
     if (dueAt == null || completed) return false;
-    return dateOnly(dueAt!).isBefore(dateOnly(now ?? DateTime.now()));
+    final reference = now ?? DateTime.now();
+    if (dueHasTime) {
+      // Equal second counts as overdue so the UI flips at the due minute.
+      return !dueAt!.isAfter(reference);
+    }
+    return dateOnly(dueAt!).isBefore(dateOnly(reference));
   }
 
   /// Due date is today (regardless of completion).
@@ -36,6 +44,7 @@ extension TaskDateHelpers on NoteItem {
       todayAt: null,
       completedAt: null,
       completed: false,
+      reminderMinutesBefore: null,
     );
   }
 }

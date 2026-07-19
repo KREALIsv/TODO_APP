@@ -9,6 +9,7 @@ import '../../notes/domain/notes_filter.dart';
 import '../../notes/domain/notes_query.dart';
 import '../../notes/domain/task_groups.dart';
 import '../../notes/presentation/note_editor_screen.dart';
+import '../../notes/presentation/widgets/clock_refresh.dart';
 import '../../notes/presentation/widgets/filter_chips_bar.dart';
 import '../../notes/presentation/widgets/grouped_tasks_sliver.dart';
 import '../../notes/presentation/widgets/note_compose_sheet.dart';
@@ -33,11 +34,27 @@ class _HomeScreenState extends State<HomeScreen> {
   NotesFilter _activeFilter = NotesFilter.all;
   bool _isSearchExpanded = false;
   bool _completedExpanded = false;
+  late final ClockRefreshController _clock;
+  DateTime _now = DateTime.now();
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
 
   @override
+  void initState() {
+    super.initState();
+    _clock = ClockRefreshController(
+      repository: _repo,
+      onTick: () {
+        if (!mounted) return;
+        setState(() => _now = DateTime.now());
+      },
+    );
+    _clock.start();
+  }
+
+  @override
   void dispose() {
+    _clock.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -229,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSliverAppBar(TextTheme textTheme, String searchQuery) {
-    final today = _formatHeaderDate(DateTime.now());
+    final today = _formatHeaderDate(_now);
 
     return SliverAppBar(
       pinned: true,
@@ -300,6 +317,11 @@ class _HomeScreenState extends State<HomeScreen> {
         child: ValueListenableBuilder<Box<Map>>(
           valueListenable: _repo.listenable(),
           builder: (context, box, child) {
+          // Re-arm the due-time ticker when the dataset changes.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _clock.schedule();
+          });
+
           final isArchivedFilter = _activeFilter == NotesFilter.archived;
           final all =
               isArchivedFilter ? _repo.getArchived() : _repo.getAll();
@@ -324,7 +346,7 @@ class _HomeScreenState extends State<HomeScreen> {
             hasAnyItems: all.isNotEmpty,
           );
           final groups = useGrouped
-              ? TaskGroupsQuery.from(filtered)
+              ? TaskGroupsQuery.from(filtered, now: _now)
               : null;
 
           return SlidableAutoCloseBehavior(

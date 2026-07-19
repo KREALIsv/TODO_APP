@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
+import 'task_reminders_service.dart';
 
 class NotesRepository {
   NotesRepository._();
@@ -12,6 +13,7 @@ class NotesRepository {
   static const String _boxName = 'notes';
 
   late Box<Map> _box;
+  TaskRemindersService _reminders = TaskRemindersService.instance;
 
   Future<void> init() async {
     _box = await Hive.openBox<Map>(_boxName);
@@ -21,6 +23,11 @@ class NotesRepository {
   @visibleForTesting
   Future<void> initWithBox(Box<Map> box) async {
     _box = box;
+  }
+
+  @visibleForTesting
+  set remindersForTests(TaskRemindersService service) {
+    _reminders = service;
   }
 
   ValueListenable<Box<Map>> listenable() => _box.listenable();
@@ -55,15 +62,43 @@ class NotesRepository {
     return NoteItem.fromMap(Map<dynamic, dynamic>.from(raw));
   }
 
+  Future<void> _syncReminder(NoteItem item) async {
+    try {
+      await _reminders.sync(item);
+    } catch (e, st) {
+      debugPrint('Reminder sync failed for ${item.id}: $e\n$st');
+    }
+  }
+
+  Future<void> _cancelReminder(String id) async {
+    try {
+      await _reminders.cancel(id);
+    } catch (e, st) {
+      debugPrint('Reminder cancel failed for $id: $e\n$st');
+    }
+  }
+
+  /// Re-schedule all active task reminders (e.g. after app start / reboot).
+  Future<void> syncAllReminders() async {
+    try {
+      await _reminders.syncAll(getAll());
+    } catch (e, st) {
+      debugPrint('Reminder syncAll failed: $e\n$st');
+    }
+  }
+
   Future<void> add(NoteItem item) async {
     await _box.put(item.id, item.toMap());
+    await _syncReminder(item);
   }
 
   Future<void> update(NoteItem item) async {
     await _box.put(item.id, item.toMap());
+    await _syncReminder(item);
   }
 
   Future<void> delete(String id) async {
+    await _cancelReminder(id);
     await _box.delete(id);
   }
 
