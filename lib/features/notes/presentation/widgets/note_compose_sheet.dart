@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../../global/themes/app_colors.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/note_item.dart';
+import 'note_task_type_switch.dart';
 
 /// Bottom sheet ligero para crear una nota (o tarea sin fecha).
 Future<void> showNoteComposeSheet(
@@ -139,21 +139,9 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
                 ),
               ),
               const SizedBox(height: 12),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: SwitchListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  title: Text('Es una tarea', style: textTheme.labelLarge),
-                  subtitle: Text(
-                    'Muestra un checkbox en la lista',
-                    style: textTheme.bodySmall,
-                  ),
-                  value: _isTask,
-                  onChanged: (value) => setState(() => _isTask = value),
-                ),
+              NoteTaskTypeSwitch(
+                value: _isTask,
+                onChanged: (value) => setState(() => _isTask = value),
               ),
               const SizedBox(height: 16),
               Row(

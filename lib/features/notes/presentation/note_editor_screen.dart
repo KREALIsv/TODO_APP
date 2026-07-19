@@ -8,6 +8,7 @@ import '../data/tags_repository.dart';
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
 import '../domain/task_groups.dart';
+import 'widgets/note_task_type_switch.dart';
 import 'widgets/tags_editor.dart';
 import 'widgets/task_when_field.dart';
 
@@ -214,7 +215,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final isTask = _type == NoteType.task;
 
     return Scaffold(
@@ -304,32 +304,20 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             onChanged: (tags) => setState(() => _tags = tags),
           ),
           const SizedBox(height: 24),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: SwitchListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-              title: Text('Es una tarea', style: textTheme.labelLarge),
-              subtitle: Text(
-                'Muestra un checkbox en la lista',
-                style: textTheme.bodySmall,
-              ),
-              value: isTask,
-              onChanged: (value) {
-                setState(() {
-                  _type = value ? NoteType.task : NoteType.note;
-                  if (!value) {
-                    _completed = false;
-                    _dueAt = null;
-                    _dueHasTime = false;
-                    _todayOn = false;
-                    _reminderMinutesBefore = null;
-                  }
-                });
-              },
-            ),
+          NoteTaskTypeSwitch(
+            value: isTask,
+            onChanged: (value) {
+              setState(() {
+                _type = value ? NoteType.task : NoteType.note;
+                if (!value) {
+                  _completed = false;
+                  _dueAt = null;
+                  _dueHasTime = false;
+                  _todayOn = false;
+                  _reminderMinutesBefore = null;
+                }
+              });
+            },
           ),
           ],
         ),

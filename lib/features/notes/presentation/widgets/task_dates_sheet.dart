@@ -1,10 +1,11 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../global/themes/app_colors.dart';
-import '../../../../global/themes/tokens.dart';
 import '../../data/task_reminders_service.dart';
 import '../../domain/date_only.dart';
 import '../../domain/reminder_offset.dart';
+import 'tappable_value_field.dart';
 
 class TaskDatesSheetResult {
   const TaskDatesSheetResult({
@@ -19,6 +20,8 @@ class TaskDatesSheetResult {
   final int? reminderMinutesBefore;
   final bool clearDate;
 }
+
+enum _TaskDatesPage { form, date, time }
 
 /// Panel de detalle de fecha (PRD §6.12): fecha, hora y recordatorio.
 Future<TaskDatesSheetResult?> showTaskDatesSheet(
@@ -63,6 +66,10 @@ class _TaskDatesSheetState extends State<TaskDatesSheet> {
   late bool _dueHasTime;
   int? _reminderMinutesBefore;
 
+  _TaskDatesPage _page = _TaskDatesPage.form;
+  late DateTime _draftDate;
+  late TimeOfDay _draftTime;
+
   static const _months = [
     'ene',
     'feb',
@@ -86,6 +93,10 @@ class _TaskDatesSheetState extends State<TaskDatesSheet> {
     _dueAt = _dueHasTime ? seed : dateOnly(seed);
     _reminderMinutesBefore =
         widget.dueAt == null ? null : widget.reminderMinutesBefore;
+    _draftDate = dateOnly(_dueAt);
+    _draftTime = _dueHasTime
+        ? TimeOfDay.fromDateTime(_dueAt)
+        : TimeOfDay.fromDateTime(DateTime.now());
   }
 
   String _formatDate() {
@@ -101,46 +112,52 @@ class _TaskDatesSheetState extends State<TaskDatesSheet> {
     return '$h12:$minute ${isPm ? 'PM' : 'AM'}';
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: dateOnly(_dueAt),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-      useRootNavigator: true,
-    );
-    if (picked == null || !mounted) return;
+  void _openDate() {
     setState(() {
-      _dueAt = _dueHasTime
-          ? DateTime(
-              picked.year,
-              picked.month,
-              picked.day,
-              _dueAt.hour,
-              _dueAt.minute,
-            )
-          : DateTime(picked.year, picked.month, picked.day);
+      _draftDate = dateOnly(_dueAt);
+      _page = _TaskDatesPage.date;
     });
   }
 
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _dueHasTime
+  void _openTime() {
+    setState(() {
+      _draftTime = _dueHasTime
           ? TimeOfDay.fromDateTime(_dueAt)
-          : TimeOfDay.fromDateTime(DateTime.now()),
-      useRootNavigator: true,
-    );
-    if (picked == null || !mounted) return;
+          : TimeOfDay.fromDateTime(DateTime.now());
+      _page = _TaskDatesPage.time;
+    });
+  }
+
+  void _backToForm() {
+    setState(() => _page = _TaskDatesPage.form);
+  }
+
+  void _confirmDate() {
+    setState(() {
+      _dueAt = _dueHasTime
+          ? DateTime(
+              _draftDate.year,
+              _draftDate.month,
+              _draftDate.day,
+              _dueAt.hour,
+              _dueAt.minute,
+            )
+          : DateTime(_draftDate.year, _draftDate.month, _draftDate.day);
+      _page = _TaskDatesPage.form;
+    });
+  }
+
+  void _confirmTime() {
     setState(() {
       _dueHasTime = true;
       _dueAt = DateTime(
         _dueAt.year,
         _dueAt.month,
         _dueAt.day,
-        picked.hour,
-        picked.minute,
+        _draftTime.hour,
+        _draftTime.minute,
       );
+      _page = _TaskDatesPage.form;
     });
   }
 
@@ -192,157 +209,257 @@ class _TaskDatesSheetState extends State<TaskDatesSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.9;
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const SizedBox(width: 40),
-                  Expanded(
-                    child: Text(
-                      'Fecha',
-                      textAlign: TextAlign.center,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Cerrar',
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text('Vencimiento', style: textTheme.labelLarge),
-              const SizedBox(height: 8),
-              _EditableValueField(
-                value: _formatDate(),
-                onTap: _pickDate,
-              ),
-              const SizedBox(height: 16),
-              Text('Hora', style: textTheme.labelLarge),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _EditableValueField(
-                      value: _dueHasTime ? _formatTime() : 'Sin hora',
-                      isPlaceholder: !_dueHasTime,
-                      onTap: _pickTime,
-                    ),
-                  ),
-                  if (_dueHasTime) ...[
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: _clearTime,
-                      child: const Text('Quitar'),
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text('Recordatorio', style: textTheme.labelLarge),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<int?>(
-                // ignore: deprecated_member_use
-                value: _reminderMinutesBefore,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: switch (_page) {
+              _TaskDatesPage.form => KeyedSubtree(
+                  key: const ValueKey('dates-form'),
+                  child: _buildFormPage(context),
                 ),
-                items: [
-                  const DropdownMenuItem<int?>(
-                    value: null,
-                    child: Text('Ninguno'),
-                  ),
-                  ...ReminderOffset.presets.map(
-                    (preset) => DropdownMenuItem<int?>(
-                      value: preset.minutesBefore,
-                      child: Text(preset.label),
-                    ),
-                  ),
-                ],
-                onChanged: (value) => _pickReminder(value),
-              ),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _save,
-                child: const Text('Guardar'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: _clear,
-                child: const Text('Quitar fecha'),
-              ),
-            ],
+              _TaskDatesPage.date => KeyedSubtree(
+                  key: const ValueKey('dates-date'),
+                  child: _buildDatePage(context),
+                ),
+              _TaskDatesPage.time => KeyedSubtree(
+                  key: const ValueKey('dates-time'),
+                  child: _buildTimePage(context),
+                ),
+            },
           ),
         ),
       ),
     );
   }
-}
 
-class _EditableValueField extends StatelessWidget {
-  const _EditableValueField({
-    required this.value,
-    required this.onTap,
-    this.isPlaceholder = false,
-  });
-
-  final String value;
-  final VoidCallback onTap;
-  final bool isPlaceholder;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSheetHeader({
+    required String title,
+    VoidCallback? onBack,
+    VoidCallback? onClose,
+  }) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Material(
-      color: AppColors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: ThemeTokens.borderRadius,
-        side: BorderSide(color: AppColors.neutral20),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+      child: Row(
+        children: [
+          if (onBack != null)
+            IconButton(
+              tooltip: 'Volver',
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+            )
+          else
+            const SizedBox(width: 40),
+          Expanded(
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (onClose != null)
+            IconButton(
+              tooltip: 'Cerrar',
+              onPressed: onClose,
+              icon: const Icon(Icons.close),
+            )
+          else
+            const SizedBox(width: 40),
+        ],
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: ThemeTokens.borderRadius,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  value,
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: isPlaceholder
-                        ? AppColors.neutral40
-                        : AppColors.neutral100,
-                  ),
+    );
+  }
+
+  Widget _buildFooter(List<Widget> children) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        20 + MediaQuery.viewPaddingOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _buildFormPage(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildSheetHeader(
+            title: 'Fecha',
+            onClose: () => Navigator.of(context).pop(),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Vencimiento', style: textTheme.labelLarge),
+                const SizedBox(height: 8),
+                TappableValueField(
+                  value: _formatDate(),
+                  onTap: _openDate,
                 ),
-              ),
-              const Icon(
-                Icons.expand_more,
-                size: 22,
-                color: AppColors.neutral60,
-              ),
-            ],
+                const SizedBox(height: 16),
+                Text('Hora', style: textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TappableValueField(
+                        value: _dueHasTime ? _formatTime() : 'Sin hora',
+                        isPlaceholder: !_dueHasTime,
+                        onTap: _openTime,
+                      ),
+                    ),
+                    if (_dueHasTime) ...[
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: _clearTime,
+                        child: const Text('Quitar'),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text('Recordatorio', style: textTheme.labelLarge),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int?>(
+                  // ignore: deprecated_member_use
+                  value: _reminderMinutesBefore,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                  ),
+                  items: [
+                    const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('Ninguno'),
+                    ),
+                    ...ReminderOffset.presets.map(
+                      (preset) => DropdownMenuItem<int?>(
+                        value: preset.minutesBefore,
+                        child: Text(preset.label),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) => _pickReminder(value),
+                ),
+              ],
+            ),
+          ),
+          _buildFooter([
+            FilledButton(
+              onPressed: _save,
+              child: const Text('Guardar'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: _clear,
+              child: const Text('Quitar fecha'),
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDatePage(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSheetHeader(
+          title: 'Vencimiento',
+          onBack: _backToForm,
+        ),
+        CalendarDatePicker(
+          initialDate: _draftDate,
+          firstDate: DateTime(2000),
+          lastDate: DateTime(2100),
+          currentDate: dateOnly(DateTime.now()),
+          onDateChanged: (picked) {
+            setState(() => _draftDate = dateOnly(picked));
+          },
+        ),
+        _buildFooter([
+          FilledButton(
+            onPressed: _confirmDate,
+            child: const Text('Listo'),
+          ),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildTimePage(BuildContext context) {
+    final seed = DateTime(
+      _dueAt.year,
+      _dueAt.month,
+      _dueAt.day,
+      _draftTime.hour,
+      _draftTime.minute,
+    );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSheetHeader(
+          title: 'Hora',
+          onBack: _backToForm,
+        ),
+        SizedBox(
+          height: 216,
+          child: CupertinoTheme(
+            data: const CupertinoThemeData(
+              primaryColor: AppColors.primary,
+            ),
+            child: CupertinoDatePicker(
+              mode: CupertinoDatePickerMode.time,
+              initialDateTime: seed,
+              use24hFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+              onDateTimeChanged: (picked) {
+                setState(() => _draftTime = TimeOfDay.fromDateTime(picked));
+              },
+            ),
           ),
         ),
-      ),
+        _buildFooter([
+          FilledButton(
+            onPressed: _confirmTime,
+            child: const Text('Listo'),
+          ),
+        ]),
+      ],
     );
   }
 }

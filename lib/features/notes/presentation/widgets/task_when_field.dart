@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../../global/themes/app_colors.dart';
-import '../../../../global/themes/tokens.dart';
 import '../../domain/date_only.dart';
 import 'task_dates_sheet.dart';
+import 'tappable_value_field.dart';
 
 enum TaskWhenKind { today, tomorrow, date, someday }
 
@@ -228,60 +228,12 @@ class TaskWhenField extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        _WhenValueField(
-          label: _fieldLabel,
+        TappableValueField(
+          value: _fieldLabel,
           isPlaceholder: _isPlaceholder,
-          showOverdue: _showOverdue,
           onTap: () => _openConfiguration(context),
-        ),
-      ],
-    );
-  }
-}
-
-/// Input-like value row (same radius/border language as text fields).
-class _WhenValueField extends StatelessWidget {
-  const _WhenValueField({
-    required this.label,
-    required this.isPlaceholder,
-    required this.showOverdue,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool isPlaceholder;
-  final bool showOverdue;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Material(
-      color: AppColors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: ThemeTokens.borderRadius,
-        side: BorderSide(color: AppColors.neutral20),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: ThemeTokens.borderRadius,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: isPlaceholder
-                        ? AppColors.neutral40
-                        : AppColors.neutral100,
-                  ),
-                ),
-              ),
-              if (showOverdue) ...[
-                Container(
+          trailing: _showOverdue
+              ? Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 3,
@@ -297,18 +249,10 @@ class _WhenValueField extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              const Icon(
-                Icons.expand_more,
-                size: 22,
-                color: AppColors.neutral60,
-              ),
-            ],
-          ),
+                )
+              : null,
         ),
-      ),
+      ],
     );
   }
 }
