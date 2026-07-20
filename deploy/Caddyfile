@@ -1,0 +1,32 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$LANDING_DOMAIN} {
+	root * /srv/landing
+	encode gzip zstd
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+	file_server
+}
+
+www.{$LANDING_DOMAIN} {
+	redir https://{$LANDING_DOMAIN}{uri} permanent
+}
+
+{$APP_DOMAIN} {
+	root * /srv/web
+	encode gzip zstd
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+	try_files {path} /index.html
+	file_server
+}
