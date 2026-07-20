@@ -6,6 +6,7 @@ import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/activity_stats.dart';
 import '../../notes/domain/notes_filter.dart';
 import '../../notes/presentation/widgets/activity_heatmap.dart';
+import '../../notes/presentation/widgets/monthly_activity_bars.dart';
 import '../../settings/presentation/widgets/list_background_layer.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -56,6 +57,10 @@ class ProfileScreen extends StatelessWidget {
                     textTheme: textTheme,
                     bestStreak: baseStats.bestStreak,
                     activeDayCount: baseStats.activeDayCount,
+                  ),
+                  const SizedBox(height: 16),
+                  MonthlyActivityBars(
+                    bars: monthlyEventBars(eventCounts: metrics.eventCounts),
                   ),
                   const SizedBox(height: 20),
                   _ContentRows(

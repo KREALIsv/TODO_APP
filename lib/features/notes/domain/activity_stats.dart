@@ -136,6 +136,73 @@ List<int> weekCounts({
   return cells;
 }
 
+/// One month column for the monthly activity bars chart.
+class MonthActivityBar {
+  const MonthActivityBar({
+    required this.year,
+    required this.month,
+    required this.label,
+    required this.count,
+  });
+
+  final int year;
+  final int month;
+
+  /// Single-letter Spanish month label (E, F, M…).
+  final String label;
+  final int count;
+}
+
+const _monthLetterLabels = [
+  'E',
+  'F',
+  'M',
+  'A',
+  'M',
+  'J',
+  'J',
+  'A',
+  'S',
+  'O',
+  'N',
+  'D',
+];
+
+/// First day of the calendar month containing [value].
+DateTime startOfMonth(DateTime value) {
+  final day = dateOnly(value);
+  return DateTime(day.year, day.month);
+}
+
+/// Event counts for the last [months] calendar months (oldest → newest).
+/// Uses the same write-activity definition as the heatmap.
+List<MonthActivityBar> monthlyEventBars({
+  required Map<DateTime, int> eventCounts,
+  DateTime? now,
+  int months = 12,
+}) {
+  assert(months > 0);
+  final reference = now ?? DateTime.now();
+  final current = startOfMonth(reference);
+
+  final totals = <DateTime, int>{};
+  for (final entry in eventCounts.entries) {
+    final key = startOfMonth(entry.key);
+    totals[key] = (totals[key] ?? 0) + entry.value;
+  }
+
+  return List<MonthActivityBar>.generate(months, (i) {
+    final offset = months - 1 - i;
+    final monthStart = DateTime(current.year, current.month - offset);
+    return MonthActivityBar(
+      year: monthStart.year,
+      month: monthStart.month,
+      label: _monthLetterLabels[monthStart.month - 1],
+      count: totals[monthStart] ?? 0,
+    );
+  });
+}
+
 class ActivityStats {
   const ActivityStats({
     required this.streak,

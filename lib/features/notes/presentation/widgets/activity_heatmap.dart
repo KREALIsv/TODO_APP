@@ -174,6 +174,15 @@ class ActivityHeatmap extends StatelessWidget {
     return scheme.primary;
   }
 
+  /// Maps a 0..1 intensity (e.g. month count / max month) onto the heatmap palette.
+  static Color colorForIntensity(double intensity, ColorScheme scheme) {
+    if (intensity <= 0) return colorForCount(0, scheme);
+    if (intensity < 0.25) return colorForCount(1, scheme);
+    if (intensity < 0.5) return colorForCount(2, scheme);
+    if (intensity < 0.75) return colorForCount(4, scheme);
+    return colorForCount(5, scheme);
+  }
+
   List<String?> _monthLabelsForWeeks() {
     final labels = List<String?>.filled(weeks, null);
     var lastMonth = -1;
