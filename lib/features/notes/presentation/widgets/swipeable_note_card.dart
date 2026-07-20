@@ -6,8 +6,8 @@ import '../../../../global/themes/tokens.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/note_item.dart';
-import '../../domain/task_dates.dart';
 import 'note_card.dart';
+import 'note_card_context_sheet.dart';
 
 class SwipeableNoteCard extends StatelessWidget {
   const SwipeableNoteCard({
@@ -95,60 +95,37 @@ class SwipeableNoteCard extends StatelessWidget {
     );
   }
 
-  Future<void> _showContextMenu(BuildContext context) async {
-    final isTask = item.type == NoteType.task;
-    final todayOn = item.isTodayCommitment();
-
-    await showModalBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isTask)
-                ListTile(
-                  leading: Icon(
-                    todayOn ? Icons.wb_sunny : Icons.wb_sunny_outlined,
-                    color: Theme.of(sheetContext).colorScheme.primary,
-                  ),
-                  title: Text(todayOn ? 'Quitar de hoy' : 'Hacer hoy'),
-                  onTap: () async {
-                    Navigator.pop(sheetContext);
-                    await _repo.setTodayCommitment(item.id, !todayOn);
-                  },
-                ),
-              if (!item.isArchived)
-                ListTile(
-                  leading: const Icon(Icons.archive_outlined),
-                  title: const Text('Archivar'),
-                  onTap: () async {
-                    Navigator.pop(sheetContext);
-                    await _archive(context);
-                  },
-                ),
-              if (item.isArchived)
-                ListTile(
-                  leading: const Icon(Icons.unarchive_outlined),
-                  title: const Text('Restaurar'),
-                  onTap: () async {
-                    Navigator.pop(sheetContext);
-                    await _repo.restore(item.id);
-                  },
-                ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: AppColors.error),
-                title: const Text('Eliminar'),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  await _deleteForever(context);
-                },
-              ),
-            ],
-          ),
-        );
-      },
+  Future<void> _duplicate(BuildContext context) async {
+    final copy = await _repo.duplicate(item.id);
+    if (copy == null || !context.mounted) return;
+    final kind = item.type == NoteType.task ? 'Tarea' : 'Nota';
+    await _undoToast(
+      context,
+      message: '$kind duplicada',
+      onUndo: () => _repo.delete(copy.id),
     );
+  }
+
+  Future<void> _showContextMenu(BuildContext context) async {
+    final action = await showNoteCardContextSheet(
+      context,
+      item: item,
+      repository: _repo,
+    );
+    if (action == null || !context.mounted) return;
+
+    switch (action) {
+      case NoteCardContextAction.pin:
+        await _pin(context);
+      case NoteCardContextAction.duplicate:
+        await _duplicate(context);
+      case NoteCardContextAction.archive:
+        await _archive(context);
+      case NoteCardContextAction.restore:
+        await _repo.restore(item.id);
+      case NoteCardContextAction.delete:
+        await _deleteForever(context);
+    }
   }
 
   @override

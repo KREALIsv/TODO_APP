@@ -112,12 +112,66 @@ void main() {
     expect(repo.getArchived(), isEmpty);
   });
 
-  test('setTodayCommitment toggles todayAt', () async {
-    await repo.add(buildItem(id: 't', type: NoteType.task));
+  test('setTodayCommitment toggles todayAt and clears due when on', () async {
+    await repo.add(
+      buildItem(id: 't', type: NoteType.task).copyWith(
+        dueAt: DateTime(2026, 7, 20),
+        dueHasTime: true,
+        reminderMinutesBefore: 30,
+      ),
+    );
     await repo.setTodayCommitment('t', true);
-    expect(repo.getById('t')?.todayAt, isNotNull);
+    final on = repo.getById('t')!;
+    expect(on.todayAt, isNotNull);
+    expect(on.dueAt, isNull);
+    expect(on.dueHasTime, isFalse);
+    expect(on.reminderMinutesBefore, isNull);
+
     await repo.setTodayCommitment('t', false);
     expect(repo.getById('t')?.todayAt, isNull);
+  });
+
+  test('applyTaskWhen matches exclusive Hoy / Mañana semantics', () async {
+    await repo.add(buildItem(id: 't', type: NoteType.task));
+
+    await repo.applyTaskWhen('t', todayOn: true, dueAt: null);
+    expect(repo.getById('t')?.todayAt, isNotNull);
+    expect(repo.getById('t')?.dueAt, isNull);
+
+    final tomorrow = DateTime(2026, 7, 21);
+    await repo.applyTaskWhen(
+      't',
+      todayOn: false,
+      dueAt: tomorrow,
+      dueHasTime: false,
+    );
+    final after = repo.getById('t')!;
+    expect(after.todayAt, isNull);
+    expect(after.dueAt, tomorrow);
+  });
+
+  test('duplicate copies content and resets pin/completed/archive', () async {
+    await repo.add(
+      buildItem(id: 'src', type: NoteType.task, pinned: true, completed: true)
+          .copyWith(
+        tags: const ['Work'],
+        dueAt: DateTime(2026, 7, 22),
+        completedAt: DateTime(2026, 7, 16),
+        archivedAt: DateTime(2026, 7, 16),
+      ),
+    );
+
+    final copy = await repo.duplicate('src');
+    expect(copy, isNotNull);
+    expect(copy!.id, isNot('src'));
+    expect(copy.title, 'Title src');
+    expect(copy.tags, ['Work']);
+    expect(copy.dueAt, DateTime(2026, 7, 22));
+    expect(copy.pinned, isFalse);
+    expect(copy.completed, isFalse);
+    expect(copy.completedAt, isNull);
+    expect(copy.archivedAt, isNull);
+    expect(repo.getById(copy.id), isNotNull);
   });
 
   test('toMap and fromMap roundtrip', () {

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
@@ -11,6 +12,7 @@ class NotesRepository {
   static final NotesRepository instance = NotesRepository._();
 
   static const String _boxName = 'notes';
+  static const _uuid = Uuid();
 
   late Box<Map> _box;
   TaskRemindersService _reminders = TaskRemindersService.instance;
@@ -131,12 +133,61 @@ class NotesRepository {
     final current = getById(id);
     if (current == null || current.type != NoteType.task) return;
     final now = DateTime.now();
+    // Match editor «Hoy» exclusivity: commitment clears due / reminder.
     await update(
       current.copyWith(
         todayAt: on ? now : null,
+        dueAt: on ? null : current.dueAt,
+        dueHasTime: on ? false : current.dueHasTime,
+        reminderMinutesBefore:
+            on ? null : current.reminderMinutesBefore,
         updatedAt: now,
       ),
     );
+  }
+
+  /// Applies exclusive «¿Cuándo?» fields (same contract as [TaskWhenField.onChanged]).
+  Future<void> applyTaskWhen(
+    String id, {
+    required bool todayOn,
+    DateTime? dueAt,
+    bool dueHasTime = false,
+    int? reminderMinutesBefore,
+  }) async {
+    final current = getById(id);
+    if (current == null || current.type != NoteType.task) return;
+    final now = DateTime.now();
+    final nextTodayAt = todayOn
+        ? (current.isTodayCommitment(now) ? current.todayAt : now)
+        : null;
+    await update(
+      current.copyWith(
+        todayAt: nextTodayAt,
+        dueAt: dueAt,
+        dueHasTime: dueHasTime,
+        reminderMinutesBefore:
+            dueAt != null ? reminderMinutesBefore : null,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  /// Copies content/tags/dates; resets pin, completion and archive. Returns the copy.
+  Future<NoteItem?> duplicate(String id) async {
+    final current = getById(id);
+    if (current == null) return null;
+    final now = DateTime.now();
+    final copy = current.copyWith(
+      id: _uuid.v4(),
+      pinned: false,
+      completed: false,
+      completedAt: null,
+      archivedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await add(copy);
+    return copy;
   }
 
   Future<void> archive(String id) async {

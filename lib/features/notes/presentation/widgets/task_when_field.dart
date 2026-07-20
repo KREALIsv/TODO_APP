@@ -8,6 +8,9 @@ import 'tappable_value_field.dart';
 enum TaskWhenKind { today, tomorrow, date, someday }
 
 /// Exclusive «¿Cuándo?» selector for tasks.
+///
+/// Set [compact] for context menus: chips only (no section title / value field),
+/// with the date chip labeled «Más…».
 class TaskWhenField extends StatelessWidget {
   const TaskWhenField({
     super.key,
@@ -16,12 +19,14 @@ class TaskWhenField extends StatelessWidget {
     required this.todayOn,
     required this.onChanged,
     this.reminderMinutesBefore,
+    this.compact = false,
   });
 
   final DateTime? dueAt;
   final bool dueHasTime;
   final bool todayOn;
   final int? reminderMinutesBefore;
+  final bool compact;
   final void Function({
     required bool todayOn,
     DateTime? dueAt,
@@ -195,46 +200,52 @@ class TaskWhenField extends StatelessWidget {
     );
   }
 
+  Widget _chips(BuildContext context) {
+    final selected = _selected;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _chip(
+          context: context,
+          label: 'Hoy',
+          selected: selected == TaskWhenKind.today,
+          onSelected: _selectToday,
+        ),
+        _chip(
+          context: context,
+          label: 'Mañana',
+          selected: selected == TaskWhenKind.tomorrow,
+          onSelected: _selectTomorrow,
+        ),
+        _chip(
+          context: context,
+          label: compact ? 'Más…' : 'Fecha',
+          selected: selected == TaskWhenKind.date,
+          onSelected: () => _openConfiguration(context),
+        ),
+        _chip(
+          context: context,
+          label: 'Algún día',
+          selected: selected == TaskWhenKind.someday,
+          onSelected: _selectSomeday,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (compact) return _chips(context);
+
     final textTheme = Theme.of(context).textTheme;
-    final selected = _selected;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('¿Cuándo?', style: textTheme.labelLarge),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _chip(
-              context: context,
-              label: 'Hoy',
-              selected: selected == TaskWhenKind.today,
-              onSelected: _selectToday,
-            ),
-            _chip(
-              context: context,
-              label: 'Mañana',
-              selected: selected == TaskWhenKind.tomorrow,
-              onSelected: _selectTomorrow,
-            ),
-            _chip(
-              context: context,
-              label: 'Fecha',
-              selected: selected == TaskWhenKind.date,
-              onSelected: () => _openConfiguration(context),
-            ),
-            _chip(
-              context: context,
-              label: 'Algún día',
-              selected: selected == TaskWhenKind.someday,
-              onSelected: _selectSomeday,
-            ),
-          ],
-        ),
+        _chips(context),
         const SizedBox(height: 10),
         TappableValueField(
           value: _fieldLabel,
