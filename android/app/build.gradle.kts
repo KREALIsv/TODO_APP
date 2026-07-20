@@ -6,7 +6,10 @@ plugins {
 
 android {
     namespace = "app.kreali.dowo"
-    compileSdk = flutter.compileSdkVersion
+    // Android 16 (API 36): Flutter 3.44 default + Google Play requirement (from Aug 31, 2026).
+    // See https://docs.flutter.dev/deployment/android and
+    // https://developer.android.com/google/play/requirements/target-sdk
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -17,10 +20,10 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "app.kreali.dowo"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        // minSdk 24 = Android 7.0 (Flutter default / engine floor).
+        // targetSdk 36 = Android 16 (required by Play for new apps/updates).
+        minSdk = 24
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
