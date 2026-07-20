@@ -1,4 +1,4 @@
-package com.example.todos_app
+package app.kreali.dowo
 
 import io.flutter.embedding.android.FlutterActivity
 
