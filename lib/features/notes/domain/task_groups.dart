@@ -62,27 +62,35 @@ class TaskGroupsQuery {
         continue;
       }
 
-      if (item.completed) {
-        // Completed earlier than today (or without completedAt) → Completadas.
-        completedEarlier.add(item);
+      if (item.dueAt != null && dateOnly(item.dueAt!).isAfter(todayDay)) {
+        upcoming.add(item);
         continue;
       }
 
-      if (item.dueAt != null && dateOnly(item.dueAt!).isAfter(todayDay)) {
-        upcoming.add(item);
-      } else if (item.dueAt == null && !item.isTodayCommitment(reference)) {
+      if (item.dueAt == null && !item.isTodayCommitment(reference)) {
         undated.add(item);
+        continue;
+      }
+
+      if (item.completed) {
+        completedEarlier.add(item);
       }
     }
 
     today.sort((a, b) => _compareToday(a, b, todayDay, reference));
-    upcoming.sort((a, b) => a.dueAt!.compareTo(b.dueAt!));
-    undated.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    upcoming.sort(_compareUpcoming);
+    undated.sort(_compareUndated);
     completedEarlier.sort((a, b) {
       final aAt = a.completedAt ?? a.updatedAt;
       final bAt = b.completedAt ?? b.updatedAt;
       return bAt.compareTo(aAt);
     });
+
+    if (completedEarlier.isNotEmpty) {
+      undated.addAll(completedEarlier);
+      undated.sort(_compareUndated);
+      completedEarlier.clear();
+    }
 
     return TaskGroups(
       today: today,
@@ -101,24 +109,25 @@ class TaskGroupsQuery {
   }
 
   /// PRD §6.2: switch today OR due today OR overdue incomplete;
-  /// completed today stay (due today / switch); overdue completed leave.
+  /// completed today stay in Hoy (due today / switch / inbox); future-due
+  /// completed go to Próximas; overdue completed completed today stay in Hoy.
   static bool _belongsToToday(
     NoteItem item,
     DateTime todayDay,
     DateTime now,
   ) {
-    final commitment = item.isTodayCommitment(now);
-    final dueToday = item.isDueToday(now);
-
     if (item.completed) {
-      if (!item.isCompletedToday(now)) return false;
-      // Vencidas completadas salen de Hoy.
-      if (item.dueAt != null && dateOnly(item.dueAt!).isBefore(todayDay)) {
+      if (item.dueAt != null && dateOnly(item.dueAt!).isAfter(todayDay)) {
         return false;
       }
+      if (item.isCompletedToday(now)) return true;
+      final commitment = item.isTodayCommitment(now);
+      final dueToday = item.isDueToday(now);
       return commitment || dueToday;
     }
 
+    final commitment = item.isTodayCommitment(now);
+    final dueToday = item.isDueToday(now);
     return commitment || dueToday || item.isOverdue(now);
   }
 
@@ -151,6 +160,28 @@ class TaskGroupsQuery {
       return (a.todayAt ?? a.updatedAt).compareTo(b.todayAt ?? b.updatedAt);
     }
     return a.updatedAt.compareTo(b.updatedAt);
+  }
+
+  /// Pending first, then by due date; completed last (newest completion first).
+  static int _compareUpcoming(NoteItem a, NoteItem b) {
+    if (a.completed != b.completed) return a.completed ? 1 : -1;
+    if (a.completed && b.completed) {
+      final aAt = a.completedAt ?? a.updatedAt;
+      final bAt = b.completedAt ?? b.updatedAt;
+      return bAt.compareTo(aAt);
+    }
+    return a.dueAt!.compareTo(b.dueAt!);
+  }
+
+  /// Pending first by recency; completed last (newest completion first).
+  static int _compareUndated(NoteItem a, NoteItem b) {
+    if (a.completed != b.completed) return a.completed ? 1 : -1;
+    if (a.completed && b.completed) {
+      final aAt = a.completedAt ?? a.updatedAt;
+      final bAt = b.completedAt ?? b.updatedAt;
+      return bAt.compareTo(aAt);
+    }
+    return b.updatedAt.compareTo(a.updatedAt);
   }
 
   static int _todayRank(NoteItem item, DateTime todayDay, DateTime now) {

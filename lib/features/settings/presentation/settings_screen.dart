@@ -19,13 +19,23 @@ class SettingsScreen extends StatelessWidget {
     super.key,
     this.repository,
     this.settings,
+    this.onResetSelectedDay,
   });
 
   final NotesRepository? repository;
   final SettingsRepository? settings;
 
+  /// Restores the home day selector to today, then returns to the root route.
+  final VoidCallback? onResetSelectedDay;
+
   NotesRepository get _repo => repository ?? NotesRepository.instance;
   SettingsRepository get _settings => settings ?? SettingsRepository.instance;
+
+  void _goToToday(BuildContext context) {
+    onResetSelectedDay?.call();
+    if (!context.mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
 
   Future<void> _pickTheme(BuildContext context) async {
     final selected = await showSettingsRadioSheet<ThemeMode>(
@@ -242,6 +252,16 @@ class SettingsScreen extends StatelessWidget {
                           accent: accent,
                           onTap: () => _openArchived(context),
                         ),
+                        if (onResetSelectedDay != null) ...[
+                          const SettingsDivider(),
+                          SettingsRow(
+                            icon: Icons.today_outlined,
+                            title: 'Ir a hoy',
+                            trailing: 'Restaurar fecha',
+                            accent: accent,
+                            onTap: () => _goToToday(context),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 20),

@@ -236,7 +236,19 @@ class TaskWhenField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (compact) return _chips(context);
+    if (compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '¿Cuándo?',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 8),
+          _chips(context),
+        ],
+      );
+    }
 
     final textTheme = Theme.of(context).textTheme;
 

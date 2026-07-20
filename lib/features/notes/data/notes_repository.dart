@@ -2,8 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../domain/date_only.dart';
+import '../domain/day_entry.dart';
+import '../domain/day_log.dart';
+import '../domain/day_migration.dart';
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
+import 'day_entries_repository.dart';
 import 'task_reminders_service.dart';
 
 class NotesRepository {
@@ -16,6 +21,7 @@ class NotesRepository {
 
   late Box<Map> _box;
   TaskRemindersService _reminders = TaskRemindersService.instance;
+  DayEntriesRepository _dayEntries = DayEntriesRepository.instance;
 
   Future<void> init() async {
     _box = await Hive.openBox<Map>(_boxName);
@@ -30,6 +36,11 @@ class NotesRepository {
   @visibleForTesting
   set remindersForTests(TaskRemindersService service) {
     _reminders = service;
+  }
+
+  @visibleForTesting
+  set dayEntriesForTests(DayEntriesRepository repo) {
+    _dayEntries = repo;
   }
 
   ValueListenable<Box<Map>> listenable() => _box.listenable();
@@ -120,6 +131,7 @@ class NotesRepository {
     if (current == null || current.type != NoteType.task) return;
     final now = DateTime.now();
     final nextCompleted = !current.completed;
+    final day = commitmentDayFor(current, now);
     await update(
       current.copyWith(
         completed: nextCompleted,
@@ -127,12 +139,24 @@ class NotesRepository {
         updatedAt: now,
       ),
     );
+    await _syncDayEntry(() async {
+      if (nextCompleted) {
+        await _dayEntries.markCompleted(
+          noteId: id,
+          day: day,
+          outcomeAt: now,
+        );
+      } else {
+        await _dayEntries.reopen(noteId: id, day: day);
+      }
+    }, 'toggleCompleted');
   }
 
   Future<void> setTodayCommitment(String id, bool on) async {
     final current = getById(id);
     if (current == null || current.type != NoteType.task) return;
     final now = DateTime.now();
+    final previousToday = current.todayAt;
     // Match editor «Hoy» exclusivity: commitment clears due / reminder.
     await update(
       current.copyWith(
@@ -144,6 +168,22 @@ class NotesRepository {
         updatedAt: now,
       ),
     );
+    await _syncDayEntry(() async {
+      if (on) {
+        await _dayEntries.ensurePlanned(
+          noteId: id,
+          day: dateOnly(now),
+          via: DayVia.todaySwitch,
+          now: now,
+        );
+      } else if (previousToday != null) {
+        await _dayEntries.markBackloggedIfOpen(
+          noteId: id,
+          day: dateOnly(previousToday),
+          outcomeAt: now,
+        );
+      }
+    }, 'setTodayCommitment');
   }
 
   /// Applies exclusive «¿Cuándo?» fields (same contract as [TaskWhenField.onChanged]).
@@ -157,6 +197,7 @@ class NotesRepository {
     final current = getById(id);
     if (current == null || current.type != NoteType.task) return;
     final now = DateTime.now();
+    final previousToday = current.todayAt;
     final nextTodayAt = todayOn
         ? (current.isTodayCommitment(now) ? current.todayAt : now)
         : null;
@@ -170,6 +211,127 @@ class NotesRepository {
         updatedAt: now,
       ),
     );
+    await _syncDayEntry(() async {
+      if (todayOn && nextTodayAt != null) {
+        await _dayEntries.ensurePlanned(
+          noteId: id,
+          day: dateOnly(nextTodayAt),
+          via: DayVia.todaySwitch,
+          now: now,
+        );
+      } else if (!todayOn && previousToday != null) {
+        await _dayEntries.markBackloggedIfOpen(
+          noteId: id,
+          day: dateOnly(previousToday),
+          outcomeAt: now,
+        );
+      }
+      if (dueAt != null && !todayOn) {
+        await _dayEntries.ensurePlanned(
+          noteId: id,
+          day: dateOnly(dueAt),
+          via: DayVia.due,
+          now: now,
+        );
+      }
+    }, 'applyTaskWhen');
+  }
+
+  /// Moves a task's commitment from [fromDay] to [toDay].
+  Future<void> migrateTaskToDay(
+    String id,
+    DateTime toDay, {
+    DateTime? fromDay,
+  }) async {
+    final current = getById(id);
+    if (current == null || current.type != NoteType.task) return;
+
+    final now = DateTime.now();
+    final originDay = dateOnly(fromDay ?? commitmentDayFor(current, now));
+    final targetDay = dateOnly(toDay);
+    final patches = migrateTo(current, originDay, targetDay, now);
+    await update(patches.noteUpdate.copyWith(reminderMinutesBefore: null));
+    await _syncDayEntry(
+      () => _dayEntries.applyMigrationPatches(
+        noteId: id,
+        patches: patches,
+        now: now,
+      ),
+      'migrateTaskToDay',
+    );
+  }
+
+  /// Schedules a task on [toDay], retaining any reminder for its new due date.
+  Future<void> scheduleTaskToDay(
+    String id,
+    DateTime toDay, {
+    DateTime? fromDay,
+  }) async {
+    final current = getById(id);
+    if (current == null || current.type != NoteType.task) return;
+
+    final now = DateTime.now();
+    final originDay = dateOnly(fromDay ?? commitmentDayFor(current, now));
+    final targetDay = dateOnly(toDay);
+    final patches = scheduleTo(current, originDay, targetDay, now);
+    await update(patches.noteUpdate);
+    await _syncDayEntry(
+      () => _dayEntries.applyMigrationPatches(
+        noteId: id,
+        patches: patches,
+        now: now,
+      ),
+      'scheduleTaskToDay',
+    );
+  }
+
+  /// Returns a task to the backlog and closes its day's open entry.
+  Future<void> sendTaskToBacklog(String id, {DateTime? fromDay}) async {
+    final current = getById(id);
+    if (current == null || current.type != NoteType.task) return;
+
+    final now = DateTime.now();
+    final originDay = dateOnly(fromDay ?? commitmentDayFor(current, now));
+    final patches = sendToBacklog(current, originDay, now);
+    await update(patches.noteUpdate);
+    await _syncDayEntry(
+      () => _dayEntries.applyMigrationPatches(
+        noteId: id,
+        patches: patches,
+        now: now,
+      ),
+      'sendTaskToBacklog',
+    );
+  }
+
+  /// Cancels a task's commitment on [fromDay] without deleting the task.
+  Future<void> cancelTaskOnDay(String id, {DateTime? fromDay}) async {
+    final current = getById(id);
+    if (current == null || current.type != NoteType.task) return;
+
+    final now = DateTime.now();
+    final originDay = dateOnly(fromDay ?? commitmentDayFor(current, now));
+    final patches = cancelOnDay(current, originDay, now);
+    await update(patches.noteUpdate);
+    await _syncDayEntry(
+      () => _dayEntries.applyMigrationPatches(
+        noteId: id,
+        patches: patches,
+        now: now,
+      ),
+      'cancelTaskOnDay',
+    );
+  }
+
+  Future<void> _syncDayEntry(
+    Future<void> Function() action,
+    String contextLabel,
+  ) async {
+    try {
+      await action();
+    } catch (e, st) {
+      debugPrint('DayEntry sync failed on $contextLabel: $e\n$st');
+    }
   }
 
   /// Copies content/tags/dates; resets pin, completion and archive. Returns the copy.

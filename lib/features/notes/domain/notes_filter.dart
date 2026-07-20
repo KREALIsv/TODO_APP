@@ -23,7 +23,7 @@ extension NotesFilterLabels on NotesFilter {
 
   String get listHeader {
     return switch (this) {
-      NotesFilter.all => 'Recientes',
+      NotesFilter.all => 'Del día',
       NotesFilter.pinned => 'Fijadas',
       NotesFilter.notes => 'Notas',
       NotesFilter.tasks => 'Tareas',

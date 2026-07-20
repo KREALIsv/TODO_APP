@@ -3,22 +3,32 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 
+import 'package:todos_app/features/notes/data/day_entries_repository.dart';
 import 'package:todos_app/features/notes/data/notes_repository.dart';
 import 'package:todos_app/features/notes/data/task_reminders_service.dart';
+import 'package:todos_app/features/notes/domain/date_only.dart';
+import 'package:todos_app/features/notes/domain/day_entry.dart';
 import 'package:todos_app/features/notes/domain/note_item.dart';
 
 void main() {
   late Directory tempDir;
   late NotesRepository repo;
+  late DayEntriesRepository dayEntries;
 
   setUp(() async {
     TaskRemindersService.enabled = false;
     tempDir = await Directory.systemTemp.createTemp('notes_repo_test_');
     Hive.init(tempDir.path);
-    final box = await Hive.openBox<Map>('notes_test_${DateTime.now().microsecondsSinceEpoch}');
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final box = await Hive.openBox<Map>('notes_test_$stamp');
+    final dayBox = await Hive.openBox<Map>('day_entries_test_$stamp');
     repo = NotesRepository.instance;
+    dayEntries = DayEntriesRepository.instance;
     await repo.initWithBox(box);
+    await dayEntries.initWithBox(dayBox);
+    repo.dayEntriesForTests = dayEntries;
     await repo.clear();
+    await dayEntries.clear();
   });
 
   tearDownAll(() {
@@ -127,8 +137,15 @@ void main() {
     expect(on.dueHasTime, isFalse);
     expect(on.reminderMinutesBefore, isNull);
 
+    final entry = dayEntries.findForNoteDay('t', dateOnly(DateTime.now()));
+    expect(entry, isNotNull);
+    expect(entry!.outcome, DayOutcome.open);
+    expect(entry.via, DayVia.todaySwitch);
+
     await repo.setTodayCommitment('t', false);
     expect(repo.getById('t')?.todayAt, isNull);
+    final closed = dayEntries.findForNoteDay('t', dateOnly(on.todayAt!));
+    expect(closed?.outcome, DayOutcome.backlogged);
   });
 
   test('applyTaskWhen matches exclusive Hoy / Mañana semantics', () async {
@@ -137,6 +154,10 @@ void main() {
     await repo.applyTaskWhen('t', todayOn: true, dueAt: null);
     expect(repo.getById('t')?.todayAt, isNotNull);
     expect(repo.getById('t')?.dueAt, isNull);
+    expect(
+      dayEntries.findForNoteDay('t', dateOnly(DateTime.now()))?.via,
+      DayVia.todaySwitch,
+    );
 
     final tomorrow = DateTime(2026, 7, 21);
     await repo.applyTaskWhen(
@@ -148,6 +169,125 @@ void main() {
     final after = repo.getById('t')!;
     expect(after.todayAt, isNull);
     expect(after.dueAt, tomorrow);
+    expect(
+      dayEntries.findForNoteDay('t', tomorrow)?.via,
+      DayVia.due,
+    );
+    expect(
+      dayEntries.findForNoteDay('t', tomorrow)?.outcome,
+      DayOutcome.open,
+    );
+  });
+
+  test('toggleCompleted marks DayEntry completed and reopen restores open',
+      () async {
+    await repo.add(buildItem(id: 'task', type: NoteType.task));
+    await repo.setTodayCommitment('task', true);
+    await repo.toggleCompleted('task');
+
+    final day = dateOnly(DateTime.now());
+    final done = dayEntries.findForNoteDay('task', day);
+    expect(done?.outcome, DayOutcome.completed);
+    expect(done?.outcomeAt, isNotNull);
+    expect(repo.getById('task')?.completedAt, isNotNull);
+
+    await repo.toggleCompleted('task');
+    expect(dayEntries.findForNoteDay('task', day)?.outcome, DayOutcome.open);
+    expect(repo.getById('task')?.completedAt, isNull);
+  });
+
+  test('migrateTaskToDay creates an open destination and closes origin',
+      () async {
+    final origin = dateOnly(DateTime.now());
+    final destination = dateOnly(DateTime.now().add(const Duration(days: 2)));
+    await repo.add(
+      buildItem(
+        id: 'task',
+        type: NoteType.task,
+      ).copyWith(todayAt: DateTime.now()),
+    );
+
+    await repo.migrateTaskToDay('task', destination, fromDay: origin);
+
+    final task = repo.getById('task')!;
+    expect(task.todayAt, isNull);
+    expect(task.dueAt, destination);
+    expect(task.dueHasTime, isFalse);
+    expect(task.reminderMinutesBefore, isNull);
+    final closed = dayEntries.findForNoteDay('task', origin)!;
+    expect(closed.outcome, DayOutcome.migrated);
+    expect(closed.targetDay, destination);
+    final opened = dayEntries.findForNoteDay('task', destination)!;
+    expect(opened.outcome, DayOutcome.open);
+    expect(opened.via, DayVia.migratedIn);
+  });
+
+  test('scheduleTaskToDay sets dueAt and creates a scheduled destination',
+      () async {
+    final origin = dateOnly(DateTime.now());
+    final destination = dateOnly(DateTime.now().add(const Duration(days: 3)));
+    await repo.add(
+      buildItem(
+        id: 'task',
+        type: NoteType.task,
+      ).copyWith(todayAt: DateTime.now()),
+    );
+
+    await repo.scheduleTaskToDay('task', destination, fromDay: origin);
+
+    final task = repo.getById('task')!;
+    expect(task.todayAt, isNull);
+    expect(task.dueAt, destination);
+    final closed = dayEntries.findForNoteDay('task', origin)!;
+    expect(closed.outcome, DayOutcome.scheduled);
+    expect(closed.targetDay, destination);
+    final opened = dayEntries.findForNoteDay('task', destination)!;
+    expect(opened.outcome, DayOutcome.open);
+    expect(opened.via, DayVia.scheduledIn);
+  });
+
+  test('sendTaskToBacklog clears dates and marks origin backlogged', () async {
+    final origin = dateOnly(DateTime.now().add(const Duration(days: 1)));
+    await repo.add(
+      buildItem(id: 'task', type: NoteType.task).copyWith(
+        dueAt: origin,
+        dueHasTime: true,
+        reminderMinutesBefore: 30,
+      ),
+    );
+
+    await repo.sendTaskToBacklog('task', fromDay: origin);
+
+    final task = repo.getById('task')!;
+    expect(task.todayAt, isNull);
+    expect(task.dueAt, isNull);
+    expect(task.dueHasTime, isFalse);
+    expect(task.reminderMinutesBefore, isNull);
+    expect(
+      dayEntries.findForNoteDay('task', origin)?.outcome,
+      DayOutcome.backlogged,
+    );
+  });
+
+  test('cancelTaskOnDay clears that commitment and marks origin cancelled',
+      () async {
+    final origin = dateOnly(DateTime.now().add(const Duration(days: 1)));
+    await repo.add(
+      buildItem(id: 'task', type: NoteType.task).copyWith(
+        dueAt: origin,
+        reminderMinutesBefore: 15,
+      ),
+    );
+
+    await repo.cancelTaskOnDay('task', fromDay: origin);
+
+    final task = repo.getById('task')!;
+    expect(task.dueAt, isNull);
+    expect(repo.getById('task'), isNotNull);
+    expect(
+      dayEntries.findForNoteDay('task', origin)?.outcome,
+      DayOutcome.cancelled,
+    );
   });
 
   test('duplicate copies content and resets pin/completed/archive', () async {

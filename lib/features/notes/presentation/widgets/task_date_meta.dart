@@ -17,21 +17,6 @@ class TaskDateMeta extends StatelessWidget {
   final NoteItem item;
   final DateTime? now;
 
-  static const _months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-
   String _formatTime(DateTime due) {
     final hour = due.hour;
     final minute = due.minute.toString().padLeft(2, '0');
@@ -88,8 +73,8 @@ class TaskDateMeta extends StatelessWidget {
       final label = item.dueHasTime
           ? (item.isDueToday(reference)
               ? 'Vencida · ${_formatTime(d)}'
-              : 'Vencida · ${d.day} ${_months[d.month - 1]}')
-          : '${d.day} ${_months[d.month - 1]}';
+              : 'Vencida · ${formatDayMonth(d)}')
+          : formatDayMonth(d);
       return withReminder(
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -141,7 +126,7 @@ class TaskDateMeta extends StatelessWidget {
       final d = item.dueAt!;
       return withReminder(
         meta(
-          text: '${d.day} ${_months[d.month - 1]}',
+          text: formatDayMonth(d),
           color: AppColors.neutral60,
         ),
       );

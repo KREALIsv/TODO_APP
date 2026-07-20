@@ -86,7 +86,7 @@ void main() {
     expect(groups.progress.hideIfZero, isFalse);
   });
 
-  test('overdue completed leaves Hoy', () {
+  test('overdue completed stays in Hoy when completed today', () {
     final groups = TaskGroupsQuery.from(
       [
         task(
@@ -98,8 +98,8 @@ void main() {
       ],
       now: now,
     );
-    expect(groups.today, isEmpty);
-    expect(groups.completedEarlier.map((e) => e.id), ['paid']);
+    expect(groups.today.map((e) => e.id), ['paid']);
+    expect(groups.completedEarlier, isEmpty);
   });
 
   test('badge 0/0 is hideIfZero', () {
@@ -203,7 +203,45 @@ void main() {
     expect(groups.today.map((e) => e.id).toList(), ['am', 'pm']);
   });
 
-  test('completed earlier sorted by completedAt desc', () {
+  test('completed today without due date stays in Hoy', () {
+    final groups = TaskGroupsQuery.from(
+      [
+        task(
+          id: 'inbox-done',
+          completed: true,
+          completedAt: DateTime(2026, 7, 16, 12),
+        ),
+        task(
+          id: 'open',
+          dueAt: DateTime(2026, 7, 16),
+        ),
+      ],
+      now: now,
+    );
+    expect(groups.today.map((e) => e.id).toList(), ['open', 'inbox-done']);
+  });
+
+  test('completed future-due appears in upcoming after pending', () {
+    final groups = TaskGroupsQuery.from(
+      [
+        task(
+          id: 'done-tomorrow',
+          dueAt: DateTime(2026, 7, 17),
+          completed: true,
+          completedAt: DateTime(2026, 7, 16, 12),
+        ),
+        task(id: 'open-tomorrow', dueAt: DateTime(2026, 7, 17)),
+      ],
+      now: now,
+    );
+    expect(groups.today, isEmpty);
+    expect(
+      groups.upcoming.map((e) => e.id).toList(),
+      ['open-tomorrow', 'done-tomorrow'],
+    );
+  });
+
+  test('older completed undated tasks merge into Sin fecha', () {
     final groups = TaskGroupsQuery.from(
       [
         task(
@@ -219,7 +257,8 @@ void main() {
       ],
       now: now,
     );
-    expect(groups.completedEarlier.map((e) => e.id).toList(), ['new', 'old']);
+    expect(groups.completedEarlier, isEmpty);
+    expect(groups.undated.map((e) => e.id).toList(), ['new', 'old']);
   });
 
   test('archived tasks ignored', () {
