@@ -193,28 +193,28 @@ body {
   background:
     linear-gradient(
       145deg,
-      rgba(175, 245, 180, 0.22) 0%,
-      rgba(45, 164, 78, 0.12) 100%
+      rgba(175, 245, 180, 0.24) 0%,
+      rgba(45, 164, 78, 0.14) 100%
     );
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border-color: rgba(45, 164, 78, 0.28);
+  border-color: rgba(90, 180, 110, 0.55);
   box-shadow:
     0 8px 28px rgba(31, 35, 40, 0.06),
-    inset 0 1px 0 rgba(175, 245, 180, 0.35);
+    inset 0 1px 0 rgba(175, 245, 180, 0.4);
 }
 
 .btn-glass:hover {
   background:
     linear-gradient(
       145deg,
-      rgba(175, 245, 180, 0.28) 0%,
-      rgba(45, 164, 78, 0.16) 100%
+      rgba(175, 245, 180, 0.3) 0%,
+      rgba(45, 164, 78, 0.18) 100%
     );
-  border-color: rgba(45, 164, 78, 0.38);
+  border-color: rgba(90, 180, 110, 0.7);
   box-shadow:
     0 12px 32px rgba(31, 35, 40, 0.08),
-    inset 0 1px 0 rgba(175, 245, 180, 0.45);
+    inset 0 1px 0 rgba(175, 245, 180, 0.5);
 }
 
 .btn-android,
@@ -328,8 +328,3 @@ body {
     transform: none;
   }
 }
-
-
-/* capture aid */
-.mascot, .title, .subtitle, .cta, .scribble path { animation: none !important; opacity: 1 !important; transform: none !important; }
-.scribble path { stroke-dashoffset: 0 !important; }
