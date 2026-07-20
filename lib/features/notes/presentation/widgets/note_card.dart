@@ -5,6 +5,7 @@ import '../../../../global/themes/tokens.dart';
 import '../../data/notes_repository.dart';
 import '../../data/tags_repository.dart';
 import '../../domain/note_item.dart';
+import '../../domain/task_dates.dart';
 import 'relative_time.dart';
 import 'tag_pill.dart';
 import 'task_date_meta.dart';
@@ -17,9 +18,6 @@ class NoteCard extends StatelessWidget {
     this.onLongPress,
     this.repository,
     this.tagsRepository,
-    this.showArchiveActions = false,
-    this.onRestore,
-    this.onDeleteForever,
     this.flat = false,
   });
 
@@ -28,9 +26,6 @@ class NoteCard extends StatelessWidget {
   final VoidCallback? onLongPress;
   final NotesRepository? repository;
   final TagsRepository? tagsRepository;
-  final bool showArchiveActions;
-  final VoidCallback? onRestore;
-  final VoidCallback? onDeleteForever;
 
   /// When true, skips Card chrome so the parent can clip/shape the row
   /// (e.g. swipe actions inside the same rounded silhouette).
@@ -63,7 +58,7 @@ class NoteCard extends StatelessWidget {
                   height: 24,
                   child: Checkbox(
                     value: item.completed,
-                    onChanged: showArchiveActions
+                    onChanged: item.isArchived
                         ? null
                         : (_) => _repo.toggleCompleted(item.id),
                   ),
@@ -163,7 +158,14 @@ class NoteCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text('· ', style: textTheme.labelSmall),
-                      if (isTask)
+                      if (item.isArchived)
+                        Text(
+                          formatRelativeTime(
+                            item.archivedAt ?? item.updatedAt,
+                          ),
+                          style: textTheme.labelSmall,
+                        )
+                      else if (isTask)
                         Flexible(child: TaskDateMeta(item: item))
                       else
                         Text(
@@ -172,24 +174,6 @@ class NoteCard extends StatelessWidget {
                         ),
                     ],
                   ),
-                  if (showArchiveActions) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: onRestore,
-                          child: const Text('Restaurar'),
-                        ),
-                        TextButton(
-                          onPressed: onDeleteForever,
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.error,
-                          ),
-                          child: const Text('Eliminar'),
-                        ),
-                      ],
-                    ),
-                  ],
                 ],
               ),
             ),

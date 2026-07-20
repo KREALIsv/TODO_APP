@@ -185,7 +185,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildNoteList(
     List<NoteItem> items,
     void Function(NoteItem item) onTap, {
-    bool archived = false,
     double bottomPadding = 88,
   }) {
     return SliverPadding(
@@ -198,8 +197,6 @@ class _HomeScreenState extends State<HomeScreen> {
             item: item,
             repository: _repo,
             onTap: () => onTap(item),
-            enableSwipe: !archived,
-            showArchiveActions: archived,
           );
         },
       ),
@@ -438,7 +435,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildNoteList(
                     filtered,
                     (item) => _openEditor(context, item: item),
-                    archived: isArchivedFilter,
                   ),
                 ],
               ],

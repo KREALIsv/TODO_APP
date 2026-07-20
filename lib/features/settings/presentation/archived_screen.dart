@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../global/themes/app_colors.dart';
-import '../../../global/widgets/app_alerts.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/note_item.dart';
 import '../../notes/presentation/note_editor_screen.dart';
@@ -78,56 +77,10 @@ class ArchivedScreen extends StatelessWidget {
               itemCount: items.length,
               itemBuilder: (context, index) {
                 final item = items[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Column(
-                    children: [
-                      SwipeableNoteCard(
-                        item: item,
-                        repository: _repo,
-                        onTap: () => _openEditor(context, item),
-                        enableSwipe: false,
-                        showArchiveActions: true,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton.icon(
-                            onPressed: () async {
-                              await _repo.restore(item.id);
-                              if (!context.mounted) return;
-                              await AppAlerts.show(
-                                context,
-                                message: 'Restaurado',
-                                type: AppAlertType.success,
-                              );
-                            },
-                            icon: const Icon(Icons.unarchive_outlined, size: 18),
-                            label: const Text('Restaurar'),
-                          ),
-                          TextButton.icon(
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.error,
-                            ),
-                            onPressed: () async {
-                              final confirmed = await AppAlerts.confirm(
-                                context,
-                                title: 'Eliminar',
-                                message:
-                                    '¿Eliminar definitivamente? Esta acción no se puede deshacer.',
-                                confirmLabel: 'Eliminar',
-                                isDestructive: true,
-                              );
-                              if (!confirmed) return;
-                              await _repo.delete(item.id);
-                            },
-                            icon: const Icon(Icons.delete_forever_outlined, size: 18),
-                            label: const Text('Eliminar'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                return SwipeableNoteCard(
+                  item: item,
+                  repository: _repo,
+                  onTap: () => _openEditor(context, item),
                 );
               },
             );

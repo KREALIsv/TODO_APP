@@ -6,6 +6,7 @@ import '../../../../global/themes/tokens.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/note_item.dart';
+import '../../domain/task_dates.dart';
 import 'note_card.dart';
 import 'note_card_context_sheet.dart';
 
@@ -16,16 +17,16 @@ class SwipeableNoteCard extends StatelessWidget {
     required this.onTap,
     this.repository,
     this.enableSwipe = true,
-    this.showArchiveActions = false,
   });
 
   final NoteItem item;
   final VoidCallback onTap;
   final NotesRepository? repository;
   final bool enableSwipe;
-  final bool showArchiveActions;
 
   NotesRepository get _repo => repository ?? NotesRepository.instance;
+
+  String get _kind => item.type == NoteType.task ? 'Tarea' : 'Nota';
 
   Future<void> _undoToast(
     BuildContext context, {
@@ -54,12 +55,11 @@ class SwipeableNoteCard extends StatelessWidget {
 
   Future<void> _pin(BuildContext context) async {
     final wasPinned = item.pinned;
-    final kind = item.type == NoteType.task ? 'Tarea' : 'Nota';
     await _repo.togglePinned(item.id);
     if (!context.mounted) return;
     await _undoToast(
       context,
-      message: wasPinned ? '$kind desfijada' : '$kind fijada',
+      message: wasPinned ? '$_kind desfijada' : '$_kind fijada',
       onUndo: () => _repo.togglePinned(item.id),
     );
   }
@@ -69,10 +69,18 @@ class SwipeableNoteCard extends StatelessWidget {
     if (!context.mounted) return;
     await _undoToast(
       context,
-      message: item.type == NoteType.task
-          ? 'Tarea archivada'
-          : 'Nota archivada',
+      message: '$_kind archivada',
       onUndo: () => _repo.restore(item.id),
+    );
+  }
+
+  Future<void> _restore(BuildContext context) async {
+    await _repo.restore(item.id);
+    if (!context.mounted) return;
+    await _undoToast(
+      context,
+      message: '$_kind restaurada',
+      onUndo: () => _repo.archive(item.id),
     );
   }
 
@@ -98,10 +106,9 @@ class SwipeableNoteCard extends StatelessWidget {
   Future<void> _duplicate(BuildContext context) async {
     final copy = await _repo.duplicate(item.id);
     if (copy == null || !context.mounted) return;
-    final kind = item.type == NoteType.task ? 'Tarea' : 'Nota';
     await _undoToast(
       context,
-      message: '$kind duplicada',
+      message: '$_kind duplicada',
       onUndo: () => _repo.delete(copy.id),
     );
   }
@@ -122,38 +129,41 @@ class SwipeableNoteCard extends StatelessWidget {
       case NoteCardContextAction.archive:
         await _archive(context);
       case NoteCardContextAction.restore:
-        await _repo.restore(item.id);
+        await _restore(context);
       case NoteCardContextAction.delete:
         await _deleteForever(context);
     }
   }
 
+  ActionPane _pane({
+    required double extentRatio,
+    required List<Widget> children,
+  }) {
+    return ActionPane(
+      motion: const BehindMotion(),
+      extentRatio: extentRatio,
+      children: children,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final useSwipe = enableSwipe && !showArchiveActions;
-
     final card = NoteCard(
       item: item,
       repository: _repo,
       onTap: onTap,
       onLongPress: () => _showContextMenu(context),
-      showArchiveActions: showArchiveActions,
-      onRestore: showArchiveActions
-          ? () => _repo.restore(item.id)
-          : null,
-      onDeleteForever:
-          showArchiveActions ? () => _deleteForever(context) : null,
-      flat: useSwipe,
+      flat: enableSwipe,
     );
 
-    if (!useSwipe) {
+    if (!enableSwipe) {
       return card;
     }
 
     final isTask = item.type == NoteType.task;
+    final isArchived = item.isArchived;
     final accent = Theme.of(context).colorScheme.primary;
 
-    // Izquierda: Archivar / Eliminar / Fijar. Derecha: Hecho/Reabrir (solo tareas).
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -165,52 +175,76 @@ class SwipeableNoteCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Slidable(
           key: ValueKey(item.id),
-          startActionPane: isTask
-              ? ActionPane(
-                  motion: const BehindMotion(),
+          startActionPane: isArchived
+              ? _pane(
                   extentRatio: 0.28,
                   children: [
                     SlidableAction(
-                      onPressed: (_) => _complete(context),
+                      onPressed: (_) => _restore(context),
                       backgroundColor: accent,
                       foregroundColor: AppColors.white,
-                      icon: item.completed
-                          ? Icons.radio_button_unchecked
-                          : Icons.check_circle_outline,
-                      label: item.completed ? 'Reabrir' : 'Hecho',
+                      icon: Icons.unarchive_outlined,
+                      label: 'Restaurar',
                     ),
                   ],
                 )
-              : null,
-          endActionPane: ActionPane(
-            motion: const BehindMotion(),
-            extentRatio: 0.72,
-            children: [
-              SlidableAction(
-                onPressed: (_) => _archive(context),
-                backgroundColor: AppColors.neutral60,
-                foregroundColor: AppColors.white,
-                icon: Icons.archive_outlined,
-                label: 'Archivar',
-              ),
-              SlidableAction(
-                onPressed: (_) => _deleteForever(context),
-                backgroundColor: AppColors.error,
-                foregroundColor: AppColors.white,
-                icon: Icons.delete_outline,
-                label: 'Eliminar',
-              ),
-              SlidableAction(
-                onPressed: (_) => _pin(context),
-                backgroundColor: accent,
-                foregroundColor: AppColors.white,
-                icon: item.pinned
-                    ? Icons.push_pin_outlined
-                    : Icons.push_pin,
-                label: item.pinned ? 'Desfijar' : 'Fijar',
-              ),
-            ],
-          ),
+              : isTask
+                  ? _pane(
+                      extentRatio: 0.28,
+                      children: [
+                        SlidableAction(
+                          onPressed: (_) => _complete(context),
+                          backgroundColor: accent,
+                          foregroundColor: AppColors.white,
+                          icon: item.completed
+                              ? Icons.radio_button_unchecked
+                              : Icons.check_circle_outline,
+                          label: item.completed ? 'Reabrir' : 'Hecho',
+                        ),
+                      ],
+                    )
+                  : null,
+          endActionPane: isArchived
+              ? _pane(
+                  extentRatio: 0.28,
+                  children: [
+                    SlidableAction(
+                      onPressed: (_) => _deleteForever(context),
+                      backgroundColor: AppColors.error,
+                      foregroundColor: AppColors.white,
+                      icon: Icons.delete_outline,
+                      label: 'Eliminar',
+                    ),
+                  ],
+                )
+              : _pane(
+                  extentRatio: 0.72,
+                  children: [
+                    SlidableAction(
+                      onPressed: (_) => _archive(context),
+                      backgroundColor: AppColors.neutral60,
+                      foregroundColor: AppColors.white,
+                      icon: Icons.archive_outlined,
+                      label: 'Archivar',
+                    ),
+                    SlidableAction(
+                      onPressed: (_) => _deleteForever(context),
+                      backgroundColor: AppColors.error,
+                      foregroundColor: AppColors.white,
+                      icon: Icons.delete_outline,
+                      label: 'Eliminar',
+                    ),
+                    SlidableAction(
+                      onPressed: (_) => _pin(context),
+                      backgroundColor: accent,
+                      foregroundColor: AppColors.white,
+                      icon: item.pinned
+                          ? Icons.push_pin_outlined
+                          : Icons.push_pin,
+                      label: item.pinned ? 'Desfijar' : 'Fijar',
+                    ),
+                  ],
+                ),
           child: card,
         ),
       ),
