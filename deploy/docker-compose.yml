@@ -1,23 +1,31 @@
+# Wodo — landing (wodo.app) + web app (app.wodo.app)
+#
+# Este stack NO publica 80/443 del host: en este VPS esos puertos los tiene
+# el Caddy compartido (syvar-uat-caddy). Los contenedores se conectan a la red
+# externa del Caddy (syvar_default) y se exponen vía reverse_proxy con el
+# script deploy/scripts/setup-wodo-https.sh.
 services:
-  caddy:
-    image: caddy:2-alpine
-    container_name: dowo-caddy
+  landing:
+    image: nginx:1.27-alpine
+    container_name: wodo-landing
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      ACME_EMAIL: ${ACME_EMAIL}
-      LANDING_DOMAIN: ${LANDING_DOMAIN:-dowo.com}
-      APP_DOMAIN: ${APP_DOMAIN:-app.dowo.com}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./sites/landing:/srv/landing:ro
-      - ./sites/web:/srv/web:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      - ./sites/landing:/usr/share/nginx/html:ro
+    networks:
+      - edge
 
-volumes:
-  caddy_data:
-  caddy_config:
+  web:
+    image: nginx:1.27-alpine
+    container_name: wodo-web
+    restart: unless-stopped
+    volumes:
+      - ./sites/web:/usr/share/nginx/html:ro
+      - ./nginx-spa.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - edge
+
+networks:
+  # Red del Caddy compartido. Sobrescribible con EDGE_NETWORK en .env.
+  edge:
+    external: true
+    name: ${EDGE_NETWORK:-syvar_default}

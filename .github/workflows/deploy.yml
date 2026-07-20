@@ -1,4 +1,4 @@
-name: Deploy Dowo
+name: Deploy Wodo
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-dowo-production
+  group: deploy-wodo-production
   cancel-in-progress: true
 
 jobs:
@@ -38,6 +38,17 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p "${{ secrets.DEPLOY_PORT || 22 }}" "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
 
+      - name: Sync deploy stack (compose + nginx + scripts)
+        run: |
+          rsync -az \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_PORT || 22 }} -o StrictHostKeyChecking=yes" \
+            deploy/docker-compose.yml deploy/nginx-spa.conf \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/"
+          rsync -az \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_PORT || 22 }} -o StrictHostKeyChecking=yes" \
+            deploy/scripts/ \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/scripts/"
+
       - name: Sync landing site
         run: |
           rsync -az --delete \
@@ -52,8 +63,17 @@ jobs:
             build/web/ \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/sites/web/"
 
-      - name: Reload Caddy
+      - name: Bring up containers
         run: |
           ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT || 22 }}" \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
             "cd '${{ secrets.DEPLOY_PATH }}' && docker compose up -d"
+
+      # Registra/actualiza el bloque de wodo en el edge compartido (idempotente).
+      # Solo aplica si el edge se maneja por Caddyfile compartido; si wodo tiene
+      # su propio edge dedicado, elimina este paso.
+      - name: Ensure edge routing (Caddy)
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT || 22 }}" \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "cd '${{ secrets.DEPLOY_PATH }}' && bash scripts/setup-wodo-https.sh"
