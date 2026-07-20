@@ -115,6 +115,7 @@ class ActivityHeatmap extends StatelessWidget {
     this.dayLabelWidth = 12,
     this.monthLabelHeight = 12,
     this.showAllWeekdayLabels = false,
+    this.showDayNumbers = false,
     this.onCellTap,
     this.semanticsLabel,
   });
@@ -127,8 +128,13 @@ class ActivityHeatmap extends StatelessWidget {
   final double monthLabelHeight;
   /// When true, labels every row (L–D) so each square maps to a weekday.
   final bool showAllWeekdayLabels;
+  /// Opt-in calendar day numbers inside each cell (Profile / settings).
+  final bool showDayNumbers;
   final void Function(DateTime day, int count)? onCellTap;
   final String? semanticsLabel;
+
+  /// Sample counts for legends; must stay aligned with [colorForCount] bands.
+  static const legendSampleCounts = [0, 1, 5, 15, 30];
 
   static const _sparseWeekdayLabels = ['L', '', 'X', '', 'V', '', ''];
   static const _fullWeekdayLabels = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -163,24 +169,30 @@ class ActivityHeatmap extends StatelessWidget {
       );
 
   static Color colorForCount(int count, ColorScheme scheme) {
-    if (count <= 0) return AppColors.neutral20;
-    if (count == 1) return scheme.primaryContainer;
-    if (count == 2) {
-      return Color.lerp(scheme.primaryContainer, scheme.primary, 0.35)!;
-    }
-    if (count <= 4) {
-      return Color.lerp(scheme.primaryContainer, scheme.primary, 0.65)!;
-    }
-    return scheme.primary;
+    if (count <= 0) return AppColors.neutral00;
+    // Wider bands so the darkest green is reserved for very active days.
+    // Thresholds mirror [legendSampleCounts]: 0 / 1 / 5 / 15 / 30.
+    if (count == 1) return AppColors.primary20;
+    if (count < 10) return AppColors.primary40; // 2–9
+    if (count < 30) return scheme.primary; // 10–29
+    return AppColors.primary80; // 30+
   }
 
   /// Maps a 0..1 intensity (e.g. month count / max month) onto the heatmap palette.
   static Color colorForIntensity(double intensity, ColorScheme scheme) {
-    if (intensity <= 0) return colorForCount(0, scheme);
-    if (intensity < 0.25) return colorForCount(1, scheme);
-    if (intensity < 0.5) return colorForCount(2, scheme);
-    if (intensity < 0.75) return colorForCount(4, scheme);
-    return colorForCount(5, scheme);
+    if (intensity <= 0) {
+      return colorForCount(legendSampleCounts[0], scheme);
+    }
+    if (intensity < 0.25) {
+      return colorForCount(legendSampleCounts[1], scheme);
+    }
+    if (intensity < 0.5) {
+      return colorForCount(legendSampleCounts[2], scheme);
+    }
+    if (intensity < 0.75) {
+      return colorForCount(legendSampleCounts[3], scheme);
+    }
+    return colorForCount(legendSampleCounts[4], scheme);
   }
 
   List<String?> _monthLabelsForWeeks() {
@@ -312,9 +324,11 @@ class ActivityHeatmap extends StatelessWidget {
                       painter: _HeatmapPainter(
                         cells: cells,
                         weeks: weeks,
+                        rangeStart: rangeStart,
                         cell: cell,
                         gap: gap,
                         scheme: scheme,
+                        showDayNumbers: showDayNumbers,
                       ),
                     ),
                   ],
@@ -362,39 +376,67 @@ class _HeatmapPainter extends CustomPainter {
   _HeatmapPainter({
     required this.cells,
     required this.weeks,
+    required this.rangeStart,
     required this.cell,
     required this.gap,
     required this.scheme,
+    required this.showDayNumbers,
   });
 
   final List<int> cells;
   final int weeks;
+  final DateTime rangeStart;
   final double cell;
   final double gap;
   final ColorScheme scheme;
+  final bool showDayNumbers;
+
+  /// Empty / pale-green cells keep a soft gray label; stronger fills use white.
+  static Color _labelColorFor(int count) {
+    return count <= 1 ? AppColors.neutral60 : AppColors.white;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     if (cell <= 0) return;
     // Soft corner on each cell; scales with size, stays subtle.
-    final radius = Radius.circular((cell * 0.25).clamp(2.0, 4.0));
+    final radius = Radius.circular((cell * 0.25).clamp(2.0, 5.0));
+    final fontSize = (cell * 0.42).clamp(6.0, 12.0);
     for (var week = 0; week < weeks; week++) {
       for (var day = 0; day < 7; day++) {
+        final index = week * 7 + day;
+        final count = cells[index];
+        final bg = ActivityHeatmap.colorForCount(count, scheme);
+        final left = week * (cell + gap);
+        final top = day * (cell + gap);
         final rect = RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            week * (cell + gap),
-            day * (cell + gap),
-            cell,
-            cell,
-          ),
+          Rect.fromLTWH(left, top, cell, cell),
           radius,
         );
-        final paint = Paint()
-          ..color = ActivityHeatmap.colorForCount(
-            cells[week * 7 + day],
-            scheme,
-          );
-        canvas.drawRRect(rect, paint);
+        canvas.drawRRect(rect, Paint()..color = bg);
+
+        if (!showDayNumbers) continue;
+
+        final date = rangeStart.add(Duration(days: index));
+        final tp = TextPainter(
+          text: TextSpan(
+            text: '${date.day}',
+            style: TextStyle(
+              color: _labelColorFor(count),
+              fontSize: fontSize,
+              fontWeight: FontWeight.w500,
+              height: 1,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: cell);
+        tp.paint(
+          canvas,
+          Offset(
+            left + (cell - tp.width) / 2,
+            top + (cell - tp.height) / 2,
+          ),
+        );
       }
     }
   }
@@ -403,8 +445,10 @@ class _HeatmapPainter extends CustomPainter {
   bool shouldRepaint(covariant _HeatmapPainter oldDelegate) {
     return oldDelegate.cells != cells ||
         oldDelegate.weeks != weeks ||
+        oldDelegate.rangeStart != rangeStart ||
         oldDelegate.cell != cell ||
         oldDelegate.gap != gap ||
-        oldDelegate.scheme != scheme;
+        oldDelegate.scheme != scheme ||
+        oldDelegate.showDayNumbers != showDayNumbers;
   }
 }

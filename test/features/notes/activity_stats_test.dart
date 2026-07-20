@@ -271,7 +271,25 @@ void main() {
     test('empty cells use solid neutral contrast', () {
       expect(
         ActivityHeatmap.colorForCount(0, const ColorScheme.light()),
-        AppColors.neutral20,
+        AppColors.neutral00,
+      );
+    });
+
+    test('single record uses a visible pale green', () {
+      final single = ActivityHeatmap.colorForCount(1, const ColorScheme.light());
+      expect(single, AppColors.primary20);
+      expect(single, isNot(AppColors.neutral00));
+    });
+
+    test('darkest green requires 30+ events', () {
+      const scheme = ColorScheme.light();
+      expect(
+        ActivityHeatmap.colorForCount(29, scheme),
+        scheme.primary,
+      );
+      expect(
+        ActivityHeatmap.colorForCount(30, scheme),
+        AppColors.primary80,
       );
     });
 

@@ -7,17 +7,23 @@ import '../../notes/domain/activity_stats.dart';
 import '../../notes/domain/notes_filter.dart';
 import '../../notes/presentation/widgets/activity_heatmap.dart';
 import '../../notes/presentation/widgets/monthly_activity_bars.dart';
+import '../../settings/data/settings_repository.dart';
 import '../../settings/presentation/widgets/list_background_layer.dart';
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key, this.repository});
+  const ProfileScreen({super.key, this.repository, this.settings});
 
   final NotesRepository? repository;
+  final SettingsRepository? settings;
 
   NotesRepository get _repo => repository ?? NotesRepository.instance;
+  SettingsRepository get _settings => settings ?? SettingsRepository.instance;
 
   static const heatmapGap = 3.0;
-  static const minCell = 12.0;
+  /// Larger cells so day numbers stay readable.
+  static const minCellWithNumbers = 14.0;
+  /// Compact cells when the grid is color-only (pre-numbers layout).
+  static const minCellCompact = 12.0;
 
   @override
   Widget build(BuildContext context) {
@@ -33,43 +39,50 @@ class ProfileScreen extends StatelessWidget {
         foregroundColor: isDark ? const Color(0xFFE6EDF3) : AppColors.neutral100,
       ),
       body: ListBackgroundScaffoldBody(
+        settings: _settings,
         child: SafeArea(
           top: false,
-          child: ValueListenableBuilder<Box<Map>>(
-            valueListenable: _repo.listenable(),
-            builder: (context, box, child) {
-              final items = _repo.getAll();
-              final counts = contentCounts(items);
-              final metrics = activityMetricsFrom(items);
-              final baseStats = ActivityStats.fromNotes(items, weeks: 1);
-              final isEmpty = items.isEmpty;
+          child: ListenableBuilder(
+            listenable: _settings,
+            builder: (context, _) {
+              return ValueListenableBuilder<Box<Map>>(
+                valueListenable: _repo.listenable(),
+                builder: (context, box, child) {
+                  final items = _repo.getAll();
+                  final counts = contentCounts(items);
+                  final metrics = activityMetricsFrom(items);
+                  final baseStats = ActivityStats.fromNotes(items, weeks: 1);
+                  final isEmpty = items.isEmpty;
 
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                children: [
-                  _ActivityHero(
-                    textTheme: textTheme,
-                    eventCounts: metrics.eventCounts,
-                    isEmpty: isEmpty,
-                  ),
-                  const SizedBox(height: 16),
-                  _SecondaryStats(
-                    textTheme: textTheme,
-                    bestStreak: baseStats.bestStreak,
-                    activeDayCount: baseStats.activeDayCount,
-                  ),
-                  const SizedBox(height: 16),
-                  MonthlyActivityBars(
-                    bars: monthlyEventBars(eventCounts: metrics.eventCounts),
-                  ),
-                  const SizedBox(height: 20),
-                  _ContentRows(
-                    textTheme: textTheme,
-                    noteCount: counts.notes,
-                    taskCount: counts.tasks,
-                    pendingTasks: counts.pendingTasks,
-                  ),
-                ],
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                    children: [
+                      _ActivityHero(
+                        textTheme: textTheme,
+                        eventCounts: metrics.eventCounts,
+                        isEmpty: isEmpty,
+                        showDayNumbers: _settings.showHeatmapDayNumbers,
+                      ),
+                      const SizedBox(height: 16),
+                      _SecondaryStats(
+                        textTheme: textTheme,
+                        bestStreak: baseStats.bestStreak,
+                        activeDayCount: baseStats.activeDayCount,
+                      ),
+                      const SizedBox(height: 16),
+                      MonthlyActivityBars(
+                        bars: monthlyEventBars(eventCounts: metrics.eventCounts),
+                      ),
+                      const SizedBox(height: 20),
+                      _ContentRows(
+                        textTheme: textTheme,
+                        noteCount: counts.notes,
+                        taskCount: counts.tasks,
+                        pendingTasks: counts.pendingTasks,
+                      ),
+                    ],
+                  );
+                },
               );
             },
           ),
@@ -84,11 +97,13 @@ class _ActivityHero extends StatelessWidget {
     required this.textTheme,
     required this.eventCounts,
     required this.isEmpty,
+    required this.showDayNumbers,
   });
 
   final TextTheme textTheme;
   final Map<DateTime, int> eventCounts;
   final bool isEmpty;
+  final bool showDayNumbers;
 
   static const _dayLabelWidth = 14.0;
 
@@ -103,12 +118,15 @@ class _ActivityHero extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final minCell = showDayNumbers
+              ? ProfileScreen.minCellWithNumbers
+              : ProfileScreen.minCellCompact;
           final weeks = HeatmapLayout.weeksForMinCell(
             width: constraints.maxWidth,
             gap: ProfileScreen.heatmapGap,
-            minCell: ProfileScreen.minCell,
-            preferredMax: 15,
-            preferredMid: 12,
+            minCell: minCell,
+            preferredMax: showDayNumbers ? 12 : 15,
+            preferredMid: showDayNumbers ? 10 : 12,
             dayLabelWidth: _dayLabelWidth,
           );
           final cells = weekCounts(
@@ -136,6 +154,7 @@ class _ActivityHero extends StatelessWidget {
                   gap: ProfileScreen.heatmapGap,
                   dayLabelWidth: _dayLabelWidth,
                   showAllWeekdayLabels: true,
+                  showDayNumbers: showDayNumbers,
                   semanticsLabel:
                       'Actividad de las últimas $weeks semanas, $totalEvents registros',
                   onCellTap: (day, count) {
@@ -381,7 +400,7 @@ class _HeatmapLegend extends StatelessWidget {
         const Spacer(),
         Text('Menos', style: style),
         const SizedBox(width: 8),
-        for (final count in [0, 1, 2, 3, 5]) ...[
+        for (final count in ActivityHeatmap.legendSampleCounts) ...[
           Container(
             width: 12,
             height: 12,

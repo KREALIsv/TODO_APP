@@ -11,6 +11,7 @@ class SettingsRepository extends ChangeNotifier {
   static const String _boxName = 'settings';
   static const String _themeModeKey = 'themeMode';
   static const String _listBackgroundIdKey = 'listBackgroundId';
+  static const String _showHeatmapDayNumbersKey = 'showHeatmapDayNumbers';
 
   late Box _box;
 
@@ -61,6 +62,21 @@ class SettingsRepository extends ChangeNotifier {
 
   Future<void> setListBackgroundId(String id) async {
     await _box.put(_listBackgroundIdKey, id);
+    notifyListeners();
+  }
+
+  /// Whether heatmap cells show the calendar day number. Defaults to on.
+  bool get showHeatmapDayNumbers {
+    final raw = _box.get(_showHeatmapDayNumbersKey);
+    if (raw is bool) return raw;
+    return true;
+  }
+
+  String get showHeatmapDayNumbersLabel =>
+      showHeatmapDayNumbers ? 'Visibles' : 'Ocultos';
+
+  Future<void> setShowHeatmapDayNumbers(bool value) async {
+    await _box.put(_showHeatmapDayNumbersKey, value);
     notifyListeners();
   }
 

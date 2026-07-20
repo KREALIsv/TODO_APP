@@ -60,6 +60,18 @@ void main() {
     );
   });
 
+  test('showHeatmapDayNumbers defaults to true and persists', () async {
+    expect(settings.showHeatmapDayNumbers, isTrue);
+    expect(settings.showHeatmapDayNumbersLabel, 'Visibles');
+
+    await settings.setShowHeatmapDayNumbers(false);
+    expect(settings.showHeatmapDayNumbers, isFalse);
+    expect(settings.showHeatmapDayNumbersLabel, 'Ocultos');
+
+    await settings.setShowHeatmapDayNumbers(true);
+    expect(settings.showHeatmapDayNumbers, isTrue);
+  });
+
   test('unknown background id falls back to default', () {
     final option = ListBackgrounds.byId('does_not_exist');
     expect(option.id, ListBackgrounds.defaultId);

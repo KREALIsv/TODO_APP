@@ -145,3 +145,47 @@ class SettingsRow extends StatelessWidget {
     );
   }
 }
+
+/// Shared radio bottom sheet used by settings pickers (theme, heatmap, …).
+Future<T?> showSettingsRadioSheet<T>({
+  required BuildContext context,
+  required String title,
+  required T groupValue,
+  required List<(T value, String label)> options,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            RadioGroup<T>(
+              groupValue: groupValue,
+              onChanged: (v) {
+                if (v != null) Navigator.pop(sheetContext, v);
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final option in options)
+                    RadioListTile<T>(
+                      title: Text(option.$2),
+                      value: option.$1,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      );
+    },
+  );
+}

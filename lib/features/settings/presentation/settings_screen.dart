@@ -28,51 +28,33 @@ class SettingsScreen extends StatelessWidget {
   SettingsRepository get _settings => settings ?? SettingsRepository.instance;
 
   Future<void> _pickTheme(BuildContext context) async {
-    final current = _settings.themeMode;
-    final selected = await showModalBottomSheet<ThemeMode>(
+    final selected = await showSettingsRadioSheet<ThemeMode>(
       context: context,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const ListTile(
-                title: Text(
-                  'Tema',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              RadioGroup<ThemeMode>(
-                groupValue: current,
-                onChanged: (v) {
-                  if (v != null) Navigator.pop(sheetContext, v);
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    RadioListTile<ThemeMode>(
-                      title: Text('Sistema'),
-                      value: ThemeMode.system,
-                    ),
-                    RadioListTile<ThemeMode>(
-                      title: Text('Claro'),
-                      value: ThemeMode.light,
-                    ),
-                    RadioListTile<ThemeMode>(
-                      title: Text('Oscuro'),
-                      value: ThemeMode.dark,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
+      title: 'Tema',
+      groupValue: _settings.themeMode,
+      options: const [
+        (ThemeMode.system, 'Sistema'),
+        (ThemeMode.light, 'Claro'),
+        (ThemeMode.dark, 'Oscuro'),
+      ],
     );
     if (selected != null) {
       await _settings.setThemeMode(selected);
+    }
+  }
+
+  Future<void> _pickHeatmapDayNumbers(BuildContext context) async {
+    final selected = await showSettingsRadioSheet<bool>(
+      context: context,
+      title: 'Números en el heatmap',
+      groupValue: _settings.showHeatmapDayNumbers,
+      options: const [
+        (true, 'Visibles'),
+        (false, 'Ocultos'),
+      ],
+    );
+    if (selected != null) {
+      await _settings.setShowHeatmapDayNumbers(selected);
     }
   }
 
@@ -234,6 +216,14 @@ class SettingsScreen extends StatelessWidget {
                           trailingWidget: _BackgroundSwatch(option: bg),
                           accent: accent,
                           onTap: () => _openFondo(context),
+                        ),
+                        const SettingsDivider(),
+                        SettingsRow(
+                          icon: Icons.calendar_view_month_outlined,
+                          title: 'Números en el heatmap',
+                          trailing: _settings.showHeatmapDayNumbersLabel,
+                          accent: accent,
+                          onTap: () => _pickHeatmapDayNumbers(context),
                         ),
                       ],
                     ),
