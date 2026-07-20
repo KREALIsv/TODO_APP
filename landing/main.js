@@ -4,7 +4,7 @@
 const STORE_URLS = {
   android: "#android", // https://play.google.com/store/apps/details?id=...
   ios: "#ios", // https://apps.apple.com/app/id...
-  web: "#web", // https://app.tudominio.com
+  web: "https://app.wodo.como",
 };
 
 function detectPreferredStore() {
