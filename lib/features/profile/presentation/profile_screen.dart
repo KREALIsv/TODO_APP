@@ -8,16 +8,37 @@ import '../../notes/domain/notes_filter.dart';
 import '../../notes/presentation/widgets/activity_heatmap.dart';
 import '../../notes/presentation/widgets/monthly_activity_bars.dart';
 import '../../settings/data/settings_repository.dart';
+import '../../settings/presentation/settings_screen.dart';
 import '../../settings/presentation/widgets/list_background_layer.dart';
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key, this.repository, this.settings});
+  const ProfileScreen({
+    super.key,
+    this.repository,
+    this.settings,
+    this.onResetSelectedDay,
+  });
 
   final NotesRepository? repository;
   final SettingsRepository? settings;
 
+  /// Forwards to [SettingsScreen] so "Ir a hoy" can restore the home day.
+  final VoidCallback? onResetSelectedDay;
+
   NotesRepository get _repo => repository ?? NotesRepository.instance;
   SettingsRepository get _settings => settings ?? SettingsRepository.instance;
+
+  Future<void> _openSettings(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SettingsScreen(
+          repository: _repo,
+          settings: _settings,
+          onResetSelectedDay: onResetSelectedDay,
+        ),
+      ),
+    );
+  }
 
   static const heatmapGap = 3.0;
   /// Larger cells so day numbers stay readable.
@@ -79,6 +100,11 @@ class ProfileScreen extends StatelessWidget {
                         noteCount: counts.notes,
                         taskCount: counts.tasks,
                         pendingTasks: counts.pendingTasks,
+                      ),
+                      const SizedBox(height: 12),
+                      _SettingsAccessRow(
+                        textTheme: textTheme,
+                        onTap: () => _openSettings(context),
                       ),
                     ],
                   );
@@ -324,12 +350,42 @@ class _ContentRows extends StatelessWidget {
   }
 }
 
+class _SettingsAccessRow extends StatelessWidget {
+  const _SettingsAccessRow({
+    required this.textTheme,
+    required this.onTap,
+  });
+
+  final TextTheme textTheme;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.neutral20),
+      ),
+      child: _ContentRow(
+        textTheme: textTheme,
+        icon: Icons.settings_outlined,
+        title: 'Ajustes',
+        accent: accent,
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
 class _ContentRow extends StatelessWidget {
   const _ContentRow({
     required this.textTheme,
     required this.icon,
     required this.title,
-    required this.trailing,
+    this.trailing,
     required this.onTap,
     required this.accent,
   });
@@ -337,7 +393,7 @@ class _ContentRow extends StatelessWidget {
   final TextTheme textTheme;
   final IconData icon;
   final String title;
-  final String trailing;
+  final String? trailing;
   final VoidCallback onTap;
   final Color accent;
 
@@ -361,13 +417,15 @@ class _ContentRow extends StatelessWidget {
                 ),
               ),
             ),
-            Text(
-              trailing,
-              style: textTheme.bodyMedium?.copyWith(
-                color: AppColors.neutral60,
+            if (trailing != null) ...[
+              Text(
+                trailing!,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: AppColors.neutral60,
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
+              const SizedBox(width: 4),
+            ],
             const Icon(
               Icons.chevron_right,
               size: 20,

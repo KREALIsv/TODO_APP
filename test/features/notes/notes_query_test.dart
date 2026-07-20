@@ -205,5 +205,25 @@ void main() {
       expect(pinned.map((e) => e.id).toList(), ['1']);
       expect(recent.map((e) => e.id).toList(), ['2', '3', '4']);
     });
+
+    test('ofDayFrom keeps unpinned items that belong to the day', () {
+      final today = DateTime(2026, 7, 20, 15);
+      final items = [
+        item(id: 'pin', pinned: true, updatedAt: today),
+        item(id: 'old-note', updatedAt: DateTime(2026, 7, 17)),
+        item(id: 'today-note', updatedAt: today),
+        item(id: 'task-today', type: NoteType.task).copyWith(
+          todayAt: today,
+          updatedAt: today,
+        ),
+        item(id: 'task-other', type: NoteType.task).copyWith(
+          dueAt: DateTime(2026, 7, 22),
+          updatedAt: today,
+        ),
+      ];
+
+      final ofDay = NotesQuery.ofDayFrom(items, today, now: today);
+      expect(ofDay.map((e) => e.id).toList(), ['today-note', 'task-today']);
+    });
   });
 }

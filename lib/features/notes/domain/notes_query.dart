@@ -1,3 +1,4 @@
+import 'date_only.dart';
 import 'note_item.dart';
 import 'notes_filter.dart';
 import 'task_dates.dart';
@@ -34,8 +35,47 @@ class NotesQuery {
     return items.where((item) => item.pinned).toList();
   }
 
+  /// Unpinned items only (legacy split). Prefer [ofDayFrom] for Home «Del día».
   static List<NoteItem> recentFrom(List<NoteItem> items) {
     return items.where((item) => !item.pinned).toList();
+  }
+
+  /// Unpinned items that belong to [day] (local calendar day).
+  ///
+  /// Notes: created or updated that day.
+  /// Tasks: todayAt / dueAt / completedAt on that day, or overdue if [day] is today.
+  static List<NoteItem> ofDayFrom(
+    List<NoteItem> items,
+    DateTime day, {
+    DateTime? now,
+  }) {
+    final reference = now ?? DateTime.now();
+    return items
+        .where(
+          (item) => !item.pinned && belongsToDay(item, day, now: reference),
+        )
+        .toList();
+  }
+
+  static bool belongsToDay(
+    NoteItem item,
+    DateTime day, {
+    DateTime? now,
+  }) {
+    final key = dateOnly(day);
+    final reference = now ?? DateTime.now();
+
+    if (item.type == NoteType.note) {
+      return dateOnly(item.createdAt) == key || dateOnly(item.updatedAt) == key;
+    }
+
+    if (item.todayAt != null && dateOnly(item.todayAt!) == key) return true;
+    if (item.dueAt != null && dateOnly(item.dueAt!) == key) return true;
+    if (item.completedAt != null && dateOnly(item.completedAt!) == key) {
+      return true;
+    }
+    if (key == dateOnly(reference) && item.isOverdue(reference)) return true;
+    return false;
   }
 
   static String emptyMessage({

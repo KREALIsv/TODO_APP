@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../domain/date_only.dart';
 import '../domain/day_entry.dart';
 import '../domain/day_log.dart' as day_log;
+import '../domain/day_migration.dart';
 import '../domain/note_item.dart';
 
 class DayEntriesRepository {
@@ -161,6 +162,74 @@ class DayEntriesRepository {
         targetDay: null,
       ),
     );
+  }
+
+  Future<void> _applyOriginPatch({
+    required String noteId,
+    required DayOriginPatch patch,
+    required DateTime now,
+  }) async {
+    final existing = findForNoteDay(noteId, patch.day);
+    final entry = existing == null
+        ? DayEntry(
+            id: _uuid.v4(),
+            noteId: noteId,
+            day: patch.day,
+            via: DayVia.manual,
+            outcome: patch.outcome,
+            targetDay: patch.targetDay,
+            outcomeAt: patch.outcomeAt,
+            createdAt: now,
+          )
+        : existing.copyWith(
+            outcome: patch.outcome,
+            targetDay: patch.targetDay,
+            outcomeAt: patch.outcomeAt,
+          );
+    await upsert(entry);
+  }
+
+  Future<void> _ensureOpenDestination({
+    required String noteId,
+    required DateTime day,
+    required DayVia via,
+    required DateTime now,
+  }) async {
+    final existing = findForNoteDay(noteId, day);
+    if (existing == null) {
+      await ensurePlanned(noteId: noteId, day: day, via: via, now: now);
+      return;
+    }
+    await upsert(
+      existing.copyWith(
+        via: via,
+        outcome: DayOutcome.open,
+        targetDay: null,
+        outcomeAt: null,
+      ),
+    );
+  }
+
+  /// Persists coordinated day-entry changes from [DayMigrationPatches].
+  Future<void> applyMigrationPatches({
+    required String noteId,
+    required DayMigrationPatches patches,
+    required DateTime now,
+  }) async {
+    await _applyOriginPatch(
+      noteId: noteId,
+      now: now,
+      patch: patches.originUpdate,
+    );
+    final destination = patches.destinationEnsure;
+    if (destination != null) {
+      await _ensureOpenDestination(
+        noteId: noteId,
+        day: destination.day,
+        via: destination.via,
+        now: now,
+      );
+    }
   }
 
   /// Lazy backfill for a past day with no entries yet.

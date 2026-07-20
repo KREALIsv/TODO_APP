@@ -45,7 +45,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   NotesFilter _activeFilter = NotesFilter.all;
   bool _isSearchExpanded = false;
-  bool _completedExpanded = false;
+  GroupedTasksExpansion _groupedExpansion = const GroupedTasksExpansion();
+  bool _pinnedSectionExpanded = true;
+  bool _ofDaySectionExpanded = true;
   late final ClockRefreshController _clock;
   DateTime _now = DateTime.now();
   late DateTime _selectedDay;
@@ -105,10 +107,17 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _resetSelectedDayToToday() {
+    _onSelectedDayChanged(dateOnly(DateTime.now()));
+  }
+
   Future<void> _openProfile(BuildContext context) async {
     final filter = await Navigator.of(context).push<NotesFilter>(
       MaterialPageRoute(
-        builder: (_) => ProfileScreen(repository: _repo),
+        builder: (_) => ProfileScreen(
+          repository: _repo,
+          onResetSelectedDay: _resetSelectedDayToToday,
+        ),
       ),
     );
     if (filter != null && mounted) {
@@ -119,7 +128,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openSettings(BuildContext context) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SettingsScreen(repository: _repo),
+        builder: (_) => SettingsScreen(
+          repository: _repo,
+          onResetSelectedDay: _resetSelectedDayToToday,
+        ),
       ),
     );
   }
@@ -228,10 +240,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(
+    String title, {
+    bool collapsible = true,
+    required bool expanded,
+    required VoidCallback onToggle,
+  }) {
     return SliverToBoxAdapter(
-      child: TaskSectionHeader(title: title),
+      child: TaskSectionHeader(
+        title: title,
+        expanded: collapsible ? expanded : null,
+        onToggle: collapsible ? onToggle : null,
+      ),
     );
+  }
+
+  void _resetSectionExpansion() {
+    _groupedExpansion = const GroupedTasksExpansion();
+    _pinnedSectionExpanded = true;
+    _ofDaySectionExpanded = true;
   }
 
   PreferredSizeWidget _buildAppBarBottom(String searchQuery) {
@@ -286,39 +313,37 @@ class _HomeScreenState extends State<HomeScreen> {
     return SliverAppBar(
       pinned: true,
       floating: false,
-      titleSpacing: 16,
+      centerTitle: true,
+      titleSpacing: 0,
+      leadingWidth: 56,
       backgroundColor: barColor,
       surfaceTintColor: Colors.transparent,
-      title: Row(
-        children: [
-          Tooltip(
-            message: 'Perfil',
-            child: InkWell(
-              onTap: () => _openProfile(context),
-              customBorder: const CircleBorder(),
-              child: CircleAvatar(
-                radius: 18,
-                backgroundColor: scheme.primaryContainer,
-                child: Icon(
-                  Icons.person_outline,
-                  color: scheme.primary,
-                  size: 20,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: DaySelectorHeader(
-              selectedDay: _selectedDay,
-              today: _now,
-              onDayChanged: _onSelectedDayChanged,
-              textStyle: textTheme.labelLarge?.copyWith(
+      leading: Center(
+        child: Tooltip(
+          message: 'Perfil · mantén para Ajustes',
+          child: InkWell(
+            onTap: () => _openProfile(context),
+            onLongPress: () => _openSettings(context),
+            customBorder: const CircleBorder(),
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: scheme.primaryContainer,
+              child: Icon(
+                Icons.person_outline,
                 color: scheme.primary,
+                size: 20,
               ),
             ),
           ),
-        ],
+        ),
+      ),
+      title: DaySelectorHeader(
+        selectedDay: _selectedDay,
+        today: _now,
+        onDayChanged: _onSelectedDayChanged,
+        textStyle: textTheme.labelLarge?.copyWith(
+          color: scheme.primary,
+        ),
       ),
       actions: [
         IconButton(
@@ -329,15 +354,6 @@ class _HomeScreenState extends State<HomeScreen> {
             color: _isSearchExpanded ? scheme.primary : AppColors.neutral60,
           ),
         ),
-        if (!_isSearchExpanded)
-          IconButton(
-            tooltip: 'Ajustes',
-            onPressed: () => _openSettings(context),
-            icon: const Icon(
-              Icons.settings_outlined,
-              color: AppColors.neutral60,
-            ),
-          ),
       ],
       bottom: _buildAppBarBottom(searchQuery),
     );
@@ -346,7 +362,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> _buildLiveBodySlivers({
     required TextTheme textTheme,
     required String searchQuery,
-    required bool isArchivedFilter,
     required List<NoteItem> all,
   }) {
     final useSectioned = NotesQuery.useSectionedLayout(
@@ -363,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
       searchQuery: searchQuery,
     );
     final pinned = NotesQuery.pinnedFrom(filtered);
-    final recent = NotesQuery.recentFrom(filtered);
+    final ofDay = NotesQuery.ofDayFrom(filtered, _now, now: _now);
     final emptyMessage = NotesQuery.emptyMessage(
       filter: _activeFilter,
       searchQuery: searchQuery,
@@ -373,13 +388,12 @@ class _HomeScreenState extends State<HomeScreen> {
         useGrouped ? TaskGroupsQuery.from(filtered, now: _now) : null;
 
     return [
-      if (!isArchivedFilter)
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: QuickCaptureField(repository: _repo),
-          ),
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: QuickCaptureField(repository: _repo),
         ),
+      ),
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -388,7 +402,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onFilterChanged: (filter) {
               setState(() {
                 _activeFilter = filter;
-                _completedExpanded = false;
+                _resetSectionExpansion();
               });
             },
           ),
@@ -400,44 +414,69 @@ class _HomeScreenState extends State<HomeScreen> {
           onOpen: (item) => _openEditor(context, item: item),
           repository: _repo,
           textTheme: textTheme,
-          completedExpanded: _completedExpanded,
-          onToggleCompleted: () {
-            setState(() => _completedExpanded = !_completedExpanded);
+          expansion: _groupedExpansion,
+          onToggleSection: (section) {
+            setState(() {
+              _groupedExpansion = _groupedExpansion.toggle(section);
+            });
           },
         )
       else if (filtered.isEmpty ||
           (useGrouped && groups != null && groups.isEmpty))
         _buildEmptyState(emptyMessage, textTheme)
-      else if (useSectioned) ...[
-        if (pinned.isNotEmpty) ...[
-          _buildSectionHeader('Fijadas'),
-          _buildNoteList(
-            pinned,
-            (item) => _openEditor(context, item: item),
-            bottomPadding: 0,
-          ),
-        ],
-        _buildSectionHeader('Recientes'),
-        if (recent.isEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'No hay notas recientes',
-                style: textTheme.bodyMedium,
+      else if (useSectioned) ...() {
+        final hasPinned = pinned.isNotEmpty;
+        final collapsible = hasPinned;
+        return [
+          if (hasPinned) ...[
+            _buildSectionHeader(
+              'Fijadas',
+              collapsible: collapsible,
+              expanded: _pinnedSectionExpanded,
+              onToggle: () => setState(
+                () => _pinnedSectionExpanded = !_pinnedSectionExpanded,
               ),
             ),
-          )
-        else
-          _buildNoteList(
-            recent,
-            (item) => _openEditor(context, item: item),
+            if (!collapsible || _pinnedSectionExpanded)
+              _buildNoteList(
+                pinned,
+                (item) => _openEditor(context, item: item),
+                bottomPadding: 0,
+              ),
+          ],
+          _buildSectionHeader(
+            'Del día',
+            collapsible: collapsible,
+            expanded: _ofDaySectionExpanded,
+            onToggle: () => setState(
+              () => _ofDaySectionExpanded = !_ofDaySectionExpanded,
+            ),
           ),
-      ] else ...[
+          if (!collapsible || _ofDaySectionExpanded)
+            if (ofDay.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'Nada más del día',
+                    style: textTheme.bodyMedium,
+                  ),
+                ),
+              )
+            else
+              _buildNoteList(
+                ofDay,
+                (item) => _openEditor(context, item: item),
+              ),
+        ];
+      }() else ...[
         _buildSectionHeader(
           searchQuery.trim().isNotEmpty
               ? 'Resultados'
               : _activeFilter.listHeader,
+          collapsible: false,
+          expanded: true,
+          onToggle: () {},
         ),
         _buildNoteList(
           filtered,
@@ -466,6 +505,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final items = planNotesForDay(_repo.getAll(), day);
     return [
       DayPlanSliver(
+        day: day,
         items: items,
         onOpen: (item) => _openEditor(context, item: item),
       ),
@@ -506,7 +546,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? _buildLiveBodySlivers(
                           textTheme: textTheme,
                           searchQuery: searchQuery,
-                          isArchivedFilter: isArchivedFilter,
                           all: all,
                         )
                       : isPastDay

@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../domain/date_only.dart';
 import '../domain/day_entry.dart';
 import '../domain/day_log.dart';
+import '../domain/day_migration.dart';
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
 import 'day_entries_repository.dart';
@@ -234,6 +235,92 @@ class NotesRepository {
         );
       }
     }, 'applyTaskWhen');
+  }
+
+  /// Moves a task's commitment from [fromDay] to [toDay].
+  Future<void> migrateTaskToDay(
+    String id,
+    DateTime toDay, {
+    DateTime? fromDay,
+  }) async {
+    final current = getById(id);
+    if (current == null || current.type != NoteType.task) return;
+
+    final now = DateTime.now();
+    final originDay = dateOnly(fromDay ?? commitmentDayFor(current, now));
+    final targetDay = dateOnly(toDay);
+    final patches = migrateTo(current, originDay, targetDay, now);
+    await update(patches.noteUpdate.copyWith(reminderMinutesBefore: null));
+    await _syncDayEntry(
+      () => _dayEntries.applyMigrationPatches(
+        noteId: id,
+        patches: patches,
+        now: now,
+      ),
+      'migrateTaskToDay',
+    );
+  }
+
+  /// Schedules a task on [toDay], retaining any reminder for its new due date.
+  Future<void> scheduleTaskToDay(
+    String id,
+    DateTime toDay, {
+    DateTime? fromDay,
+  }) async {
+    final current = getById(id);
+    if (current == null || current.type != NoteType.task) return;
+
+    final now = DateTime.now();
+    final originDay = dateOnly(fromDay ?? commitmentDayFor(current, now));
+    final targetDay = dateOnly(toDay);
+    final patches = scheduleTo(current, originDay, targetDay, now);
+    await update(patches.noteUpdate);
+    await _syncDayEntry(
+      () => _dayEntries.applyMigrationPatches(
+        noteId: id,
+        patches: patches,
+        now: now,
+      ),
+      'scheduleTaskToDay',
+    );
+  }
+
+  /// Returns a task to the backlog and closes its day's open entry.
+  Future<void> sendTaskToBacklog(String id, {DateTime? fromDay}) async {
+    final current = getById(id);
+    if (current == null || current.type != NoteType.task) return;
+
+    final now = DateTime.now();
+    final originDay = dateOnly(fromDay ?? commitmentDayFor(current, now));
+    final patches = sendToBacklog(current, originDay, now);
+    await update(patches.noteUpdate);
+    await _syncDayEntry(
+      () => _dayEntries.applyMigrationPatches(
+        noteId: id,
+        patches: patches,
+        now: now,
+      ),
+      'sendTaskToBacklog',
+    );
+  }
+
+  /// Cancels a task's commitment on [fromDay] without deleting the task.
+  Future<void> cancelTaskOnDay(String id, {DateTime? fromDay}) async {
+    final current = getById(id);
+    if (current == null || current.type != NoteType.task) return;
+
+    final now = DateTime.now();
+    final originDay = dateOnly(fromDay ?? commitmentDayFor(current, now));
+    final patches = cancelOnDay(current, originDay, now);
+    await update(patches.noteUpdate);
+    await _syncDayEntry(
+      () => _dayEntries.applyMigrationPatches(
+        noteId: id,
+        patches: patches,
+        now: now,
+      ),
+      'cancelTaskOnDay',
+    );
   }
 
   Future<void> _syncDayEntry(

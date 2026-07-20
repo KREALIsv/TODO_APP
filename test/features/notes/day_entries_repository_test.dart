@@ -6,6 +6,7 @@ import 'package:hive/hive.dart';
 import 'package:todos_app/features/notes/data/day_entries_repository.dart';
 import 'package:todos_app/features/notes/domain/date_only.dart';
 import 'package:todos_app/features/notes/domain/day_entry.dart';
+import 'package:todos_app/features/notes/domain/day_migration.dart';
 import 'package:todos_app/features/notes/domain/note_item.dart';
 
 void main() {
@@ -125,5 +126,107 @@ void main() {
     final second = await repo.backfillDayIfEmpty(day: day, notes: notes);
     expect(second.length, 1);
     expect(second.first.id, first.first.id);
+  });
+
+  test('applyMigrationPatches closes origin and ensures destination once',
+      () async {
+    final fromDay = DateTime(2026, 7, 20, 15);
+    final toDay = DateTime(2026, 7, 22, 11);
+    final now = DateTime(2026, 7, 20, 16);
+    final patches = migrateTo(
+      NoteItem(
+        id: 'n1',
+        type: NoteType.task,
+        title: 'Task',
+        body: '',
+        pinned: false,
+        completed: false,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      fromDay,
+      toDay,
+      now,
+    );
+
+    await repo.applyMigrationPatches(
+      noteId: 'n1',
+      patches: patches,
+      now: now,
+    );
+    await repo.applyMigrationPatches(
+      noteId: 'n1',
+      patches: patches,
+      now: now,
+    );
+
+    final origin = repo.findForNoteDay('n1', fromDay)!;
+    final destination = repo.findForNoteDay('n1', toDay)!;
+    expect(origin.outcome, DayOutcome.migrated);
+    expect(origin.targetDay, dateOnly(toDay));
+    expect(destination.outcome, DayOutcome.open);
+    expect(destination.via, DayVia.migratedIn);
+    expect(repo.getAll().length, 2);
+  });
+
+  test('applyMigrationPatches handles schedule, backlog, and cancel origins',
+      () async {
+    final now = DateTime(2026, 7, 20, 16);
+    final task = NoteItem(
+      id: 'task',
+      type: NoteType.task,
+      title: 'Task',
+      body: '',
+      pinned: false,
+      completed: false,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await repo.applyMigrationPatches(
+      noteId: 'scheduled',
+      patches: scheduleTo(
+        task.copyWith(id: 'scheduled'),
+        DateTime(2026, 7, 20),
+        DateTime(2026, 7, 23),
+        now,
+      ),
+      now: now,
+    );
+    await repo.applyMigrationPatches(
+      noteId: 'backlogged',
+      patches: sendToBacklog(
+        task.copyWith(id: 'backlogged'),
+        DateTime(2026, 7, 20),
+        now,
+      ),
+      now: now,
+    );
+    await repo.applyMigrationPatches(
+      noteId: 'cancelled',
+      patches: cancelOnDay(
+        task.copyWith(id: 'cancelled'),
+        DateTime(2026, 7, 20),
+        now,
+      ),
+      now: now,
+    );
+
+    expect(
+      repo.findForNoteDay('scheduled', DateTime(2026, 7, 20))!.outcome,
+      DayOutcome.scheduled,
+    );
+    expect(
+      repo.findForNoteDay('scheduled', DateTime(2026, 7, 23))!.via,
+      DayVia.scheduledIn,
+    );
+    expect(
+      repo.findForNoteDay('backlogged', DateTime(2026, 7, 20))!.outcome,
+      DayOutcome.backlogged,
+    );
+    expect(
+      repo.findForNoteDay('cancelled', DateTime(2026, 7, 20))!.outcome,
+      DayOutcome.cancelled,
+    );
   });
 }

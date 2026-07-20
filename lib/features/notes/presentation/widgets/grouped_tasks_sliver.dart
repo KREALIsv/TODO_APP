@@ -7,101 +7,134 @@ import '../../domain/task_groups.dart';
 import 'swipeable_note_card.dart';
 import 'task_section_header.dart';
 
-/// Builds slivers for grouped tasks (Hoy / Próximas / Sin fecha / Completadas).
+enum GroupedTasksSection { today, upcoming, undated }
+
+class GroupedTasksExpansion {
+  const GroupedTasksExpansion({
+    this.today = true,
+    this.upcoming = true,
+    this.undated = true,
+  });
+
+  final bool today;
+  final bool upcoming;
+  final bool undated;
+
+  bool isExpanded(GroupedTasksSection section) => switch (section) {
+        GroupedTasksSection.today => today,
+        GroupedTasksSection.upcoming => upcoming,
+        GroupedTasksSection.undated => undated,
+      };
+
+  GroupedTasksExpansion toggle(GroupedTasksSection section) {
+    return GroupedTasksExpansion(
+      today: section == GroupedTasksSection.today ? !today : today,
+      upcoming: section == GroupedTasksSection.upcoming ? !upcoming : upcoming,
+      undated: section == GroupedTasksSection.undated ? !undated : undated,
+    );
+  }
+}
+
+/// Builds slivers for grouped tasks (Hoy / Próximas / Sin fecha).
 List<Widget> buildGroupedTasksSlivers({
   required TaskGroups groups,
   required void Function(NoteItem item) onOpen,
   NotesRepository? repository,
   TextTheme? textTheme,
-  bool completedExpanded = false,
-  VoidCallback? onToggleCompleted,
+  GroupedTasksExpansion expansion = const GroupedTasksExpansion(),
+  void Function(GroupedTasksSection section)? onToggleSection,
 }) {
   final hasOther =
       groups.upcoming.isNotEmpty || groups.undated.isNotEmpty;
+  final sectionCount = 1 +
+      (groups.upcoming.isNotEmpty ? 1 : 0) +
+      (groups.undated.isNotEmpty ? 1 : 0);
+  final collapsible = sectionCount > 1;
+
+  VoidCallback? toggle(GroupedTasksSection section) {
+    if (!collapsible || onToggleSection == null) return null;
+    return () => onToggleSection(section);
+  }
+
+  bool showContent(GroupedTasksSection section) {
+    if (!collapsible) return true;
+    return expansion.isExpanded(section);
+  }
+
   final slivers = <Widget>[
     SliverToBoxAdapter(
       child: TaskSectionHeader(
         title: 'Hoy',
         progress: groups.progress,
+        expanded: collapsible ? expansion.today : null,
+        onToggle: toggle(GroupedTasksSection.today),
       ),
     ),
   ];
 
-  if (groups.today.isEmpty) {
-    slivers.add(
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Text(
-            hasOther
-                ? 'Nada para hoy · desliza o abre una tarea para planear tu día'
-                : 'Nada para hoy',
-            style: textTheme?.bodyMedium?.copyWith(
-              color: AppColors.neutral60,
+  if (showContent(GroupedTasksSection.today)) {
+    if (groups.today.isEmpty) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              hasOther
+                  ? 'Nada para hoy · desliza o abre una tarea para planear tu día'
+                  : 'Nada para hoy',
+              style: textTheme?.bodyMedium?.copyWith(
+                color: AppColors.neutral60,
+              ),
             ),
           ),
         ),
-      ),
-    );
-  } else {
-    slivers.add(
-      _taskListSliver(
-        items: groups.today,
-        onOpen: onOpen,
-        repository: repository,
-      ),
-    );
+      );
+    } else {
+      slivers.add(
+        _taskListSliver(
+          items: groups.today,
+          onOpen: onOpen,
+          repository: repository,
+        ),
+      );
+    }
   }
 
   if (groups.upcoming.isNotEmpty) {
-    slivers
-      ..add(
-        const SliverToBoxAdapter(
-          child: TaskSectionHeader(title: 'Próximas'),
+    slivers.add(
+      SliverToBoxAdapter(
+        child: TaskSectionHeader(
+          title: 'Próximas',
+          expanded: collapsible ? expansion.upcoming : null,
+          onToggle: toggle(GroupedTasksSection.upcoming),
         ),
-      )
-      ..add(
+      ),
+    );
+    if (showContent(GroupedTasksSection.upcoming)) {
+      slivers.add(
         _taskListSliver(
           items: groups.upcoming,
           onOpen: onOpen,
           repository: repository,
         ),
       );
+    }
   }
 
   if (groups.undated.isNotEmpty) {
-    slivers
-      ..add(
-        const SliverToBoxAdapter(
-          child: TaskSectionHeader(title: 'Sin fecha'),
-        ),
-      )
-      ..add(
-        _taskListSliver(
-          items: groups.undated,
-          onOpen: onOpen,
-          repository: repository,
-        ),
-      );
-  }
-
-  if (groups.completedEarlier.isNotEmpty) {
     slivers.add(
       SliverToBoxAdapter(
         child: TaskSectionHeader(
-          title: 'Completadas (${groups.completedEarlier.length})',
-          trailing: Icon(
-            completedExpanded ? Icons.expand_less : Icons.expand_more,
-            color: AppColors.neutral60,
-          ),
-          onTap: onToggleCompleted,
+          title: 'Sin fecha',
+          expanded: collapsible ? expansion.undated : null,
+          onToggle: toggle(GroupedTasksSection.undated),
         ),
       ),
     );
-    if (completedExpanded) {
+    if (showContent(GroupedTasksSection.undated)) {
       slivers.add(
         _taskListSliver(
-          items: groups.completedEarlier,
+          items: groups.undated,
           onOpen: onOpen,
           repository: repository,
         ),
