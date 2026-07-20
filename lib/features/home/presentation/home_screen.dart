@@ -3,13 +3,17 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../../global/themes/app_colors.dart';
+import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
+import '../../notes/domain/date_only.dart';
+import '../../notes/domain/day_log.dart';
 import '../../notes/domain/note_item.dart';
 import '../../notes/domain/notes_filter.dart';
 import '../../notes/domain/notes_query.dart';
 import '../../notes/domain/task_groups.dart';
 import '../../notes/presentation/note_editor_screen.dart';
 import '../../notes/presentation/widgets/clock_refresh.dart';
+import '../../notes/presentation/widgets/day_replay_sliver.dart';
 import '../../notes/presentation/widgets/filter_chips_bar.dart';
 import '../../notes/presentation/widgets/grouped_tasks_sliver.dart';
 import '../../notes/presentation/widgets/note_compose_sheet.dart';
@@ -19,11 +23,17 @@ import '../../notes/presentation/widgets/task_section_header.dart';
 import '../../profile/presentation/profile_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../settings/presentation/widgets/list_background_layer.dart';
+import 'widgets/day_selector_header.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.repository});
+  const HomeScreen({
+    super.key,
+    this.repository,
+    this.dayEntriesRepository,
+  });
 
   final NotesRepository? repository;
+  final DayEntriesRepository? dayEntriesRepository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -38,17 +48,28 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _completedExpanded = false;
   late final ClockRefreshController _clock;
   DateTime _now = DateTime.now();
+  late DateTime _selectedDay;
+  DateTime? _backfillRequestedFor;
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
+  DayEntriesRepository get _dayEntries =>
+      widget.dayEntriesRepository ?? DayEntriesRepository.instance;
 
   @override
   void initState() {
     super.initState();
+    _selectedDay = dateOnly(_now);
     _clock = ClockRefreshController(
       repository: _repo,
       onTick: () {
         if (!mounted) return;
-        setState(() => _now = DateTime.now());
+        setState(() {
+          final previousToday = dateOnly(_now);
+          _now = DateTime.now();
+          if (dateOnly(_selectedDay) == previousToday) {
+            _selectedDay = dateOnly(_now);
+          }
+        });
       },
     );
     _clock.start();
@@ -60,6 +81,28 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _onSelectedDayChanged(DateTime day) {
+    setState(() {
+      _selectedDay = dateOnly(day);
+      _backfillRequestedFor = null;
+    });
+  }
+
+  void _maybeBackfillPastDay(DateTime day) {
+    final key = dateOnly(day);
+    final today = dateOnly(_now);
+    if (!key.isBefore(today)) return;
+    if (_backfillRequestedFor == key) return;
+    _backfillRequestedFor = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await _dayEntries.backfillDayIfEmpty(
+        day: key,
+        notes: [..._repo.getAll(), ..._repo.getArchived()],
+      );
+    });
   }
 
   Future<void> _openProfile(BuildContext context) async {
@@ -131,24 +174,6 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) _searchFocusNode.requestFocus();
       });
     }
-  }
-
-  String _formatHeaderDate(DateTime date) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
   Widget _buildEmptyState(String message, TextTheme textTheme) {
@@ -253,7 +278,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSliverAppBar(TextTheme textTheme, String searchQuery) {
-    final today = _formatHeaderDate(_now);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
@@ -283,11 +307,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          Text(
-            today,
-            style: textTheme.labelLarge?.copyWith(
-              color: scheme.primary,
+          const SizedBox(width: 8),
+          Expanded(
+            child: DaySelectorHeader(
+              selectedDay: _selectedDay,
+              today: _now,
+              onDayChanged: _onSelectedDayChanged,
+              textStyle: textTheme.labelLarge?.copyWith(
+                color: scheme.primary,
+              ),
             ),
           ),
         ],
@@ -315,10 +343,143 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  List<Widget> _buildLiveBodySlivers({
+    required TextTheme textTheme,
+    required String searchQuery,
+    required bool isArchivedFilter,
+    required List<NoteItem> all,
+  }) {
+    final useSectioned = NotesQuery.useSectionedLayout(
+      filter: _activeFilter,
+      searchQuery: searchQuery,
+    );
+    final useGrouped = NotesQuery.useGroupedTasksLayout(
+      filter: _activeFilter,
+      searchQuery: searchQuery,
+    );
+    final filtered = NotesQuery.apply(
+      items: all,
+      filter: _activeFilter,
+      searchQuery: searchQuery,
+    );
+    final pinned = NotesQuery.pinnedFrom(filtered);
+    final recent = NotesQuery.recentFrom(filtered);
+    final emptyMessage = NotesQuery.emptyMessage(
+      filter: _activeFilter,
+      searchQuery: searchQuery,
+      hasAnyItems: all.isNotEmpty,
+    );
+    final groups =
+        useGrouped ? TaskGroupsQuery.from(filtered, now: _now) : null;
+
+    return [
+      if (!isArchivedFilter)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: QuickCaptureField(repository: _repo),
+          ),
+        ),
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: FilterChipsBar(
+            activeFilter: _activeFilter,
+            onFilterChanged: (filter) {
+              setState(() {
+                _activeFilter = filter;
+                _completedExpanded = false;
+              });
+            },
+          ),
+        ),
+      ),
+      if (useGrouped && groups != null && !groups.isEmpty)
+        ...buildGroupedTasksSlivers(
+          groups: groups,
+          onOpen: (item) => _openEditor(context, item: item),
+          repository: _repo,
+          textTheme: textTheme,
+          completedExpanded: _completedExpanded,
+          onToggleCompleted: () {
+            setState(() => _completedExpanded = !_completedExpanded);
+          },
+        )
+      else if (filtered.isEmpty ||
+          (useGrouped && groups != null && groups.isEmpty))
+        _buildEmptyState(emptyMessage, textTheme)
+      else if (useSectioned) ...[
+        if (pinned.isNotEmpty) ...[
+          _buildSectionHeader('Fijadas'),
+          _buildNoteList(
+            pinned,
+            (item) => _openEditor(context, item: item),
+            bottomPadding: 0,
+          ),
+        ],
+        _buildSectionHeader('Recientes'),
+        if (recent.isEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'No hay notas recientes',
+                style: textTheme.bodyMedium,
+              ),
+            ),
+          )
+        else
+          _buildNoteList(
+            recent,
+            (item) => _openEditor(context, item: item),
+          ),
+      ] else ...[
+        _buildSectionHeader(
+          searchQuery.trim().isNotEmpty
+              ? 'Resultados'
+              : _activeFilter.listHeader,
+        ),
+        _buildNoteList(
+          filtered,
+          (item) => _openEditor(context, item: item),
+        ),
+      ],
+    ];
+  }
+
+  List<Widget> _buildReplaySlivers(DateTime day) {
+    _maybeBackfillPastDay(day);
+    final entries = _dayEntries.entriesForDay(day);
+    final notesById = <String, NoteItem>{
+      for (final n in [..._repo.getAll(), ..._repo.getArchived()]) n.id: n,
+    };
+    final rows = resolveDayLogRows(entries: entries, notesById: notesById);
+    return [
+      DayReplaySliver(
+        rows: rows,
+        onOpen: (item) => _openEditor(context, item: item),
+      ),
+    ];
+  }
+
+  List<Widget> _buildPlanSlivers(DateTime day) {
+    final items = planNotesForDay(_repo.getAll(), day);
+    return [
+      DayPlanSliver(
+        items: items,
+        onOpen: (item) => _openEditor(context, item: item),
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final searchQuery = _searchController.text;
+    final today = dateOnly(_now);
+    final selected = dateOnly(_selectedDay);
+    final isLiveDay = selected == today;
+    final isPastDay = selected.isBefore(today);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -327,140 +488,64 @@ class _HomeScreenState extends State<HomeScreen> {
           top: false,
           child: ValueListenableBuilder<Box<Map>>(
             valueListenable: _repo.listenable(),
-            builder: (context, box, child) {
-          // Re-arm the due-time ticker when the dataset changes.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _clock.schedule();
-          });
+            builder: (context, notesBox, _) {
+              return ValueListenableBuilder<Box<Map>>(
+                valueListenable: _dayEntries.listenable(),
+                builder: (context, dayBox, _) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _clock.schedule();
+                  });
 
-          final isArchivedFilter = _activeFilter == NotesFilter.archived;
-          final all =
-              isArchivedFilter ? _repo.getArchived() : _repo.getAll();
-          final useSectioned = NotesQuery.useSectionedLayout(
-            filter: _activeFilter,
-            searchQuery: searchQuery,
-          );
-          final useGrouped = NotesQuery.useGroupedTasksLayout(
-            filter: _activeFilter,
-            searchQuery: searchQuery,
-          );
-          final filtered = NotesQuery.apply(
-            items: all,
-            filter: _activeFilter,
-            searchQuery: searchQuery,
-          );
-          final pinned = NotesQuery.pinnedFrom(filtered);
-          final recent = NotesQuery.recentFrom(filtered);
-          final emptyMessage = NotesQuery.emptyMessage(
-            filter: _activeFilter,
-            searchQuery: searchQuery,
-            hasAnyItems: all.isNotEmpty,
-          );
-          final groups = useGrouped
-              ? TaskGroupsQuery.from(filtered, now: _now)
-              : null;
+                  final isArchivedFilter =
+                      _activeFilter == NotesFilter.archived;
+                  final all = isArchivedFilter
+                      ? _repo.getArchived()
+                      : _repo.getAll();
 
-          return SlidableAutoCloseBehavior(
-            child: CustomScrollView(
-              slivers: [
-                _buildSliverAppBar(textTheme, searchQuery),
-                if (!isArchivedFilter)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: QuickCaptureField(repository: _repo),
+                  final bodySlivers = isLiveDay
+                      ? _buildLiveBodySlivers(
+                          textTheme: textTheme,
+                          searchQuery: searchQuery,
+                          isArchivedFilter: isArchivedFilter,
+                          all: all,
+                        )
+                      : isPastDay
+                          ? _buildReplaySlivers(selected)
+                          : _buildPlanSlivers(selected);
+
+                  return SlidableAutoCloseBehavior(
+                    child: CustomScrollView(
+                      slivers: [
+                        _buildSliverAppBar(textTheme, searchQuery),
+                        ...bodySlivers,
+                      ],
                     ),
-                  ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: FilterChipsBar(
-                      activeFilter: _activeFilter,
-                      onFilterChanged: (filter) {
-                        setState(() {
-                          _activeFilter = filter;
-                          _completedExpanded = false;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-                if (useGrouped && groups != null && !groups.isEmpty)
-                  ...buildGroupedTasksSlivers(
-                    groups: groups,
-                    onOpen: (item) => _openEditor(context, item: item),
-                    repository: _repo,
-                    textTheme: textTheme,
-                    completedExpanded: _completedExpanded,
-                    onToggleCompleted: () {
-                      setState(
-                        () => _completedExpanded = !_completedExpanded,
-                      );
-                    },
-                  )
-                else if (filtered.isEmpty ||
-                    (useGrouped && groups != null && groups.isEmpty))
-                  _buildEmptyState(emptyMessage, textTheme)
-                else if (useSectioned) ...[
-                  if (pinned.isNotEmpty) ...[
-                    _buildSectionHeader('Fijadas'),
-                    _buildNoteList(
-                      pinned,
-                      (item) => _openEditor(context, item: item),
-                      bottomPadding: 0,
-                    ),
-                  ],
-                  _buildSectionHeader('Recientes'),
-                  if (recent.isEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'No hay notas recientes',
-                          style: textTheme.bodyMedium,
-                        ),
-                      ),
-                    )
-                  else
-                    _buildNoteList(
-                      recent,
-                      (item) => _openEditor(context, item: item),
-                    ),
-                ] else ...[
-                  _buildSectionHeader(
-                    searchQuery.trim().isNotEmpty
-                        ? 'Resultados'
-                        : _activeFilter.listHeader,
-                  ),
-                  _buildNoteList(
-                    filtered,
-                    (item) => _openEditor(context, item: item),
-                  ),
-                ],
-              ],
-            ),
-          );
-          },
-        ),
-        ),
-      ),
-      floatingActionButton: Tooltip(
-        message: _fabCreatesTask ? 'Nueva tarea' : 'Nueva nota',
-        child: Semantics(
-          button: true,
-          label: _fabCreatesTask ? 'Nueva tarea' : 'Nueva nota',
-          hint: _fabCreatesTask
-              ? 'Mantén pulsado para crear una nota'
-              : 'Mantén pulsado para crear una tarea',
-          child: GestureDetector(
-            onLongPress: _onFabLongPress,
-            child: FloatingActionButton(
-              onPressed: _onFabPressed,
-              child: const Icon(Icons.add),
-            ),
+                  );
+                },
+              );
+            },
           ),
         ),
       ),
+      floatingActionButton: isLiveDay
+          ? Tooltip(
+              message: _fabCreatesTask ? 'Nueva tarea' : 'Nueva nota',
+              child: Semantics(
+                button: true,
+                label: _fabCreatesTask ? 'Nueva tarea' : 'Nueva nota',
+                hint: _fabCreatesTask
+                    ? 'Mantén pulsado para crear una nota'
+                    : 'Mantén pulsado para crear una tarea',
+                child: GestureDetector(
+                  onLongPress: _onFabLongPress,
+                  child: FloatingActionButton(
+                    onPressed: _onFabPressed,
+                    child: const Icon(Icons.add),
+                  ),
+                ),
+              ),
+            )
+          : null,
     );
   }
 }
