@@ -193,28 +193,28 @@ body {
   background:
     linear-gradient(
       145deg,
-      rgba(175, 245, 180, 0.24) 0%,
-      rgba(45, 164, 78, 0.14) 100%
+      rgba(184, 230, 196, 0.72) 0%,
+      rgba(160, 216, 170, 0.55) 100%
     );
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border-color: rgba(90, 180, 110, 0.55);
+  border-color: #a8d4b2;
   box-shadow:
     0 8px 28px rgba(31, 35, 40, 0.06),
-    inset 0 1px 0 rgba(175, 245, 180, 0.4);
+    inset 0 1px 0 rgba(230, 247, 235, 0.55);
 }
 
 .btn-glass:hover {
   background:
     linear-gradient(
       145deg,
-      rgba(175, 245, 180, 0.3) 0%,
-      rgba(45, 164, 78, 0.18) 100%
+      rgba(184, 230, 196, 0.85) 0%,
+      rgba(160, 216, 170, 0.68) 100%
     );
-  border-color: rgba(90, 180, 110, 0.7);
+  border-color: #96c8a2;
   box-shadow:
     0 12px 32px rgba(31, 35, 40, 0.08),
-    inset 0 1px 0 rgba(175, 245, 180, 0.5);
+    inset 0 1px 0 rgba(230, 247, 235, 0.65);
 }
 
 .btn-android,
