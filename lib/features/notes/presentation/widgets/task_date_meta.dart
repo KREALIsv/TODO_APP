@@ -43,6 +43,7 @@ class TaskDateMeta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final accent = Theme.of(context).colorScheme.primary;
     final reference = now ?? DateTime.now();
     final today = dateOnly(reference);
 
@@ -123,7 +124,7 @@ class TaskDateMeta extends StatelessWidget {
         return withReminder(
           meta(
             text: _formatTime(item.dueAt!),
-            color: AppColors.primary,
+            color: accent,
             icon: Icons.schedule,
           ),
         );
@@ -131,7 +132,7 @@ class TaskDateMeta extends StatelessWidget {
       return withReminder(
         meta(
           text: 'Vence hoy',
-          color: AppColors.primary,
+          color: accent,
         ),
       );
     }
@@ -151,7 +152,7 @@ class TaskDateMeta extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (item.isTodayCommitment(reference)) ...[
-          const Icon(Icons.wb_sunny_outlined, size: 12, color: AppColors.primary),
+          Icon(Icons.wb_sunny_outlined, size: 12, color: accent),
           const SizedBox(width: 4),
         ],
         Text(

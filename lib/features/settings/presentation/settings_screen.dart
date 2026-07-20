@@ -1,0 +1,382 @@
+import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
+import '../../../global/constants/config.dart';
+import '../../../global/themes/app_colors.dart';
+import '../../../global/widgets/app_alerts.dart';
+import '../../notes/data/notes_repository.dart';
+import '../data/settings_repository.dart';
+import '../domain/list_background.dart';
+import 'about_screen.dart';
+import 'archived_screen.dart';
+import 'data_backup.dart';
+import 'fondo_picker_screen.dart';
+import 'widgets/list_background_layer.dart';
+import 'widgets/settings_section.dart';
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({
+    super.key,
+    this.repository,
+    this.settings,
+  });
+
+  final NotesRepository? repository;
+  final SettingsRepository? settings;
+
+  NotesRepository get _repo => repository ?? NotesRepository.instance;
+  SettingsRepository get _settings => settings ?? SettingsRepository.instance;
+
+  Future<void> _pickTheme(BuildContext context) async {
+    final current = _settings.themeMode;
+    final selected = await showModalBottomSheet<ThemeMode>(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(
+                title: Text(
+                  'Tema',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              RadioGroup<ThemeMode>(
+                groupValue: current,
+                onChanged: (v) {
+                  if (v != null) Navigator.pop(sheetContext, v);
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    RadioListTile<ThemeMode>(
+                      title: Text('Sistema'),
+                      value: ThemeMode.system,
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: Text('Claro'),
+                      value: ThemeMode.light,
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: Text('Oscuro'),
+                      value: ThemeMode.dark,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+    if (selected != null) {
+      await _settings.setThemeMode(selected);
+    }
+  }
+
+  Future<void> _openFondo(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FondoPickerScreen(settings: _settings),
+      ),
+    );
+  }
+
+  Future<void> _openArchived(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ArchivedScreen(repository: _repo),
+      ),
+    );
+  }
+
+  Future<void> _openAbout(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const AboutScreen(),
+      ),
+    );
+  }
+
+  Future<void> _export(BuildContext context) async {
+    try {
+      await exportNotesData(_repo);
+      if (!context.mounted) return;
+      await AppAlerts.show(
+        context,
+        message: 'Datos exportados',
+        type: AppAlertType.success,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      await AppAlerts.show(
+        context,
+        message: 'No se pudo exportar: $e',
+        type: AppAlertType.error,
+      );
+    }
+  }
+
+  Future<void> _import(BuildContext context) async {
+    final confirmed = await AppAlerts.confirm(
+      context,
+      title: 'Importar datos',
+      message:
+          'Esto reemplazará tus notas y tareas actuales. ¿Continuar?',
+      confirmLabel: 'Continuar',
+      isDestructive: true,
+    );
+    if (!confirmed || !context.mounted) return;
+
+    try {
+      final result = await importNotesData(_repo);
+      if (!context.mounted) return;
+      if (result == ImportResult.cancelled) return;
+      if (result == ImportResult.invalid) {
+        await AppAlerts.show(
+          context,
+          message: 'El archivo no es válido o está corrupto.',
+          type: AppAlertType.error,
+        );
+        return;
+      }
+      await AppAlerts.show(
+        context,
+        message: 'Datos importados',
+        type: AppAlertType.success,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      await AppAlerts.show(
+        context,
+        message: 'No se pudo importar: $e',
+        type: AppAlertType.error,
+      );
+    }
+  }
+
+  Future<void> _wipe(BuildContext context) async {
+    final first = await AppAlerts.confirm(
+      context,
+      title: 'Borrar todos los datos',
+      message:
+          'Se eliminarán todas tus notas y tareas, incluidas las archivadas. Esta acción no se puede deshacer.',
+      confirmLabel: 'Continuar',
+      isDestructive: true,
+    );
+    if (!first || !context.mounted) return;
+
+    final second = await AppAlerts.confirm(
+      context,
+      title: '¿Seguro?',
+      message: 'Confirma que quieres borrar todo permanentemente.',
+      confirmLabel: 'Borrar todo',
+      isDestructive: true,
+    );
+    if (!second || !context.mounted) return;
+
+    await _repo.resetAll();
+    if (!context.mounted) return;
+    await AppAlerts.show(
+      context,
+      message: 'Todos los datos fueron eliminados',
+      type: AppAlertType.success,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: const Text('Ajustes'),
+        backgroundColor: isDark ? const Color(0xFF1C2128) : AppColors.white,
+        surfaceTintColor: Colors.transparent,
+      ),
+      body: ListBackgroundScaffoldBody(
+        settings: _settings,
+        child: ListenableBuilder(
+          listenable: _settings,
+          builder: (context, _) {
+            final bg = _settings.listBackground;
+            final brightness = Theme.of(context).brightness;
+            final accent = bg.resolveAccent(brightness);
+            return ValueListenableBuilder<Box<Map>>(
+              valueListenable: _repo.listenable(),
+              builder: (context, box, _) {
+                final archivedCount = _repo.getArchived().length;
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  children: [
+                    SettingsSectionLabel(
+                      label: 'Apariencia',
+                      textTheme: textTheme,
+                      accent: accent,
+                    ),
+                    SettingsCard(
+                      children: [
+                        SettingsRow(
+                          icon: Icons.brightness_6_outlined,
+                          title: 'Tema',
+                          trailing: _settings.themeModeLabel,
+                          accent: accent,
+                          onTap: () => _pickTheme(context),
+                        ),
+                        const SettingsDivider(),
+                        SettingsRow(
+                          icon: Icons.wallpaper_outlined,
+                          title: 'Fondo de la lista',
+                          trailingWidget: _BackgroundSwatch(option: bg),
+                          accent: accent,
+                          onTap: () => _openFondo(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    SettingsSectionLabel(
+                      label: 'Organización',
+                      textTheme: textTheme,
+                      accent: accent,
+                    ),
+                    SettingsCard(
+                      children: [
+                        SettingsRow(
+                          icon: Icons.inventory_2_outlined,
+                          title: 'Archivadas',
+                          trailing: archivedCount > 0 ? '$archivedCount' : null,
+                          accent: accent,
+                          onTap: () => _openArchived(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    SettingsSectionLabel(
+                      label: 'Datos',
+                      textTheme: textTheme,
+                      accent: accent,
+                    ),
+                    SettingsCard(
+                      children: [
+                        SettingsRow(
+                          icon: Icons.upload_outlined,
+                          title: 'Exportar datos',
+                          accent: accent,
+                          onTap: () => _export(context),
+                        ),
+                        const SettingsDivider(),
+                        SettingsRow(
+                          icon: Icons.download_outlined,
+                          title: 'Importar datos',
+                          accent: accent,
+                          onTap: () => _import(context),
+                        ),
+                        const SettingsDivider(),
+                        SettingsRow(
+                          icon: Icons.delete_forever_outlined,
+                          title: 'Borrar todos los datos',
+                          iconColor: AppColors.error,
+                          titleColor: AppColors.error,
+                          onTap: () => _wipe(context),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    SettingsSectionLabel(
+                      label: 'Acerca de',
+                      textTheme: textTheme,
+                      accent: accent,
+                    ),
+                    SettingsCard(
+                      children: [
+                        SettingsRow(
+                          icon: Icons.info_outline,
+                          title: 'Acerca de esta app',
+                          accent: accent,
+                          onTap: () => _openAbout(context),
+                        ),
+                        const SettingsDivider(),
+                        SettingsRow(
+                          icon: Icons.tag_outlined,
+                          title: 'Versión',
+                          trailing: Config.version,
+                          accent: accent,
+                          showChevron: false,
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _BackgroundSwatch extends StatelessWidget {
+  const _BackgroundSwatch({required this.option});
+
+  final ListBackgroundOption option;
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    Widget fill;
+    switch (option.kind) {
+      case ListBackgroundKind.solid:
+        if (option.hasAsset) {
+          fill = Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                option.assetPath!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    ColoredBox(color: option.resolveSolid(brightness)),
+              ),
+              ColoredBox(
+                color: option.resolveSolid(brightness).withValues(alpha: 0.55),
+              ),
+            ],
+          );
+        } else {
+          fill = ColoredBox(color: option.resolveSolid(brightness));
+        }
+      case ListBackgroundKind.gradient:
+        final colors = option.resolveGradient(brightness) ??
+            [AppColors.neutral00, AppColors.neutral20];
+        fill = DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: colors),
+          ),
+        );
+      case ListBackgroundKind.brandRosa:
+        fill = Image.asset(
+          ListBackgrounds.rosaAsset,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) =>
+              const ColoredBox(color: Color(0xFFF2327D)),
+        );
+      case ListBackgroundKind.brandVerde:
+        fill = const ColoredBox(color: AppColors.primary00);
+    }
+
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: option.resolveAccent(brightness)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: fill,
+    );
+  }
+}

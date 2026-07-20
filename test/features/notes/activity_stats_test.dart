@@ -270,7 +270,7 @@ void main() {
   group('ActivityHeatmap', () {
     test('empty cells use solid neutral contrast', () {
       expect(
-        ActivityHeatmap.colorForCount(0),
+        ActivityHeatmap.colorForCount(0, const ColorScheme.light()),
         AppColors.neutral20,
       );
     });

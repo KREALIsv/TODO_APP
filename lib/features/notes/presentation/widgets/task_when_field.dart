@@ -169,22 +169,26 @@ class TaskWhenField extends StatelessWidget {
   }
 
   Widget _chip({
+    required BuildContext context,
     required String label,
     required bool selected,
     required VoidCallback onSelected,
   }) {
+    final scheme = Theme.of(context).colorScheme;
     return ChoiceChip(
       label: Text(label),
       selected: selected,
       onSelected: (_) => onSelected(),
       showCheckmark: false,
-      selectedColor: AppColors.primary00,
+      selectedColor: scheme.primaryContainer,
       labelStyle: TextStyle(
-        color: selected ? AppColors.primary : AppColors.neutral80,
+        color: selected ? scheme.primary : AppColors.neutral80,
         fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
       ),
       side: BorderSide(
-        color: selected ? AppColors.primary20 : AppColors.neutral20,
+        color: selected
+            ? scheme.primary.withValues(alpha: 0.45)
+            : AppColors.neutral20,
       ),
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -206,21 +210,25 @@ class TaskWhenField extends StatelessWidget {
           runSpacing: 8,
           children: [
             _chip(
+              context: context,
               label: 'Hoy',
               selected: selected == TaskWhenKind.today,
               onSelected: _selectToday,
             ),
             _chip(
+              context: context,
               label: 'Mañana',
               selected: selected == TaskWhenKind.tomorrow,
               onSelected: _selectTomorrow,
             ),
             _chip(
+              context: context,
               label: 'Fecha',
               selected: selected == TaskWhenKind.date,
               onSelected: () => _openConfiguration(context),
             ),
             _chip(
+              context: context,
               label: 'Algún día',
               selected: selected == TaskWhenKind.someday,
               onSelected: _selectSomeday,

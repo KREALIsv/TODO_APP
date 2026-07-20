@@ -17,9 +17,10 @@ class NoteTaskTypeSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final accent = Theme.of(context).colorScheme.primary;
 
     return Material(
-      color: AppColors.primary.withValues(alpha: 0.05),
+      color: accent.withValues(alpha: 0.05),
       borderRadius: ThemeTokens.borderRadius,
       child: SwitchListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12),

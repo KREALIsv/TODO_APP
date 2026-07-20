@@ -226,7 +226,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             onPressed: () => setState(() => _pinned = !_pinned),
             icon: Icon(
               _pinned ? Icons.push_pin : Icons.push_pin_outlined,
-              color: _pinned ? AppColors.primary : null,
+              color: _pinned ? Theme.of(context).colorScheme.primary : null,
             ),
           ),
           if (_isEditing) ...[

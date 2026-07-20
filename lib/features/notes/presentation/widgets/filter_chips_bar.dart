@@ -15,6 +15,8 @@ class FilterChipsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -27,12 +29,12 @@ class FilterChipsBar extends StatelessWidget {
               selected: isSelected,
               showCheckmark: false,
               onSelected: (_) => onFilterChanged(filter),
-              selectedColor: AppColors.primary00,
+              selectedColor: scheme.primaryContainer,
               side: BorderSide(
-                color: isSelected ? AppColors.primary : AppColors.neutral20,
+                color: isSelected ? scheme.primary : AppColors.neutral20,
               ),
               labelStyle: TextStyle(
-                color: isSelected ? AppColors.primary : AppColors.neutral80,
+                color: isSelected ? scheme.primary : AppColors.neutral80,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
               ),
             ),

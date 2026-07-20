@@ -7,6 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:todos_app/app/app.dart';
 import 'package:todos_app/features/home/presentation/home_screen.dart';
 import 'package:todos_app/features/notes/data/notes_repository.dart';
+import 'package:todos_app/features/settings/data/settings_repository.dart';
 
 void main() {
   late Directory tempDir;
@@ -18,6 +19,8 @@ void main() {
     final box = await Hive.openBox<Map>('notes');
     await NotesRepository.instance.initWithBox(box);
     await NotesRepository.instance.clear();
+    final settingsBox = await Hive.openBox('settings');
+    await SettingsRepository.instance.initWithBox(settingsBox);
   });
 
   tearDownAll(() async {

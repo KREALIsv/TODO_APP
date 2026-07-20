@@ -1,0 +1,147 @@
+import 'package:flutter/material.dart';
+
+import '../../../../global/themes/app_colors.dart';
+
+class SettingsSectionLabel extends StatelessWidget {
+  const SettingsSectionLabel({
+    super.key,
+    required this.label,
+    required this.textTheme,
+    this.accent,
+  });
+
+  final String label;
+  final TextTheme textTheme;
+  final Color? accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = accent ?? AppColors.neutral60;
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        label.toUpperCase(),
+        style: textTheme.labelSmall?.copyWith(
+          color: color.withValues(alpha: 0.85),
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
+        ),
+      ),
+    );
+  }
+}
+
+class SettingsCard extends StatelessWidget {
+  const SettingsCard({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2D333B) : AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF444C56) : AppColors.neutral20,
+        ),
+      ),
+      child: Column(children: children),
+    );
+  }
+}
+
+class SettingsDivider extends StatelessWidget {
+  const SettingsDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Divider(
+      height: 1,
+      color: isDark ? const Color(0xFF444C56) : AppColors.neutral20,
+    );
+  }
+}
+
+class SettingsRow extends StatelessWidget {
+  const SettingsRow({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.trailing,
+    this.trailingWidget,
+    this.onTap,
+    this.showChevron = true,
+    this.iconColor,
+    this.titleColor,
+    this.accent,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? trailing;
+  final Widget? trailingWidget;
+  final VoidCallback? onTap;
+  final bool showChevron;
+  final Color? iconColor;
+  final Color? titleColor;
+
+  /// Harmonized ink from the active list background.
+  final Color? accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final resolvedIcon =
+        iconColor ?? accent ?? Theme.of(context).colorScheme.primary;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: resolvedIcon,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: textTheme.titleSmall?.copyWith(
+                  color: titleColor ??
+                      (isDark ? const Color(0xFFE6EDF3) : AppColors.neutral100),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (trailingWidget != null) ...[
+              trailingWidget!,
+              const SizedBox(width: 8),
+            ] else if (trailing != null) ...[
+              Text(
+                trailing!,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: AppColors.neutral60,
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+            if (showChevron && onTap != null)
+              Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: AppColors.neutral40,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}

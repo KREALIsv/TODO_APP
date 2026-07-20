@@ -110,7 +110,7 @@ class SwipeableNoteCard extends StatelessWidget {
                 ListTile(
                   leading: Icon(
                     todayOn ? Icons.wb_sunny : Icons.wb_sunny_outlined,
-                    color: AppColors.primary,
+                    color: Theme.of(sheetContext).colorScheme.primary,
                   ),
                   title: Text(todayOn ? 'Quitar de hoy' : 'Hacer hoy'),
                   onTap: () async {
@@ -174,6 +174,7 @@ class SwipeableNoteCard extends StatelessWidget {
     }
 
     final isTask = item.type == NoteType.task;
+    final accent = Theme.of(context).colorScheme.primary;
 
     // PRD §6.7: derecha = completar (tarea) / fijar (nota); izquierda = archivar.
     // Eliminar nunca va en swipe (editor, long-press o Archivadas).
@@ -195,7 +196,7 @@ class SwipeableNoteCard extends StatelessWidget {
               if (isTask)
                 SlidableAction(
                   onPressed: (_) => _complete(context),
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: accent,
                   foregroundColor: AppColors.white,
                   icon: item.completed
                       ? Icons.radio_button_unchecked
@@ -205,7 +206,7 @@ class SwipeableNoteCard extends StatelessWidget {
               else
                 SlidableAction(
                   onPressed: (_) => _pin(context),
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: accent,
                   foregroundColor: AppColors.white,
                   icon: item.pinned
                       ? Icons.push_pin_outlined

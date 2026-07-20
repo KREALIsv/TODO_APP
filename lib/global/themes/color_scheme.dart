@@ -25,3 +25,27 @@ final ColorScheme appColorScheme = ColorScheme(
   error: AppColors.error,
   onError: AppColors.white,
 );
+
+final ColorScheme appDarkColorScheme = ColorScheme(
+  brightness: Brightness.dark,
+  primary: AppColors.primary40,
+  onPrimary: AppColors.neutral100,
+  primaryContainer: AppColors.primary80,
+  onPrimaryContainer: AppColors.primary00,
+  secondary: AppColors.secondary40,
+  onSecondary: AppColors.neutral100,
+  secondaryContainer: AppColors.secondary80,
+  onSecondaryContainer: AppColors.secondary00,
+  tertiary: AppColors.tertiary,
+  onTertiary: AppColors.neutral100,
+  tertiaryContainer: const Color(0xFF1F3A24),
+  onTertiaryContainer: AppColors.tertiary15,
+  surface: const Color(0xFF1C2128),
+  onSurface: const Color(0xFFE6EDF3),
+  surfaceContainerHighest: const Color(0xFF2D333B),
+  onSurfaceVariant: AppColors.neutral40,
+  outline: const Color(0xFF444C56),
+  outlineVariant: const Color(0xFF2D333B),
+  error: AppColors.error,
+  onError: AppColors.white,
+);

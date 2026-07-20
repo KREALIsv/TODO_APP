@@ -440,8 +440,8 @@ class _TaskDatesSheetState extends State<TaskDatesSheet> {
         SizedBox(
           height: 216,
           child: CupertinoTheme(
-            data: const CupertinoThemeData(
-              primaryColor: AppColors.primary,
+            data: CupertinoThemeData(
+              primaryColor: Theme.of(context).colorScheme.primary,
             ),
             child: CupertinoDatePicker(
               mode: CupertinoDatePickerMode.time,

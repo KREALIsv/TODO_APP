@@ -162,12 +162,16 @@ class ActivityHeatmap extends StatelessWidget {
         monthLabelHeight: monthLabelHeight,
       );
 
-  static Color colorForCount(int count) {
+  static Color colorForCount(int count, ColorScheme scheme) {
     if (count <= 0) return AppColors.neutral20;
-    if (count == 1) return AppColors.primary00;
-    if (count == 2) return AppColors.primary20;
-    if (count <= 4) return AppColors.primary40;
-    return AppColors.primary60;
+    if (count == 1) return scheme.primaryContainer;
+    if (count == 2) {
+      return Color.lerp(scheme.primaryContainer, scheme.primary, 0.35)!;
+    }
+    if (count <= 4) {
+      return Color.lerp(scheme.primaryContainer, scheme.primary, 0.65)!;
+    }
+    return scheme.primary;
   }
 
   List<String?> _monthLabelsForWeeks() {
@@ -204,6 +208,7 @@ class ActivityHeatmap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     assert(cells.length == weeks * 7);
+    final scheme = Theme.of(context).colorScheme;
     final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
           color: AppColors.neutral60,
           fontSize: 9,
@@ -300,6 +305,7 @@ class ActivityHeatmap extends StatelessWidget {
                         weeks: weeks,
                         cell: cell,
                         gap: gap,
+                        scheme: scheme,
                       ),
                     ),
                   ],
@@ -349,12 +355,14 @@ class _HeatmapPainter extends CustomPainter {
     required this.weeks,
     required this.cell,
     required this.gap,
+    required this.scheme,
   });
 
   final List<int> cells;
   final int weeks;
   final double cell;
   final double gap;
+  final ColorScheme scheme;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -373,7 +381,10 @@ class _HeatmapPainter extends CustomPainter {
           radius,
         );
         final paint = Paint()
-          ..color = ActivityHeatmap.colorForCount(cells[week * 7 + day]);
+          ..color = ActivityHeatmap.colorForCount(
+            cells[week * 7 + day],
+            scheme,
+          );
         canvas.drawRRect(rect, paint);
       }
     }
@@ -384,6 +395,7 @@ class _HeatmapPainter extends CustomPainter {
     return oldDelegate.cells != cells ||
         oldDelegate.weeks != weeks ||
         oldDelegate.cell != cell ||
-        oldDelegate.gap != gap;
+        oldDelegate.gap != gap ||
+        oldDelegate.scheme != scheme;
   }
 }

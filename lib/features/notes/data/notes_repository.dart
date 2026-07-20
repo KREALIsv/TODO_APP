@@ -209,6 +209,25 @@ class NotesRepository {
     }
   }
 
+  /// All notes (active + archived) as serializable maps for backup.
+  List<Map<String, dynamic>> exportAllMaps() {
+    return _readAllRaw().map((item) => item.toMap()).toList(growable: false);
+  }
+
+  /// Replaces all notes with [maps]. Invalid maps throw via [NoteItem.fromMap].
+  Future<void> replaceAllFromMaps(List<Map<String, dynamic>> maps) async {
+    await _box.clear();
+    for (final map in maps) {
+      final item = NoteItem.fromMap(map);
+      await _box.put(item.id, item.toMap());
+    }
+  }
+
+  /// Production wipe used by Settings. Separate from test-only [clear].
+  Future<void> resetAll() async {
+    await _box.clear();
+  }
+
   @visibleForTesting
   Future<void> clear() async {
     await _box.clear();

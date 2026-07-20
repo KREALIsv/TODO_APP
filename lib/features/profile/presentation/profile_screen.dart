@@ -6,6 +6,7 @@ import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/activity_stats.dart';
 import '../../notes/domain/notes_filter.dart';
 import '../../notes/presentation/widgets/activity_heatmap.dart';
+import '../../settings/presentation/widgets/list_background_layer.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key, this.repository});
@@ -20,50 +21,53 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: AppColors.neutral00,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Perfil'),
-        backgroundColor: AppColors.white,
+        backgroundColor: isDark ? const Color(0xFF1C2128) : AppColors.white,
         surfaceTintColor: Colors.transparent,
-        foregroundColor: AppColors.neutral100,
+        foregroundColor: isDark ? const Color(0xFFE6EDF3) : AppColors.neutral100,
       ),
-      body: SafeArea(
-        top: false,
-        child: ValueListenableBuilder<Box<Map>>(
-          valueListenable: _repo.listenable(),
-          builder: (context, box, child) {
-            final items = _repo.getAll();
-            final counts = contentCounts(items);
-            final metrics = activityMetricsFrom(items);
-            final baseStats = ActivityStats.fromNotes(items, weeks: 1);
-            final isEmpty = items.isEmpty;
+      body: ListBackgroundScaffoldBody(
+        child: SafeArea(
+          top: false,
+          child: ValueListenableBuilder<Box<Map>>(
+            valueListenable: _repo.listenable(),
+            builder: (context, box, child) {
+              final items = _repo.getAll();
+              final counts = contentCounts(items);
+              final metrics = activityMetricsFrom(items);
+              final baseStats = ActivityStats.fromNotes(items, weeks: 1);
+              final isEmpty = items.isEmpty;
 
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              children: [
-                _ActivityHero(
-                  textTheme: textTheme,
-                  eventCounts: metrics.eventCounts,
-                  isEmpty: isEmpty,
-                ),
-                const SizedBox(height: 16),
-                _SecondaryStats(
-                  textTheme: textTheme,
-                  bestStreak: baseStats.bestStreak,
-                  activeDayCount: baseStats.activeDayCount,
-                ),
-                const SizedBox(height: 20),
-                _ContentRows(
-                  textTheme: textTheme,
-                  noteCount: counts.notes,
-                  taskCount: counts.tasks,
-                  pendingTasks: counts.pendingTasks,
-                ),
-              ],
-            );
-          },
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                children: [
+                  _ActivityHero(
+                    textTheme: textTheme,
+                    eventCounts: metrics.eventCounts,
+                    isEmpty: isEmpty,
+                  ),
+                  const SizedBox(height: 16),
+                  _SecondaryStats(
+                    textTheme: textTheme,
+                    bestStreak: baseStats.bestStreak,
+                    activeDayCount: baseStats.activeDayCount,
+                  ),
+                  const SizedBox(height: 20),
+                  _ContentRows(
+                    textTheme: textTheme,
+                    noteCount: counts.notes,
+                    taskCount: counts.tasks,
+                    pendingTasks: counts.pendingTasks,
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -261,6 +265,7 @@ class _ContentRows extends StatelessWidget {
     final pendingLabel = pendingTasks == 1
         ? '1 pendiente'
         : '$pendingTasks pendientes';
+    final accent = Theme.of(context).colorScheme.primary;
 
     return Container(
       decoration: BoxDecoration(
@@ -275,6 +280,7 @@ class _ContentRows extends StatelessWidget {
             icon: Icons.sticky_note_2_outlined,
             title: 'Notas',
             trailing: '$noteCount',
+            accent: accent,
             onTap: () => Navigator.of(context).pop(NotesFilter.notes),
           ),
           const Divider(height: 1, color: AppColors.neutral20),
@@ -285,6 +291,7 @@ class _ContentRows extends StatelessWidget {
             trailing: pendingTasks > 0
                 ? '$taskCount · $pendingLabel'
                 : '$taskCount',
+            accent: accent,
             onTap: () => Navigator.of(context).pop(NotesFilter.tasks),
           ),
         ],
@@ -300,6 +307,7 @@ class _ContentRow extends StatelessWidget {
     required this.title,
     required this.trailing,
     required this.onTap,
+    required this.accent,
   });
 
   final TextTheme textTheme;
@@ -307,6 +315,7 @@ class _ContentRow extends StatelessWidget {
   final String title;
   final String trailing;
   final VoidCallback onTap;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -317,7 +326,7 @@ class _ContentRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: AppColors.primary),
+            Icon(icon, size: 22, color: accent),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -373,7 +382,10 @@ class _HeatmapLegend extends StatelessWidget {
             height: 12,
             margin: const EdgeInsets.only(right: 4),
             decoration: BoxDecoration(
-              color: ActivityHeatmap.colorForCount(count),
+              color: ActivityHeatmap.colorForCount(
+                count,
+                Theme.of(context).colorScheme,
+              ),
               borderRadius: BorderRadius.circular(2),
             ),
           ),

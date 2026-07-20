@@ -153,4 +153,21 @@ void main() {
 
     expect(repo.getAllTags(), {'Work', 'Personal', 'Ideas'});
   });
+
+  test('exportAllMaps and replaceAllFromMaps roundtrip', () async {
+    await repo.add(buildItem(id: 'a'));
+    await repo.add(buildItem(id: 'b'));
+    final exported = repo.exportAllMaps();
+    expect(exported.length, 2);
+
+    await repo.replaceAllFromMaps([exported.first]);
+    expect(repo.getAll().map((e) => e.id), ['a']);
+  });
+
+  test('resetAll clears all notes', () async {
+    await repo.add(buildItem(id: 'x'));
+    await repo.resetAll();
+    expect(repo.getAll(), isEmpty);
+    expect(repo.getArchived(), isEmpty);
+  });
 }

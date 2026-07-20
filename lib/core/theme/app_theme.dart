@@ -6,4 +6,6 @@ class AppTheme {
   AppTheme._();
 
   static ThemeData light() => AppThemes.lightTheme;
+
+  static ThemeData dark() => AppThemes.darkTheme;
 }

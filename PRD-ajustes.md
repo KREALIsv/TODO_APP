@@ -46,7 +46,8 @@ No se agregan cuentas, sincronización en la nube ni ajustes por usuario: la app
 - Idioma seleccionable (la app ya es 100% ES; EN queda para cuando exista i18n real).
 - Ajustes por nota/tarea individual (ya viven en el editor).
 - Gestión avanzada de etiquetas (renombrar/fusionar global) — se propone como v1.1 (§11).
-- Fondo con **imagen personalizada** de galería o color libre (picker RGB) — v1 solo ofrece una paleta curada; imagen propia queda para v1.1 (§11) por el riesgo de contraste (§12).
+- Fondo con **imagen personalizada** (foto de galería/cámara) — v1 ofrece colores/degradados curados y 2 fondos ilustrados de marca; la imagen propia con selector de galería/cámara y ajuste de colocación queda para v1.1 (§11) por los permisos y el riesgo de contraste (§12).
+- Color libre (picker RGB) — no se ofrece en ninguna fase; siempre paleta curada, para mantener consistencia visual.
 
 ---
 
@@ -124,21 +125,49 @@ ACERCA DE
 - [ ] Preferencia persiste tras cerrar y reabrir la app
 - [ ] `Sistema` sigue el modo del OS y reacciona a cambios en caliente
 
-### 6.3 Apariencia → Fondo de la lista (P0)
+### 6.3 Apariencia → Fondo de la lista (P0 colores/ilustrados · P1 imagen propia)
 
-- Fila "Fondo de la lista" (justo debajo de "Tema") muestra un swatch circular pequeño con el fondo actual como trailing.
-- Tap abre un **bottom sheet** con una grilla de opciones (mismo espíritu visual que la paleta de `TagColors`, pero para fondos de pantalla):
-  - `Predeterminado` — el `AppColors.neutral00` actual, sin cambio (default).
-  - Paleta curada de ~6 fondos sólidos suaves, coherentes con la marca (ej. verde muy claro, menta, arena, lavanda, gris cálido, azul suave) — pensados para no competir con las cards blancas encima.
-- Se aplica **inmediatamente** detrás de las listas de Home y, por consistencia visual, también en Archivadas y Perfil; persiste en la misma preferencia local que el Tema (box `settings`, ver §13).
-- Si el Tema activo es `Oscuro`, la paleta usa variantes de menor luminosidad del mismo tono (no los mismos valores hex que en claro) para no romper contraste — ver riesgo §12.
-- Las cards **no cambian**: mantienen su fondo opaco (blanco en claro / superficie oscura en oscuro). El fondo elegido solo es visible en márgenes, gaps entre cards, header y estados vacíos.
+Fila "Fondo de la lista" (justo debajo de "Tema") muestra un swatch circular pequeño con una miniatura del fondo actual como trailing. Tap abre **`FondoPickerScreen`** (pantalla completa o bottom sheet alto, con scroll), dividida en 3 grupos — igual idea que un picker de "Colores" de referencia: grilla de tarjetas grandes con degradado + icono, más una fila de sólidos rápidos abajo.
+
+#### A) Colores (P0)
+
+- Grilla de **2 columnas** con tarjetas de fondo (proporción ~16:10), cada una:
+  - Un degradado suave de 2 tonos (diagonal), coherente con la paleta de marca (`AppColors`) pero con más variedad que un solo color plano.
+  - Un pequeño emoji/ícono en la esquina inferior izquierda como identidad de la opción (ej. 🌊 `Océano`, ❄️ `Glaciar`, 🌸 `Sakura`, 🌍 `Selva`, 🍑 `Durazno`, 🌈 `Aurora`).
+  - Borde de selección (ring de 2px en `AppColors.primary`) en la opción activa.
+- Debajo de la grilla, una fila horizontal de **swatches sólidos** (colores planos, sin degradado) para quien quiera algo más simple/rápido.
+- Primera opción siempre es `Predeterminado` (el `AppColors.neutral00` actual, sin degradado ni ilustración) — default de fábrica.
+- Catálogo inicial sugerido: 8–10 degradados + 5 sólidos (ver anexo §16 para nombres).
+
+#### B) Fondos ilustrados de marca (P0)
+
+- Sección aparte, con 2 tarjetas grandes (mismo tamaño que las de Colores) usando la mascota rana de la app:
+  - **`Rosa`** — la rana sobre el rosa de marca (`#F2327D`, el mismo que ya usa `landing/assets/app_icon.png` y `adaptive_icon_background` en `pubspec.yaml`). Asset ya existe, solo se debe copiar/optimizar a `assets/images/backgrounds/`.
+  - **`Verde`** — la rana sobre un fondo verde simple (mismo estilo ilustrado, tono derivado de `AppColors.primary`/`secondary`). Asset **nuevo**, a generar en el mismo estilo que `Rosa` (ver riesgo §12: hoy solo existe el arte en rosa).
+- Estas dos opciones son ilustraciones fijas (no editables ni recolorables) — son "identidad de marca", no parte de la paleta abstracta de colores.
+
+#### C) Imagen personalizada (P1 — v1.1)
+
+- Tarjeta `+ Elegir imagen…` al final de la grilla de Colores.
+- Tap abre una **ventana emergente (action sheet)** con dos acciones:
+  - `Elegir de galería`
+  - `Tomar foto`
+- Tras seleccionar/capturar la imagen, se muestra un paso de **colocación** antes de confirmar:
+  - Modo de encuadre, exclusivo: `Cubrir` (recorta y llena toda la pantalla, default) · `Ajustar` (se ve completa, puede dejar franjas) · `Mosaico` (repite en patrón, pensado para texturas pequeñas).
+  - En `Cubrir`/`Ajustar`: gesto simple de pan + pinch-zoom sobre una vista previa para reposicionar/encuadrar antes de aplicar.
+  - Botones `Aplicar` (confirma y guarda) / `Cancelar` (descarta, el fondo actual no cambia).
+- La imagen elegida se **copia** al almacenamiento local de la app (no solo se referencia), para que no se rompa si el usuario borra la foto original de su galería.
+- Requiere permisos de cámara y galería/fotos; si el usuario los niega, mensaje explicativo con acceso directo a Ajustes del sistema.
+
+En todos los casos (A/B/C): se aplica **de inmediato** detrás de las listas de Home y, por consistencia visual, también en Archivadas y Perfil; persiste en la misma preferencia local que el Tema (box `settings`, ver §13). Si el Tema activo es `Oscuro`, las opciones de Colores (grupo A) usan su variante de menor luminosidad (no el mismo hex que en claro); los fondos ilustrados (grupo B) y la imagen propia (grupo C) se mantienen iguales en ambos temas. Las **cards nunca cambian**: mantienen su fondo opaco (blanco en claro / superficie oscura en oscuro); el fondo elegido solo es visible en márgenes, gaps entre cards, header y estados vacíos.
 
 **Criterios de aceptación**
-- [ ] Elegir un fondo de la paleta se aplica de inmediato detrás de la lista de Home
+- [ ] Elegir un degradado, sólido o fondo ilustrado se aplica de inmediato detrás de la lista de Home
 - [ ] El fondo elegido persiste tras cerrar y reabrir la app
-- [ ] Cambiar de Tema Claro↔Oscuro no deja el fondo con contraste roto (usa la variante correspondiente al tema activo)
+- [ ] Cambiar de Tema Claro↔Oscuro no deja los fondos de Colores con contraste roto (usa la variante correspondiente); `Rosa`/`Verde` e imagen propia no cambian con el tema
 - [ ] El contraste texto/card se mantiene igual sin importar el fondo elegido (las cards siguen opacas)
+- [ ] (v1.1) Elegir imagen desde la ventana emergente ofrece galería y cámara, y permite ajustar colocación (Cubrir/Ajustar/Mosaico) antes de aplicar
+- [ ] (v1.1) Cancelar en el paso de colocación no modifica el fondo previamente activo
 
 ### 6.4 Organización → Archivadas (P0)
 
@@ -209,8 +238,14 @@ Home → ⚙ → Ajustes → Tema → `Oscuro` → toda la app cambia al instant
 ### F2 — Revisar y restaurar una tarea archivada
 Home → ⚙ → Archivadas (`3`) → tap en item → `Restaurar` → vuelve a aparecer en Home
 
-### F2.1 — Personalizar el fondo de la lista
-Home → ⚙ → Ajustes → Fondo de la lista → elegir `Menta` → el fondo detrás de las cards cambia al instante → preferencia persiste
+### F2.1 — Personalizar el fondo con un color/degradado
+Home → ⚙ → Ajustes → Fondo de la lista → pestaña Colores → elegir 🌸 `Sakura` → el fondo detrás de las cards cambia al instante → preferencia persiste
+
+### F2.2 — Elegir un fondo ilustrado de marca
+Ajustes → Fondo de la lista → sección Fondos ilustrados → elegir `Verde` → la ranita aparece de fondo tras las cards
+
+### F2.3 — Poner una foto propia de fondo (v1.1)
+Ajustes → Fondo de la lista → `+ Elegir imagen…` → ventana emergente → `Elegir de galería` (o `Tomar foto`) → seleccionar/capturar → elegir `Cubrir` y reencuadrar con el dedo → `Aplicar` → fondo actualizado
 
 ### F3 — Respaldar antes de cambiar de teléfono
 Ajustes → Datos → Exportar datos → compartir archivo `.json` → guardar en Drive/Files
@@ -232,7 +267,7 @@ Ajustes → Acerca de → Enviar comentarios → se abre correo con versión pre
 |---|---|
 | Ícono ⚙ sin acción (`onPressed: () {}`) | Abre `AjustesScreen` |
 | Solo `AppTheme.light()` | `Sistema` / `Claro` / `Oscuro` seleccionable |
-| Fondo de la lista fijo (`AppColors.neutral00`) | Paleta de fondos seleccionable, persistente |
+| Fondo de la lista fijo (`AppColors.neutral00`) | Picker de fondos: colores/degradados, 2 fondos ilustrados de marca (Rosa/Verde) y, en v1.1, foto propia con colocación ajustable |
 | Sin entrada a Archivadas en ningún lugar | Fila "Archivadas" en Ajustes con contador |
 | Sin respaldo ni borrado masivo | Exportar / Importar / Borrar todo en sección Datos |
 | Sin versión visible ni canal de feedback | Sección Acerca de |
@@ -264,14 +299,14 @@ Instrumentación mínima: `settings_opened`, `theme_changed`, `background_change
 ### v1 (este PRD — MVP del slice)
 - `AjustesScreen` con las 4 secciones (Apariencia, Organización, Datos, Acerca de)
 - Tema Claro/Oscuro/Sistema persistente
-- Fondo de la lista: paleta curada de ~6 fondos + Predeterminado, persistente
+- Fondo de la lista: grupo Colores (degradados + sólidos, con `Predeterminado`) + grupo Fondos ilustrados de marca (`Rosa`, `Verde`), persistente
 - `ArchivedScreen` (restaurar / eliminar definitivo) — cierra Decisión #A de `PRD-control-tareas.md`
 - Exportar / Importar datos (JSON)
 - Borrar todos los datos (doble confirmación)
 - Acerca de + Enviar comentarios + Versión
 
 ### v1.1
-- Fondo con imagen personalizada (galería), con overlay automático claro/oscuro para preservar contraste
+- Fondo con imagen personalizada: ventana emergente `Elegir de galería` / `Tomar foto` + paso de colocación (`Cubrir` / `Ajustar` / `Mosaico` + reposicionar)
 - Gestionar etiquetas (renombrar/fusionar/eliminar global) — §6.9
 - Importar con merge inteligente (detectar duplicados por `id` en vez de reemplazo total)
 - Copia de seguridad automática antes de "Borrar todo" / antes de importar (rollback de un paso)
@@ -288,9 +323,11 @@ Instrumentación mínima: `settings_opened`, `theme_changed`, `background_change
 | Riesgo | Mitigación |
 |---|---|
 | Construir `AppTheme.dark()` completo (paleta, contraste AA) es más trabajo del esperado | Se puede lanzar v1 con solo `Claro`/`Sistema` y agregar `Oscuro` en un follow-up corto sin cambiar la UI de Ajustes |
-| Un fondo de color mal elegido reduce el contraste o "ensucia" la sensación limpia de la app | Paleta **curada y fija** (no color picker libre) en v1, con tonos suaves ya validados contra la paleta de marca; cards siempre opacas encima |
-| Fondo de color no se ve bien en Tema Oscuro (mismo hex, luminosidad invertida) | Cada opción de la paleta define explícitamente su variante clara y oscura, no se reutiliza el mismo valor en ambos temas |
-| Imagen personalizada (v1.1) puede romper legibilidad si el usuario elige una foto muy contrastada | Diferido a v1.1 con overlay/blur obligatorio; no entra en v1 (§3 no-objetivos) |
+| Un fondo de color mal elegido reduce el contraste o "ensucia" la sensación limpia de la app | Paleta **curada y fija** (no color picker libre) en v1, con degradados/sólidos ya validados contra la paleta de marca; cards siempre opacas encima |
+| Fondo de color no se ve bien en Tema Oscuro (mismo hex, luminosidad invertida) | Cada opción del grupo Colores define explícitamente su variante clara y oscura, no se reutiliza el mismo valor en ambos temas |
+| El asset ilustrado `Verde` no existe todavía (solo hay arte para `Rosa` en `landing/assets/app_icon.png`) | Encargar/generar el asset `Verde` en el mismo estilo antes del TRD; si no está listo, lanzar v1 solo con `Rosa` y agregar `Verde` en un follow-up corto |
+| Imagen personalizada (v1.1) puede romper legibilidad si el usuario elige una foto muy contrastada o oscura | Paso obligatorio de colocación (Cubrir/Ajustar/Mosaico) + reencuadre manual; evaluar en TRD si se necesita un overlay/oscurecido automático adicional |
+| Permisos de cámara/galería denegados dejan la función inutilizable (v1.1) | Mensaje explicativo + acceso directo a Ajustes del sistema; el resto de Ajustes sigue funcionando con normalidad |
 | Importar un archivo corrupto rompe la app | Validación de esquema antes de tocar el box; si falla, no se modifica nada y se muestra error |
 | Usuario borra todo por error | Doble confirmación con copy explícito del alcance; sin acceso directo desde ningún otro punto de la app |
 | Mover Archivadas a Ajustes reduce su descubribilidad vs un chip visible | Contador visible en la fila; se puede reevaluar visibilidad en v1.1 si el uso cae mucho |
@@ -304,7 +341,9 @@ Instrumentación mínima: `settings_opened`, `theme_changed`, `background_change
 - `NoteItem.toMap()` / `fromMap()` — reutilizados para exportar/importar sin cambios
 - Nueva persistencia de preferencias: box Hive `settings` (evita agregar `shared_preferences` si se prefiere mantener un solo mecanismo de storage); guarda tanto `themeMode` como el fondo elegido
 - `TodosApp` (`lib/app/app.dart`) — debe pasar de tema fijo a `themeMode` reactivo; requiere `AppTheme.dark()` (no existe hoy, solo `AppTheme.light()`)
-- Fondo de la lista v1 — reutiliza `AppColors` (nueva paleta de fondos ahí o en un archivo hermano, sin dependencias nuevas); v1.1 (imagen) requeriría `image_picker` o similar, no presente en `pubspec.yaml`
+- Fondo de la lista v1 (Colores) — reutiliza `AppColors` (nueva paleta de degradados/sólidos ahí o en un archivo hermano), sin dependencias nuevas
+- Fondo de la lista v1 (Ilustrados) — nuevos assets en `assets/images/backgrounds/`: `bg_rosa.png` (ya existe el arte en `landing/assets/app_icon.png`, falta exportarlo/optimizarlo) y `bg_verde.png` (arte nuevo a crear, mismo estilo)
+- Fondo de la lista v1.1 (Imagen propia) — requiere paquete de selección de imagen (ej. `image_picker`, no presente en `pubspec.yaml`), permisos de cámara/galería en `Info.plist` (iOS) y `AndroidManifest.xml` (Android), y un cropper/preview simple (paquete o implementación propia con `Matrix4`/`InteractiveViewer`)
 - Export/Import de archivos — probablemente requiere paquetes nuevos no presentes en `pubspec.yaml` (ej. compartir archivo y seleccionar archivo); evaluar en TRD
 - Versión de la app — leer de `pubspec.yaml`/`Config` o paquete de info de plataforma (nuevo si se opta por leerlo en runtime)
 
@@ -314,7 +353,8 @@ Instrumentación mínima: `settings_opened`, `theme_changed`, `background_change
 
 - [ ] Ícono ⚙ en Home abre `AjustesScreen` (ya no es un no-op)
 - [ ] Tema Claro/Oscuro/Sistema cambia la app al instante y persiste entre sesiones
-- [ ] Fondo de la lista se puede elegir de la paleta, se aplica al instante y persiste entre sesiones
+- [ ] Fondo de la lista: se puede elegir un color/degradado o uno de los 2 fondos ilustrados de marca, se aplica al instante y persiste entre sesiones
+- [ ] (v1.1, no bloquea v1) Fondo con imagen propia: ventana emergente galería/cámara + paso de colocación funcionan de punta a punta
 - [ ] Archivadas accesible desde Ajustes con contador correcto; restaurar y eliminar definitivo funcionan
 - [ ] Exportar genera un archivo válido que, importado de nuevo, reproduce los mismos datos (roundtrip)
 - [ ] Importar rechaza archivos inválidos sin tocar los datos actuales
@@ -335,7 +375,9 @@ Instrumentación mínima: `settings_opened`, `theme_changed`, `background_change
 | 3 | ¿Importar hace merge o reemplaza? | **Reemplaza todo** en v1 (más simple, evita conflictos de `id`); merge inteligente queda para v1.1 |
 | 4 | ¿Se incluye un toggle de notificaciones en v1? | **No.** La feature de recordatorios no existe aún; agregar un toggle sin funcionalidad real generaría un affordance roto, el mismo problema que este PRD busca resolver |
 | 5 | ¿Selector de idioma en v1? | **No.** La app es ES-only hoy; no hay i18n real que alternar |
-| 6 | ¿Fondo con color libre/imagen o paleta curada? | **Paleta curada** en v1 (consistencia visual + sin riesgo de contraste); color libre no se ofrece; imagen queda para v1.1 con overlay obligatorio |
+| 6 | ¿Fondo con color libre/imagen o paleta curada? | **Paleta curada** en v1 (degradados + sólidos + 2 fondos ilustrados de marca); color libre (RGB) no se ofrece nunca; imagen propia queda para v1.1 |
+| 7 | ¿Cómo se pide la imagen propia (v1.1)? | **Ventana emergente (action sheet)** con `Elegir de galería` / `Tomar foto`, seguida de un paso de colocación (Cubrir/Ajustar/Mosaico + reencuadre manual) antes de aplicar |
+| 8 | ¿Los fondos ilustrados de marca (`Rosa`/`Verde`) cambian con el Tema Oscuro? | **No.** Son ilustraciones fijas de identidad de marca; solo el grupo Colores tiene variante clara/oscura |
 
 ### Pendientes (no bloquean v1)
 
@@ -344,6 +386,8 @@ Instrumentación mínima: `settings_opened`, `theme_changed`, `background_change
 | A | ¿`AppTheme.dark()` se construye completo en este slice o se lanza solo Claro/Sistema primero? | Al iniciar el TRD, según capacidad de diseño disponible |
 | B | ¿Backup automático antes de importar/borrar (rollback de un paso)? | v1.1, si el riesgo de error del usuario lo justifica |
 | C | ¿Gestionar etiquetas vive en Ajustes u otro punto de entrada? | v1.1, junto con el diseño de esa pantalla |
+| D | ¿Quién genera el asset ilustrado `Verde` y con qué herramienta (mismo prompt/estilo que `Rosa`)? | Antes de iniciar el TRD de este slice |
+| E | ¿Se necesita overlay/oscurecido automático sobre la imagen propia (v1.1) para garantizar contraste, o alcanza con el paso de colocación? | Al diseñar el TRD de imagen personalizada |
 
 ---
 
@@ -355,7 +399,13 @@ Instrumentación mínima: `settings_opened`, `theme_changed`, `background_change
 | Sección | `Apariencia` / `Organización` / `Datos` / `Acerca de` |
 | Fila tema | `Tema` · valores `Sistema` / `Claro` / `Oscuro` |
 | Fila fondo | `Fondo de la lista` |
-| Opciones de fondo | `Predeterminado` / `Verde suave` / `Menta` / `Arena` / `Lavanda` / `Gris cálido` / `Azul suave` |
+| Secciones del picker | `Colores` / `Fondos ilustrados` |
+| Degradados (grupo A) | `Predeterminado` · 🌊 `Océano` · ❄️ `Glaciar` · 🌸 `Sakura` · 🌍 `Selva` · 🍑 `Durazno` · 🌈 `Aurora` |
+| Sólidos (grupo A) | `Menta` / `Arena` / `Lavanda` / `Gris cálido` / `Azul suave` |
+| Ilustrados de marca (grupo B) | `Rosa` / `Verde` |
+| Acción imagen propia (grupo C, v1.1) | `+ Elegir imagen…` |
+| Ventana emergente imagen | `Elegir de galería` / `Tomar foto` |
+| Colocación imagen | `Cubrir` / `Ajustar` / `Mosaico` · botones `Aplicar` / `Cancelar` |
 | Fila archivadas | `Archivadas` |
 | Empty archivadas | `No hay elementos archivados` |
 | Fila exportar | `Exportar datos` |

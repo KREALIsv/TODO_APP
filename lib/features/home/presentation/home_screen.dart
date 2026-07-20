@@ -17,6 +17,8 @@ import '../../notes/presentation/widgets/quick_capture_field.dart';
 import '../../notes/presentation/widgets/swipeable_note_card.dart';
 import '../../notes/presentation/widgets/task_section_header.dart';
 import '../../profile/presentation/profile_screen.dart';
+import '../../settings/presentation/settings_screen.dart';
+import '../../settings/presentation/widgets/list_background_layer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.repository});
@@ -69,6 +71,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (filter != null && mounted) {
       setState(() => _activeFilter = filter);
     }
+  }
+
+  Future<void> _openSettings(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SettingsScreen(repository: _repo),
+      ),
+    );
   }
 
   bool get _fabCreatesTask => _activeFilter == NotesFilter.tasks;
@@ -247,12 +257,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSliverAppBar(TextTheme textTheme, String searchQuery) {
     final today = _formatHeaderDate(_now);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final barColor = isDark ? const Color(0xFF1C2128) : AppColors.white;
 
     return SliverAppBar(
       pinned: true,
       floating: false,
       titleSpacing: 16,
-      backgroundColor: AppColors.white,
+      backgroundColor: barColor,
       surfaceTintColor: Colors.transparent,
       title: Row(
         children: [
@@ -261,12 +275,12 @@ class _HomeScreenState extends State<HomeScreen> {
             child: InkWell(
               onTap: () => _openProfile(context),
               customBorder: const CircleBorder(),
-              child: const CircleAvatar(
+              child: CircleAvatar(
                 radius: 18,
-                backgroundColor: AppColors.primary00,
+                backgroundColor: scheme.primaryContainer,
                 child: Icon(
                   Icons.person_outline,
-                  color: AppColors.primary,
+                  color: scheme.primary,
                   size: 20,
                 ),
               ),
@@ -276,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             today,
             style: textTheme.labelLarge?.copyWith(
-              color: AppColors.primary,
+              color: scheme.primary,
             ),
           ),
         ],
@@ -287,15 +301,13 @@ class _HomeScreenState extends State<HomeScreen> {
           onPressed: _toggleSearch,
           icon: Icon(
             _isSearchExpanded ? Icons.close : Icons.search,
-            color: _isSearchExpanded
-                ? AppColors.primary
-                : AppColors.neutral60,
+            color: _isSearchExpanded ? scheme.primary : AppColors.neutral60,
           ),
         ),
         if (!_isSearchExpanded)
           IconButton(
             tooltip: 'Ajustes',
-            onPressed: () {},
+            onPressed: () => _openSettings(context),
             icon: const Icon(
               Icons.settings_outlined,
               color: AppColors.neutral60,
@@ -312,11 +324,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final searchQuery = _searchController.text;
 
     return Scaffold(
-      body: SafeArea(
-        top: false,
-        child: ValueListenableBuilder<Box<Map>>(
-          valueListenable: _repo.listenable(),
-          builder: (context, box, child) {
+      backgroundColor: Colors.transparent,
+      body: ListBackgroundScaffoldBody(
+        child: SafeArea(
+          top: false,
+          child: ValueListenableBuilder<Box<Map>>(
+            valueListenable: _repo.listenable(),
+            builder: (context, box, child) {
           // Re-arm the due-time ticker when the dataset changes.
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) _clock.schedule();
@@ -431,6 +445,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
           },
+        ),
         ),
       ),
       floatingActionButton: Tooltip(

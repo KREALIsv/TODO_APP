@@ -100,12 +100,12 @@ class NoteCard extends StatelessWidget {
                         ),
                       ),
                       if (item.pinned)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 4),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4),
                           child: Icon(
                             Icons.push_pin,
                             size: 14,
-                            color: AppColors.primary,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                     ],

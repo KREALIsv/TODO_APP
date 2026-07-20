@@ -129,9 +129,9 @@ class _AppAlertDialog extends StatelessWidget {
         AppAlertType.error => Icons.error_outline,
       };
 
-  Color get _accent => switch (type) {
-        AppAlertType.info => AppColors.primary,
-        AppAlertType.success => AppColors.primary,
+  Color _accentFor(BuildContext context) => switch (type) {
+        AppAlertType.info => Theme.of(context).colorScheme.primary,
+        AppAlertType.success => Theme.of(context).colorScheme.primary,
         AppAlertType.warning => const Color(0xFFBF8700),
         AppAlertType.error => AppColors.error,
       };
@@ -139,6 +139,7 @@ class _AppAlertDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final accent = _accentFor(context);
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -153,7 +154,7 @@ class _AppAlertDialog extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(_icon, color: _accent, size: 24),
+                Icon(_icon, color: accent, size: 24),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
