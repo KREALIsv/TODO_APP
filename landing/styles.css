@@ -23,8 +23,8 @@
   --muted: var(--neutral);
   --accent: var(--brand-pink);
   --scribble: var(--brand-pink);
-  --btn-size: 3.25rem;
-  --btn-radius: 16px;
+  --btn-size: 4.5rem;
+  --btn-radius: 18px;
   --font: "Sora", ui-sans-serif, sans-serif;
 }
 
@@ -160,17 +160,18 @@ body {
 }
 
 .btn-logo {
-  width: 1.65rem;
-  height: 1.65rem;
+  width: 2.1rem;
+  height: 2.1rem;
   flex-shrink: 0;
   display: block;
 }
 
 .btn-logo-app {
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 22%;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
   object-fit: cover;
+  display: block;
 }
 
 .btn:hover {
@@ -186,44 +187,64 @@ body {
   outline-offset: 3px;
 }
 
+.btn-glass {
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-color: rgba(255, 255, 255, 0.62);
+  box-shadow:
+    0 8px 28px rgba(31, 35, 40, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.btn-glass:hover {
+  background: rgba(255, 255, 255, 0.56);
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 12px 32px rgba(31, 35, 40, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
 .btn-android {
-  background: var(--black);
-  color: var(--white);
-}
-
-.btn-android:hover {
-  box-shadow: 0 10px 28px rgba(31, 35, 40, 0.2);
-}
-
-.btn-apple {
-  background: var(--white);
-  border-color: var(--neutral-20);
   color: var(--black);
 }
 
-.btn-apple:hover {
-  border-color: var(--neutral-40);
-  box-shadow: 0 8px 22px rgba(31, 35, 40, 0.08);
+.btn-apple {
+  color: var(--black);
 }
 
 .btn-web {
-  background: var(--brand-pink);
-  color: var(--white);
-  box-shadow: 0 8px 24px rgba(242, 50, 125, 0.3);
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: 0 10px 28px rgba(242, 50, 125, 0.28);
 }
 
 .btn-web:hover {
-  box-shadow: 0 12px 32px rgba(242, 50, 125, 0.4);
-}
-
-.btn.is-preferred {
-  box-shadow:
-    0 0 0 2px var(--brand-pink),
-    0 10px 28px rgba(242, 50, 125, 0.18);
+  box-shadow: 0 14px 36px rgba(242, 50, 125, 0.38);
 }
 
 .btn-apple.is-preferred {
   border-color: var(--brand-pink);
+  box-shadow:
+    0 0 0 2px var(--brand-pink),
+    0 10px 28px rgba(242, 50, 125, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.btn-android.is-preferred {
+  border-color: var(--brand-pink);
+  box-shadow:
+    0 0 0 2px var(--brand-pink),
+    0 10px 28px rgba(242, 50, 125, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.btn-web.is-preferred {
+  box-shadow:
+    0 0 0 2px var(--brand-pink),
+    0 14px 36px rgba(242, 50, 125, 0.32);
 }
 
 @keyframes frog-in {
@@ -274,22 +295,17 @@ body {
   }
 
   .cta {
-    gap: 0.75rem;
+    gap: 0.9rem;
   }
 
   .btn {
-    width: 3rem;
-    height: 3rem;
+    width: 4rem;
+    height: 4rem;
   }
 
   .btn-logo {
-    width: 1.5rem;
-    height: 1.5rem;
-  }
-
-  .btn-logo-app {
-    width: 1.6rem;
-    height: 1.6rem;
+    width: 1.9rem;
+    height: 1.9rem;
   }
 }
 
