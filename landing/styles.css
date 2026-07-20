@@ -165,6 +165,7 @@ body {
   height: 2.1rem;
   flex-shrink: 0;
   display: block;
+  object-fit: contain;
 }
 
 .btn-logo-app {
