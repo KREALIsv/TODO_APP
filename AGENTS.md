@@ -18,3 +18,10 @@
 ### Notes / gotchas
 - First web page load is slow (Flutter compiles to JS on first request); wait ~15-20s or refresh once before assuming a failure.
 - Local notifications (`flutter_local_notifications`) bootstrap is best-effort and is skipped gracefully on web/hot-reload; the app works without it.
+
+### Deploy (production) — wodo.app + app.wodo.app
+- Runs on a **shared Contabo VPS** (`144.91.71.215`, single public IP). A shared Caddy (`syvar-uat-caddy`, network `syvar_default`, Caddyfile at `/opt/syvar/ops/Caddyfile`) owns ports 80/443 and acts as the edge for all projects. Do NOT modify other projects' blocks in that Caddyfile.
+- wodo is isolated under `/opt/wodo`: `wodo-landing` + `wodo-web` (nginx) on `syvar_default`, no host ports. `wodo.app`→landing, `app.wodo.app`→Flutter web, `www`→apex redirect. TLS via the shared Caddy (Let's Encrypt).
+- Edge registration is a one-time step (`deploy/scripts/setup-wodo-https.sh`, adds a markered block + reload). Routine deploys only rsync `landing/` and `flutter build web` output into `/opt/wodo/sites/*`; nginx serves the volume directly, so no container restart is needed.
+- GOTCHA (bind-mounted single file): the shared Caddyfile is a single-file bind mount. Editing it with `mv`/atomic-replace creates a new inode and the running Caddy keeps reading the OLD inode (changes invisible until a container restart). Always edit that file **in place** (`cat >`/`cp`, never `mv`); `setup-wodo-https.sh` already does this.
+- Auto-deploy: `.github/workflows/deploy.yml` on push to `main` (needs GitHub Actions secrets `DEPLOY_HOST/USER/SSH_PRIVATE_KEY/PATH(/opt/wodo)/PORT` and a `production` environment). See `deploy/README.md`.

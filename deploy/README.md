@@ -94,3 +94,10 @@ Y crear el environment **`production`** (Settings → Environments).
 - El bloque de wodo en el edge es reversible: basta quitar el bloque entre
   markers y recargar Caddy.
 - No se versionan secretos ni contenido servido (`.env`, `sites/`).
+- El registro en el edge (`setup-wodo-https.sh`) es de **una sola vez**; los
+  deploys rutinarios solo hacen rsync del contenido (nginx lo sirve directo del
+  volumen). Por eso el workflow no reescribe el Caddyfile compartido en cada push.
+- **Gotcha (bind mount de archivo único):** el Caddyfile compartido se monta como
+  archivo individual. Editarlo con `mv` crea un inodo nuevo y el Caddy en
+  ejecución sigue leyendo el inodo viejo (los cambios no se ven hasta reiniciar
+  el contenedor). Por eso `setup-wodo-https.sh` escribe **in-place** (`cat >`).

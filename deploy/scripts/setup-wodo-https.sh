@@ -53,7 +53,12 @@ $APP_DOMAIN {
 $END
 EOF
 
-mv "$tmp" "$CADDYFILE"
+# IMPORTANTE: escribir IN-PLACE (no `mv`). El Caddyfile se monta como archivo
+# único (bind mount) en el contenedor; un `mv` crea un inodo nuevo y el
+# contenedor seguiría leyendo el inodo viejo (los cambios no se verían hasta
+# reiniciar Caddy). `cat >` conserva el inodo y el reload los toma al instante.
+cat "$tmp" > "$CADDYFILE"
+rm -f "$tmp"
 
 # Valida y recarga (el archivo se monta en el contenedor por bind mount).
 docker exec "$CADDY_CONTAINER" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

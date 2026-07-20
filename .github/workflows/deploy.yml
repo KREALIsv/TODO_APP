@@ -69,11 +69,9 @@ jobs:
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
             "cd '${{ secrets.DEPLOY_PATH }}' && docker compose up -d"
 
-      # Registra/actualiza el bloque de wodo en el edge compartido (idempotente).
-      # Solo aplica si el edge se maneja por Caddyfile compartido; si wodo tiene
-      # su propio edge dedicado, elimina este paso.
-      - name: Ensure edge routing (Caddy)
-        run: |
-          ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT || 22 }}" \
-            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            "cd '${{ secrets.DEPLOY_PATH }}' && bash scripts/setup-wodo-https.sh"
+      # NOTA: el registro en el edge compartido (scripts/setup-wodo-https.sh) es
+      # de una sola vez y ya está aplicado; requiere privilegios para escribir el
+      # Caddyfile compartido, por eso NO se corre en cada deploy. nginx sirve el
+      # contenido nuevo directo desde el volumen, así que un deploy rutinario solo
+      # necesita el rsync + `docker compose up -d` de arriba. Si alguna vez hay que
+      # re-registrar en el edge, corre ese script una vez como root en el server.
