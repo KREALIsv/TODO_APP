@@ -176,8 +176,7 @@ class SwipeableNoteCard extends StatelessWidget {
     final isTask = item.type == NoteType.task;
     final accent = Theme.of(context).colorScheme.primary;
 
-    // PRD §6.7: derecha = completar (tarea) / fijar (nota); izquierda = archivar.
-    // Eliminar nunca va en swipe (editor, long-press o Archivadas).
+    // Izquierda: Archivar / Eliminar / Fijar. Derecha: Hecho/Reabrir (solo tareas).
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -189,35 +188,26 @@ class SwipeableNoteCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Slidable(
           key: ValueKey(item.id),
-          startActionPane: ActionPane(
-            motion: const BehindMotion(),
-            extentRatio: 0.28,
-            children: [
-              if (isTask)
-                SlidableAction(
-                  onPressed: (_) => _complete(context),
-                  backgroundColor: accent,
-                  foregroundColor: AppColors.white,
-                  icon: item.completed
-                      ? Icons.radio_button_unchecked
-                      : Icons.check_circle_outline,
-                  label: item.completed ? 'Reabrir' : 'Hecho',
+          startActionPane: isTask
+              ? ActionPane(
+                  motion: const BehindMotion(),
+                  extentRatio: 0.28,
+                  children: [
+                    SlidableAction(
+                      onPressed: (_) => _complete(context),
+                      backgroundColor: accent,
+                      foregroundColor: AppColors.white,
+                      icon: item.completed
+                          ? Icons.radio_button_unchecked
+                          : Icons.check_circle_outline,
+                      label: item.completed ? 'Reabrir' : 'Hecho',
+                    ),
+                  ],
                 )
-              else
-                SlidableAction(
-                  onPressed: (_) => _pin(context),
-                  backgroundColor: accent,
-                  foregroundColor: AppColors.white,
-                  icon: item.pinned
-                      ? Icons.push_pin_outlined
-                      : Icons.push_pin,
-                  label: item.pinned ? 'Desfijar' : 'Fijar',
-                ),
-            ],
-          ),
+              : null,
           endActionPane: ActionPane(
             motion: const BehindMotion(),
-            extentRatio: 0.28,
+            extentRatio: 0.72,
             children: [
               SlidableAction(
                 onPressed: (_) => _archive(context),
@@ -225,6 +215,22 @@ class SwipeableNoteCard extends StatelessWidget {
                 foregroundColor: AppColors.white,
                 icon: Icons.archive_outlined,
                 label: 'Archivar',
+              ),
+              SlidableAction(
+                onPressed: (_) => _deleteForever(context),
+                backgroundColor: AppColors.error,
+                foregroundColor: AppColors.white,
+                icon: Icons.delete_outline,
+                label: 'Eliminar',
+              ),
+              SlidableAction(
+                onPressed: (_) => _pin(context),
+                backgroundColor: accent,
+                foregroundColor: AppColors.white,
+                icon: item.pinned
+                    ? Icons.push_pin_outlined
+                    : Icons.push_pin,
+                label: item.pinned ? 'Desfijar' : 'Fijar',
               ),
             ],
           ),
