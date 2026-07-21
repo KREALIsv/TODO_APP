@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/layout/keyboard_insets.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/note_item.dart';
@@ -37,6 +38,9 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
   final _titleFocus = FocusNode();
+  final _bodyFocus = FocusNode();
+  final _titleFieldKey = GlobalKey();
+  final _bodyFieldKey = GlobalKey();
   static const _uuid = Uuid();
   bool _isTask = false;
 
@@ -45,6 +49,8 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
   @override
   void initState() {
     super.initState();
+    _titleFocus.addListener(() => _ensureFieldVisible(_titleFieldKey));
+    _bodyFocus.addListener(() => _ensureFieldVisible(_bodyFieldKey));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _titleFocus.requestFocus();
     });
@@ -55,7 +61,21 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
     _titleController.dispose();
     _bodyController.dispose();
     _titleFocus.dispose();
+    _bodyFocus.dispose();
     super.dispose();
+  }
+
+  void _ensureFieldVisible(GlobalKey fieldKey) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = fieldKey.currentContext;
+      if (!mounted || context == null) return;
+      Scrollable.ensureVisible(
+        context,
+        alignment: 0.2,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   Future<void> _save() async {
@@ -102,49 +122,69 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomInset = sheetKeyboardBottomInset(context);
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.92;
 
-    return Padding(
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
       padding: EdgeInsets.only(bottom: bottomInset),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                _isTask ? 'Nueva tarea' : 'Nueva nota',
-                style: textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _titleController,
-                focusNode: _titleFocus,
-                textCapitalization: TextCapitalization.sentences,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  hintText: 'Escribe un título',
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      _isTask ? 'Nueva tarea' : 'Nueva nota',
+                      style: textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      key: _titleFieldKey,
+                      controller: _titleController,
+                      focusNode: _titleFocus,
+                      textCapitalization: TextCapitalization.sentences,
+                      textInputAction: TextInputAction.next,
+                      scrollPadding: const EdgeInsets.only(bottom: 120),
+                      onSubmitted: (_) => _bodyFocus.requestFocus(),
+                      decoration: const InputDecoration(
+                        hintText: 'Escribe un título',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      key: _bodyFieldKey,
+                      controller: _bodyController,
+                      focusNode: _bodyFocus,
+                      textCapitalization: TextCapitalization.sentences,
+                      minLines: 3,
+                      maxLines: 6,
+                      scrollPadding: const EdgeInsets.only(bottom: 120),
+                      decoration: const InputDecoration(
+                        hintText: 'Añade detalles (opcional)',
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    NoteTaskTypeSwitch(
+                      value: _isTask,
+                      onChanged: (value) => setState(() => _isTask = value),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _bodyController,
-                textCapitalization: TextCapitalization.sentences,
-                minLines: 3,
-                maxLines: 6,
-                decoration: const InputDecoration(
-                  hintText: 'Añade detalles (opcional)',
-                  alignLabelWithHint: true,
-                ),
-              ),
-              const SizedBox(height: 12),
-              NoteTaskTypeSwitch(
-                value: _isTask,
-                onChanged: (value) => setState(() => _isTask = value),
-              ),
-              const SizedBox(height: 16),
-              Row(
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
@@ -161,8 +201,8 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
