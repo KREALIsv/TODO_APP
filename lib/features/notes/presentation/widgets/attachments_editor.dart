@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,8 +5,13 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../global/themes/app_colors.dart';
 import '../../../../global/themes/tokens.dart';
 import '../../../../global/widgets/app_alerts.dart';
+import '../../../../global/widgets/outlined_add_chip.dart';
 import '../../data/attachments_repository.dart';
 import '../../domain/note_attachment.dart';
+import '../attachment_viewer_screen.dart';
+import 'attachment_actions.dart';
+import 'attachment_thumb_tile.dart';
+import 'attachments_grid_sheet.dart';
 
 /// Editor section: thumbnail strip, add, see-more grid, cover controls.
 class AttachmentsEditor extends StatefulWidget {
@@ -17,12 +20,16 @@ class AttachmentsEditor extends StatefulWidget {
     required this.noteId,
     required this.coverAttachmentId,
     required this.onCoverChanged,
+    this.onAttachmentAdded,
     this.repository,
   });
 
   final String noteId;
   final String? coverAttachmentId;
   final ValueChanged<String?> onCoverChanged;
+
+  /// Fired after a new image is stored (for draft-session tracking).
+  final ValueChanged<String>? onAttachmentAdded;
   final AttachmentsRepository? repository;
 
   @override
@@ -54,6 +61,7 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
         mimeType: file.mimeType ?? 'image/jpeg',
       );
       if (!mounted) return;
+      widget.onAttachmentAdded?.call(created.id);
       if (widget.coverAttachmentId == null) {
         widget.onCoverChanged(created.id);
       }
@@ -147,20 +155,14 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
   }
 
   Future<void> _deleteAttachment(NoteAttachment item) async {
-    final confirmed = await AppAlerts.confirm(
+    final deleted = await confirmAndDeleteAttachment(
       context,
-      title: 'Eliminar imagen',
-      message: '¿Eliminar esta imagen?',
-      confirmLabel: 'Eliminar',
-      isDestructive: true,
+      item: item,
+      coverAttachmentId: widget.coverAttachmentId,
+      onCoverChanged: widget.onCoverChanged,
+      attachments: _repo,
     );
-    if (!confirmed) return;
-    await _repo.delete(item.id);
-    if (widget.coverAttachmentId == item.id) {
-      final remaining = _repo.forNote(widget.noteId);
-      widget.onCoverChanged(remaining.isEmpty ? null : remaining.first.id);
-    }
-    if (mounted) setState(() {});
+    if (deleted && mounted) setState(() {});
   }
 
   @override
@@ -178,28 +180,28 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
             Row(
               children: [
                 Expanded(
-                  child: Text('Adjuntos', style: textTheme.titleSmall),
+                  child: Text('Adjuntos', style: textTheme.labelLarge),
                 ),
-                TextButton.icon(
-                  onPressed: _busy ? null : _showAddSheet,
-                  icon: _busy
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.add, size: 18),
-                  label: const Text('Añadir'),
-                ),
+                if (items.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: _busy ? null : _showAddSheet,
+                    icon: _busy
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add, size: 18),
+                    label: const Text('Añadir'),
+                  ),
               ],
             ),
             if (items.isEmpty)
               Align(
                 alignment: Alignment.centerLeft,
-                child: TextButton.icon(
+                child: OutlinedAddChip(
+                  label: 'Añadir imagen',
                   onPressed: _busy ? null : _showAddSheet,
-                  icon: const Icon(Icons.image_outlined),
-                  label: const Text('Añadir imagen'),
                 ),
               )
             else ...[
@@ -208,14 +210,14 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: items.length + 1,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
                     if (index == items.length) {
                       return _AddTile(onTap: _busy ? null : _showAddSheet);
                     }
                     final item = items[index];
                     final isCover = item.id == widget.coverAttachmentId;
-                    return _ThumbTile(
+                    return AttachmentThumbTile(
                       bytes: _repo.bytesFor(item.id),
                       isCover: isCover,
                       onTap: () => _openViewer(items, index),
@@ -269,7 +271,8 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: AppColors.error),
+                leading:
+                    const Icon(Icons.delete_outline, color: AppColors.error),
                 title: const Text('Eliminar'),
                 onTap: () {
                   Navigator.pop(context);
@@ -304,229 +307,6 @@ class _AddTile extends StatelessWidget {
           color: AppColors.neutral00,
         ),
         child: const Icon(Icons.add, color: AppColors.neutral60),
-      ),
-    );
-  }
-}
-
-class _ThumbTile extends StatelessWidget {
-  const _ThumbTile({
-    required this.bytes,
-    required this.isCover,
-    required this.onTap,
-    this.onLongPress,
-  });
-
-  final Uint8List? bytes;
-  final bool isCover;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      borderRadius: ThemeTokens.borderRadius,
-      child: Stack(
-        children: [
-          ClipRRect(
-            borderRadius: ThemeTokens.borderRadius,
-            child: Container(
-              width: 64,
-              height: 64,
-              color: AppColors.neutral20,
-              child: bytes == null
-                  ? const Icon(Icons.broken_image_outlined)
-                  : Image.memory(bytes!, fit: BoxFit.cover),
-            ),
-          ),
-          if (isCover)
-            Positioned(
-              top: 4,
-              right: 4,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.star, size: 12, color: Colors.white),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class AttachmentsGridSheet extends StatelessWidget {
-  const AttachmentsGridSheet({
-    super.key,
-    required this.noteId,
-    required this.coverAttachmentId,
-    required this.onCoverChanged,
-    required this.onOpenViewer,
-    this.repository,
-  });
-
-  final String noteId;
-  final String? coverAttachmentId;
-  final ValueChanged<String?> onCoverChanged;
-  final ValueChanged<int> onOpenViewer;
-  final AttachmentsRepository? repository;
-
-  @override
-  Widget build(BuildContext context) {
-    final repo = repository ?? AttachmentsRepository.instance;
-    final items = repo.forNote(noteId);
-    final height = MediaQuery.sizeOf(context).height * 0.7;
-
-    return SizedBox(
-      height: height,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Text(
-              'Fotos · ${items.length}',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
-          Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-              ),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                final isCover = item.id == coverAttachmentId;
-                return _ThumbTile(
-                  bytes: repo.bytesFor(item.id),
-                  isCover: isCover,
-                  onTap: () => onOpenViewer(index),
-                  onLongPress: () {
-                    onCoverChanged(isCover ? null : item.id);
-                    Navigator.pop(context);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class AttachmentViewerScreen extends StatefulWidget {
-  const AttachmentViewerScreen({
-    super.key,
-    required this.noteId,
-    required this.initialIndex,
-    required this.coverAttachmentId,
-    required this.onCoverChanged,
-    this.repository,
-  });
-
-  final String noteId;
-  final int initialIndex;
-  final String? coverAttachmentId;
-  final ValueChanged<String?> onCoverChanged;
-  final AttachmentsRepository? repository;
-
-  @override
-  State<AttachmentViewerScreen> createState() => _AttachmentViewerScreenState();
-}
-
-class _AttachmentViewerScreenState extends State<AttachmentViewerScreen> {
-  late final PageController _controller;
-  late int _index;
-  late String? _coverId;
-
-  AttachmentsRepository get _repo =>
-      widget.repository ?? AttachmentsRepository.instance;
-
-  @override
-  void initState() {
-    super.initState();
-    _index = widget.initialIndex;
-    _coverId = widget.coverAttachmentId;
-    _controller = PageController(initialPage: widget.initialIndex);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final items = _repo.forNote(widget.noteId);
-    if (items.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: const Center(child: Text('Sin imágenes')),
-      );
-    }
-    final safeIndex = _index.clamp(0, items.length - 1);
-    final current = items[safeIndex];
-    final isCover = current.id == _coverId;
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text('${safeIndex + 1} / ${items.length}'),
-        actions: [
-          IconButton(
-            tooltip: isCover ? 'Quitar portada' : 'Usar como portada',
-            onPressed: () {
-              final next = isCover ? null : current.id;
-              setState(() => _coverId = next);
-              widget.onCoverChanged(next);
-            },
-            icon: Icon(isCover ? Icons.star : Icons.star_outline),
-          ),
-        ],
-      ),
-      body: PageView.builder(
-        controller: _controller,
-        itemCount: items.length,
-        onPageChanged: (i) => setState(() => _index = i),
-        itemBuilder: (context, i) {
-          final bytes = _repo.bytesFor(items[i].id);
-          if (bytes == null) {
-            return const Center(
-              child: Icon(Icons.broken_image, color: Colors.white54, size: 48),
-            );
-          }
-          return InteractiveViewer(
-            child: Center(
-              child: Image.memory(bytes, fit: BoxFit.contain),
-            ),
-          );
-        },
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: FilledButton(
-            onPressed: () {
-              final next = isCover ? null : current.id;
-              setState(() => _coverId = next);
-              widget.onCoverChanged(next);
-            },
-            child: Text(isCover ? 'Quitar portada' : 'Usar como portada'),
-          ),
-        ),
       ),
     );
   }

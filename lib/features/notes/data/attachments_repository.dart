@@ -82,13 +82,14 @@ class AttachmentsRepository {
     }
 
     final compressed = await compressImageBytes(bytes);
+    final storedAsPng = _isPng(compressed);
     final id = _uuid.v4();
     final now = DateTime.now();
     final attachment = NoteAttachment(
       id: id,
       noteId: noteId,
-      fileName: fileName,
-      mimeType: mimeType,
+      fileName: storedAsPng ? _withPngExtension(fileName) : fileName,
+      mimeType: storedAsPng ? 'image/png' : mimeType,
       byteSize: compressed.lengthInBytes,
       createdAt: now,
       sortOrder: existing.isEmpty ? 0 : existing.last.sortOrder + 1,
@@ -107,17 +108,6 @@ class AttachmentsRepository {
   Future<void> deleteForNote(String noteId) async {
     for (final item in forNote(noteId)) {
       await delete(item.id);
-    }
-  }
-
-  Future<void> reassignNoteId({
-    required String fromNoteId,
-    required String toNoteId,
-  }) async {
-    if (fromNoteId == toNoteId) return;
-    for (final item in forNote(fromNoteId)) {
-      final updated = item.copyWith(noteId: toNoteId);
-      await _meta.put(item.id, updated.toMap());
     }
   }
 
@@ -153,6 +143,20 @@ class AttachmentsRepository {
 
   @visibleForTesting
   Future<void> clear() => resetAll();
+}
+
+bool _isPng(Uint8List bytes) {
+  return bytes.length >= 4 &&
+      bytes[0] == 0x89 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x4E &&
+      bytes[3] == 0x47;
+}
+
+String _withPngExtension(String fileName) {
+  final dot = fileName.lastIndexOf('.');
+  if (dot <= 0) return '$fileName.png';
+  return '${fileName.substring(0, dot)}.png';
 }
 
 Future<Uint8List> compressImageBytes(Uint8List input) async {
