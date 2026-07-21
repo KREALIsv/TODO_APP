@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../global/themes/app_colors.dart';
 import '../../../global/widgets/app_alerts.dart';
+import '../../shell/presentation/desktop_column_header.dart';
 import '../data/notes_repository.dart';
 import '../data/tags_repository.dart';
 import '../domain/note_item.dart';
@@ -19,12 +19,18 @@ class NoteEditorScreen extends StatefulWidget {
     this.initialType = NoteType.note,
     this.repository,
     this.tagsRepository,
+    this.embedded = false,
+    this.onClose,
+    this.onSaved,
   });
 
   final NoteItem? item;
   final NoteType initialType;
   final NotesRepository? repository;
   final TagsRepository? tagsRepository;
+  final bool embedded;
+  final VoidCallback? onClose;
+  final ValueChanged<String>? onSaved;
 
   @override
   State<NoteEditorScreen> createState() => _NoteEditorScreenState();
@@ -172,7 +178,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final toastMessage =
         showTodayToast ? _todayProgressMessage(isCreate: isCreate) : null;
 
-    Navigator.of(context).pop();
+    if (widget.embedded) {
+      widget.onSaved?.call(toSave.id);
+    } else {
+      Navigator.of(context).pop();
+    }
 
     if (toastMessage != null) {
       messenger
@@ -192,7 +202,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     await _repo.archive(item.id);
     if (!mounted) return;
-    Navigator.of(context).pop();
+    _closeAfterMutation();
   }
 
   Future<void> _delete() async {
@@ -210,117 +220,154 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (!confirmed) return;
     await _repo.delete(item.id);
     if (!mounted) return;
-    Navigator.of(context).pop();
+    _closeAfterMutation();
+  }
+
+  void _closeAfterMutation() {
+    if (widget.embedded) {
+      widget.onClose?.call();
+    } else {
+      Navigator.of(context).pop();
+    }
+  }
+
+  List<Widget> _buildActions() {
+    return [
+      IconButton(
+        tooltip: _pinned ? 'Desfijar' : 'Fijar',
+        onPressed: () => setState(() => _pinned = !_pinned),
+        icon: Icon(
+          _pinned ? Icons.push_pin : Icons.push_pin_outlined,
+          color: _pinned ? Theme.of(context).colorScheme.primary : null,
+        ),
+      ),
+      if (_isEditing) ...[
+        IconButton(
+          tooltip: 'Archivar',
+          onPressed: _archive,
+          icon: const Icon(Icons.archive_outlined),
+        ),
+        IconButton(
+          tooltip: 'Eliminar',
+          onPressed: _delete,
+          icon: const Icon(Icons.delete_outline),
+        ),
+      ],
+      TextButton(
+        onPressed: _save,
+        child: const Text('Guardar'),
+      ),
+    ];
+  }
+
+  Widget _buildFields() {
+    final isTask = _type == NoteType.task;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        TextField(
+          controller: _titleController,
+          focusNode: _titleFocus,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            hintText: 'Escribe un título',
+          ),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _bodyController,
+          textCapitalization: TextCapitalization.sentences,
+          minLines: 4,
+          maxLines: 8,
+          decoration: const InputDecoration(
+            hintText: 'Añade detalles (opcional)',
+            alignLabelWithHint: true,
+          ),
+        ),
+        if (isTask) ...[
+          const SizedBox(height: 24),
+          TaskWhenField(
+            dueAt: _dueAt,
+            dueHasTime: _dueHasTime,
+            todayOn: _todayOn,
+            reminderMinutesBefore: _reminderMinutesBefore,
+            onChanged: ({
+              required bool todayOn,
+              DateTime? dueAt,
+              bool dueHasTime = false,
+              int? reminderMinutesBefore,
+            }) {
+              setState(() {
+                _todayOn = todayOn;
+                _dueAt = dueAt;
+                _dueHasTime = dueHasTime;
+                _reminderMinutesBefore =
+                    dueAt == null ? null : reminderMinutesBefore;
+              });
+            },
+          ),
+        ],
+        const SizedBox(height: 24),
+        TagsEditor(
+          tags: _tags,
+          suggestions: {
+            ..._tagsRepo.getAllAsSet(),
+            ..._repo.getAllTags(),
+          },
+          onChanged: (tags) => setState(() => _tags = tags),
+        ),
+        const SizedBox(height: 24),
+        NoteTaskTypeSwitch(
+          value: isTask,
+          onChanged: (value) {
+            setState(() {
+              _type = value ? NoteType.task : NoteType.note;
+              if (!value) {
+                _completed = false;
+                _dueAt = null;
+                _dueHasTime = false;
+                _todayOn = false;
+                _reminderMinutesBefore = null;
+              }
+            });
+          },
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isTask = _type == NoteType.task;
+    if (widget.embedded) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DesktopColumnHeader(
+            title: _appBarTitle,
+            leading: IconButton(
+              tooltip: 'Cerrar editor',
+              onPressed: widget.onClose,
+              icon: const Icon(Icons.close),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: _buildActions(),
+            ),
+          ),
+          Expanded(child: _buildFields()),
+        ],
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
         title: Text(_appBarTitle),
-        actions: [
-          IconButton(
-            tooltip: _pinned ? 'Desfijar' : 'Fijar',
-            onPressed: () => setState(() => _pinned = !_pinned),
-            icon: Icon(
-              _pinned ? Icons.push_pin : Icons.push_pin_outlined,
-              color: _pinned ? Theme.of(context).colorScheme.primary : null,
-            ),
-          ),
-          if (_isEditing) ...[
-            IconButton(
-              tooltip: 'Archivar',
-              onPressed: _archive,
-              icon: const Icon(Icons.archive_outlined),
-            ),
-            IconButton(
-              tooltip: 'Eliminar',
-              onPressed: _delete,
-              icon: const Icon(Icons.delete_outline),
-            ),
-          ],
-          TextButton(
-            onPressed: _save,
-            child: const Text('Guardar'),
-          ),
-        ],
+        actions: _buildActions(),
       ),
       body: SafeArea(
         top: false,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-          TextField(
-            controller: _titleController,
-            focusNode: _titleFocus,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              hintText: 'Escribe un título',
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _bodyController,
-            textCapitalization: TextCapitalization.sentences,
-            minLines: 4,
-            maxLines: 8,
-            decoration: const InputDecoration(
-              hintText: 'Añade detalles (opcional)',
-              alignLabelWithHint: true,
-            ),
-          ),
-          if (isTask) ...[
-            const SizedBox(height: 24),
-            TaskWhenField(
-              dueAt: _dueAt,
-              dueHasTime: _dueHasTime,
-              todayOn: _todayOn,
-              reminderMinutesBefore: _reminderMinutesBefore,
-              onChanged: ({
-                required bool todayOn,
-                DateTime? dueAt,
-                bool dueHasTime = false,
-                int? reminderMinutesBefore,
-              }) {
-                setState(() {
-                  _todayOn = todayOn;
-                  _dueAt = dueAt;
-                  _dueHasTime = dueHasTime;
-                  _reminderMinutesBefore =
-                      dueAt == null ? null : reminderMinutesBefore;
-                });
-              },
-            ),
-          ],
-          const SizedBox(height: 24),
-          TagsEditor(
-            tags: _tags,
-            suggestions: {
-              ..._tagsRepo.getAllAsSet(),
-              ..._repo.getAllTags(),
-            },
-            onChanged: (tags) => setState(() => _tags = tags),
-          ),
-          const SizedBox(height: 24),
-          NoteTaskTypeSwitch(
-            value: isTask,
-            onChanged: (value) {
-              setState(() {
-                _type = value ? NoteType.task : NoteType.note;
-                if (!value) {
-                  _completed = false;
-                  _dueAt = null;
-                  _dueHasTime = false;
-                  _todayOn = false;
-                  _reminderMinutesBefore = null;
-                }
-              });
-            },
-          ),
-          ],
-        ),
+        child: _buildFields(),
       ),
     );
   }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/theme.dart';
-import '../features/home/presentation/home_screen.dart';
+import 'adaptive_app_shell.dart';
 import '../features/settings/data/settings_repository.dart';
 import '../features/settings/presentation/background_palette.dart';
 import '../global/constants/constants.dart';
@@ -30,7 +30,7 @@ class TodosApp extends StatelessWidget {
           darkTheme: BackgroundPalette.fromAccent(darkAccent, Brightness.dark)
               .tint(AppTheme.dark()),
           themeMode: _settings.themeMode,
-          home: const HomeScreen(),
+          home: const AdaptiveAppShell(),
         );
       },
     );

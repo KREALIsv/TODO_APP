@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 import 'package:todos_app/features/notes/data/day_entries_repository.dart';
 import 'package:todos_app/features/notes/data/notes_repository.dart';
@@ -159,7 +159,7 @@ void main() {
       DayVia.todaySwitch,
     );
 
-    final tomorrow = DateTime(2026, 7, 21);
+    final tomorrow = dateOnly(DateTime.now()).add(const Duration(days: 1));
     await repo.applyTaskWhen(
       't',
       todayOn: false,

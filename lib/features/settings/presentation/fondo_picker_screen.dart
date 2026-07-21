@@ -1,8 +1,42 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/layout/adaptive_breakpoints.dart';
+import '../../../core/theme/app_surface.dart';
 import '../../../global/themes/app_colors.dart';
 import '../data/settings_repository.dart';
 import '../domain/list_background.dart';
+
+/// Grid sizing for the background picker — denser on wider viewports.
+abstract final class _FondoGridLayout {
+  static const double maxContentWidth = 720;
+  static const double minGradientTileWidth = 148;
+  static const double minSolidTileWidth = 100;
+  static const double minBrandTileWidth = 140;
+
+  static int gradientColumns(double width) {
+    final usable = width.clamp(0, maxContentWidth);
+    return (usable / minGradientTileWidth).floor().clamp(2, 5);
+  }
+
+  static int solidColumns(double width) {
+    final usable = width.clamp(0, maxContentWidth);
+    return (usable / minSolidTileWidth).floor().clamp(3, 6);
+  }
+
+  static int brandColumns(double width) {
+    final usable = width.clamp(0, maxContentWidth);
+    return (usable / minBrandTileWidth).floor().clamp(2, 4);
+  }
+
+  static double gradientAspectRatio(int columns) =>
+      columns >= 4 ? 1.65 : columns >= 3 ? 1.55 : 1.45;
+
+  static double solidAspectRatio(int columns) =>
+      columns >= 5 ? 0.88 : columns >= 4 ? 0.9 : 0.92;
+
+  static bool useDenseTiles(double width) =>
+      AdaptiveBreakpoints.layoutForWidth(width) != AdaptiveLayout.compact;
+}
 
 class FondoPickerScreen extends StatelessWidget {
   const FondoPickerScreen({super.key, this.settings});
@@ -14,12 +48,11 @@ class FondoPickerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Fondo de la lista'),
-        backgroundColor: isDark ? const Color(0xFF1C2128) : AppColors.white,
+        backgroundColor: AppSurface.panelOverlay(context),
         surfaceTintColor: Colors.transparent,
       ),
       body: ListenableBuilder(
@@ -28,115 +61,150 @@ class FondoPickerScreen extends StatelessWidget {
           final selectedId = _settings.listBackgroundId;
           final brightness = Theme.of(context).brightness;
 
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 36),
-            children: [
-              _SectionHeader(
-                title: 'Colores',
-                subtitle: 'Degradados suaves para la lista',
-                textTheme: textTheme,
-              ),
-              const SizedBox(height: 12),
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.45,
-                children: [
-                  _DefaultTile(
-                    selected: selectedId == ListBackgrounds.defaultId,
-                    accent: ListBackgrounds.predeterminado
-                        .resolveAccent(brightness),
-                    onTap: () => _settings
-                        .setListBackgroundId(ListBackgrounds.defaultId),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final compact = _FondoGridLayout.useDenseTiles(width);
+              final gradientColumns = _FondoGridLayout.gradientColumns(width);
+              final solidColumns = _FondoGridLayout.solidColumns(width);
+              final brandColumns = _FondoGridLayout.brandColumns(width);
+              final spacing = compact ? 10.0 : 12.0;
+
+              return Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: _FondoGridLayout.maxContentWidth,
                   ),
-                  for (final option in ListBackgrounds.gradients)
-                    _GradientTile(
-                      option: option,
-                      selected: selectedId == option.id,
-                      brightness: brightness,
-                      onTap: () => _settings.setListBackgroundId(option.id),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 28),
-              _SectionHeader(
-                title: 'Texturas',
-                subtitle: 'Fotos suaves teñidas con cada tono',
-                textTheme: textTheme,
-              ),
-              const SizedBox(height: 12),
-              GridView.count(
-                crossAxisCount: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.92,
-                children: [
-                  for (final option in ListBackgrounds.solids)
-                    _SolidTile(
-                      option: option,
-                      selected: selectedId == option.id,
-                      brightness: brightness,
-                      onTap: () => _settings.setListBackgroundId(option.id),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 28),
-              _SectionHeader(
-                title: 'Marca',
-                subtitle: 'Fondos ilustrados de la ranita',
-                textTheme: textTheme,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _BrandTile(
-                      label: 'Rosa',
-                      accent: ListBackgrounds.brandRosa
-                          .resolveAccent(brightness),
-                      selected: selectedId == ListBackgrounds.brandRosaId,
-                      child: Image.asset(
-                        ListBackgrounds.rosaAsset,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const ColoredBox(color: Color(0xFFF2327D)),
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, compact ? 24 : 36),
+                    children: [
+                      _SectionHeader(
+                        title: 'Colores',
+                        subtitle: 'Degradados suaves para la lista',
+                        textTheme: textTheme,
                       ),
-                      onTap: () => _settings
-                          .setListBackgroundId(ListBackgrounds.brandRosaId),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _BrandTile(
-                      label: 'Verde',
-                      accent: ListBackgrounds.brandVerde
-                          .resolveAccent(brightness),
-                      selected: selectedId == ListBackgrounds.brandVerdeId,
-                      child: ColoredBox(
-                        color: AppColors.primary00,
-                        child: Center(
-                          child: Image.asset(
-                            ListBackgrounds.frogAsset,
-                            width: 78,
-                            height: 78,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) =>
-                                const SizedBox.shrink(),
-                          ),
+                      SizedBox(height: compact ? 8 : 12),
+                      GridView.count(
+                        crossAxisCount: gradientColumns,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: spacing,
+                        crossAxisSpacing: spacing,
+                        childAspectRatio: _FondoGridLayout.gradientAspectRatio(
+                          gradientColumns,
                         ),
+                        children: [
+                          _DefaultTile(
+                            compact: compact,
+                            selected: selectedId == ListBackgrounds.defaultId,
+                            accent: ListBackgrounds.predeterminado
+                                .resolveAccent(brightness),
+                            onTap: () => _settings.setListBackgroundId(
+                              ListBackgrounds.defaultId,
+                            ),
+                          ),
+                          for (final option in ListBackgrounds.gradients)
+                            _GradientTile(
+                              compact: compact,
+                              option: option,
+                              selected: selectedId == option.id,
+                              brightness: brightness,
+                              onTap: () =>
+                                  _settings.setListBackgroundId(option.id),
+                            ),
+                        ],
                       ),
-                      onTap: () => _settings
-                          .setListBackgroundId(ListBackgrounds.brandVerdeId),
-                    ),
+                      SizedBox(height: compact ? 20 : 28),
+                      _SectionHeader(
+                        title: 'Texturas',
+                        subtitle: 'Fotos suaves teñidas con cada tono',
+                        textTheme: textTheme,
+                      ),
+                      SizedBox(height: compact ? 8 : 12),
+                      GridView.count(
+                        crossAxisCount: solidColumns,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: spacing,
+                        crossAxisSpacing: spacing,
+                        childAspectRatio: _FondoGridLayout.solidAspectRatio(
+                          solidColumns,
+                        ),
+                        children: [
+                          for (final option in ListBackgrounds.solids)
+                            _SolidTile(
+                              compact: compact,
+                              option: option,
+                              selected: selectedId == option.id,
+                              brightness: brightness,
+                              onTap: () =>
+                                  _settings.setListBackgroundId(option.id),
+                            ),
+                        ],
+                      ),
+                      SizedBox(height: compact ? 20 : 28),
+                      _SectionHeader(
+                        title: 'Marca',
+                        subtitle: 'Fondos ilustrados de la ranita',
+                        textTheme: textTheme,
+                      ),
+                      SizedBox(height: compact ? 8 : 12),
+                      GridView.count(
+                        crossAxisCount: brandColumns,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: spacing,
+                        crossAxisSpacing: spacing,
+                        childAspectRatio: 1.35,
+                        children: [
+                          _BrandTile(
+                            compact: compact,
+                            label: 'Rosa',
+                            accent: ListBackgrounds.brandRosa
+                                .resolveAccent(brightness),
+                            selected: selectedId == ListBackgrounds.brandRosaId,
+                            child: Image.asset(
+                              ListBackgrounds.rosaAsset,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  const ColoredBox(color: Color(0xFFF2327D)),
+                            ),
+                            onTap: () => _settings.setListBackgroundId(
+                              ListBackgrounds.brandRosaId,
+                            ),
+                          ),
+                          _BrandTile(
+                            compact: compact,
+                            label: 'Verde',
+                            accent: ListBackgrounds.brandVerde
+                                .resolveAccent(brightness),
+                            selected:
+                                selectedId == ListBackgrounds.brandVerdeId,
+                            child: ColoredBox(
+                              color: AppColors.primary00,
+                              child: Center(
+                                child: Image.asset(
+                                  ListBackgrounds.frogAsset,
+                                  width: compact ? 56 : 78,
+                                  height: compact ? 56 : 78,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) =>
+                                      const SizedBox.shrink(),
+                                ),
+                              ),
+                            ),
+                            onTap: () => _settings.setListBackgroundId(
+                              ListBackgrounds.brandVerdeId,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ],
+                ),
+              );
+            },
           );
         },
       ),
@@ -184,13 +252,15 @@ class _SelectionFrame extends StatelessWidget {
     required this.selected,
     required this.accent,
     required this.child,
+    this.compact = false,
   });
 
   final bool selected;
   final Color accent;
   final Widget child;
+  final bool compact;
 
-  static const _radius = 16.0;
+  double get _radius => compact ? 12 : 16;
 
   @override
   Widget build(BuildContext context) {
@@ -201,14 +271,14 @@ class _SelectionFrame extends StatelessWidget {
         borderRadius: BorderRadius.circular(_radius),
         border: Border.all(
           color: selected ? accent : AppColors.neutral20.withValues(alpha: 0.7),
-          width: selected ? 2.5 : 1,
+          width: selected ? 2 : 1,
         ),
         boxShadow: selected
             ? [
                 BoxShadow(
                   color: accent.withValues(alpha: 0.22),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+                  blurRadius: compact ? 6 : 10,
+                  offset: Offset(0, compact ? 2 : 3),
                 ),
               ]
             : null,
@@ -221,9 +291,9 @@ class _SelectionFrame extends StatelessWidget {
             child,
             if (selected)
               Positioned(
-                top: 8,
-                right: 8,
-                child: _CheckBadge(accent: accent),
+                top: compact ? 5 : 8,
+                right: compact ? 5 : 8,
+                child: _CheckBadge(accent: accent, compact: compact),
               ),
           ],
         ),
@@ -233,19 +303,21 @@ class _SelectionFrame extends StatelessWidget {
 }
 
 class _CheckBadge extends StatelessWidget {
-  const _CheckBadge({required this.accent});
+  const _CheckBadge({required this.accent, this.compact = false});
 
   final Color accent;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final size = compact ? 18.0 : 22.0;
     return Container(
-      width: 22,
-      height: 22,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: accent,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 1.5),
+        border: Border.all(color: Colors.white, width: compact ? 1.2 : 1.5),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
@@ -253,7 +325,7 @@ class _CheckBadge extends StatelessWidget {
           ),
         ],
       ),
-      child: const Icon(Icons.check, size: 13, color: Colors.white),
+      child: Icon(Icons.check, size: compact ? 11 : 13, color: Colors.white),
     );
   }
 }
@@ -263,20 +335,23 @@ class _DefaultTile extends StatelessWidget {
     required this.selected,
     required this.accent,
     required this.onTap,
+    this.compact = false,
   });
 
   final bool selected;
   final Color accent;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(compact ? 12 : 16),
       child: _SelectionFrame(
         selected: selected,
         accent: accent,
+        compact: compact,
         child: Builder(
           builder: (context) {
             final soft = Theme.of(context).colorScheme.primaryContainer;
@@ -292,19 +367,23 @@ class _DefaultTile extends StatelessWidget {
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(compact ? 8 : 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Icon(Icons.auto_awesome_outlined, size: 18, color: accent),
-                    const SizedBox(height: 6),
-                    const Text(
+                    Icon(
+                      Icons.auto_awesome_outlined,
+                      size: compact ? 14 : 18,
+                      color: accent,
+                    ),
+                    SizedBox(height: compact ? 4 : 6),
+                    Text(
                       'Predeterminado',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: AppColors.neutral100,
-                        fontSize: 13,
+                        fontSize: compact ? 11 : 13,
                       ),
                     ),
                   ],
@@ -324,12 +403,14 @@ class _GradientTile extends StatelessWidget {
     required this.selected,
     required this.brightness,
     required this.onTap,
+    this.compact = false,
   });
 
   final ListBackgroundOption option;
   final bool selected;
   final Brightness brightness;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -338,13 +419,15 @@ class _GradientTile extends StatelessWidget {
     final accent = option.resolveAccent(brightness);
     final darkLabel = option.prefersDarkLabel && brightness == Brightness.light;
     final labelColor = darkLabel ? AppColors.neutral100 : Colors.white;
+    final labelSize = compact ? 11.0 : 13.0;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(compact ? 12 : 16),
       child: _SelectionFrame(
         selected: selected,
         accent: accent,
+        compact: compact,
         child: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -383,7 +466,7 @@ class _GradientTile extends StatelessWidget {
                   ),
                 ),
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(compact ? 8 : 12),
                 child: Align(
                   alignment: Alignment.bottomLeft,
                   child: Text(
@@ -391,7 +474,7 @@ class _GradientTile extends StatelessWidget {
                     style: TextStyle(
                       color: labelColor,
                       fontWeight: FontWeight.w700,
-                      fontSize: 13,
+                      fontSize: labelSize,
                       shadows: darkLabel
                           ? null
                           : const [
@@ -415,12 +498,14 @@ class _SolidTile extends StatelessWidget {
     required this.selected,
     required this.brightness,
     required this.onTap,
+    this.compact = false,
   });
 
   final ListBackgroundOption option;
   final bool selected;
   final Brightness brightness;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -429,7 +514,7 @@ class _SolidTile extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(compact ? 12 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -437,6 +522,7 @@ class _SolidTile extends StatelessWidget {
             child: _SelectionFrame(
               selected: selected,
               accent: accent,
+              compact: compact,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -453,7 +539,7 @@ class _SolidTile extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: compact ? 4 : 6),
           Text(
             option.label,
             textAlign: TextAlign.center,
@@ -461,7 +547,7 @@ class _SolidTile extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-              fontSize: 12,
+              fontSize: compact ? 10 : 12,
               color: selected ? accent : AppColors.neutral80,
             ),
           ),
@@ -478,6 +564,7 @@ class _BrandTile extends StatelessWidget {
     required this.selected,
     required this.child,
     required this.onTap,
+    this.compact = false,
   });
 
   final String label;
@@ -485,30 +572,32 @@ class _BrandTile extends StatelessWidget {
   final bool selected;
   final Widget child;
   final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AspectRatio(
-          aspectRatio: 1.35,
+        Expanded(
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(compact ? 12 : 16),
             child: _SelectionFrame(
               selected: selected,
               accent: accent,
+              compact: compact,
               child: child,
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: compact ? 5 : 8),
         Text(
           label,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            fontSize: compact ? 11 : 14,
             color: selected ? accent : AppColors.neutral100,
           ),
         ),

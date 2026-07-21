@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../../global/themes/app_colors.dart';
 import '../../domain/notes_filter.dart';
 
 class FilterChipsBar extends StatelessWidget {
@@ -31,10 +30,10 @@ class FilterChipsBar extends StatelessWidget {
               onSelected: (_) => onFilterChanged(filter),
               selectedColor: scheme.primaryContainer,
               side: BorderSide(
-                color: isSelected ? scheme.primary : AppColors.neutral20,
+                color: isSelected ? scheme.primary : scheme.outline,
               ),
               labelStyle: TextStyle(
-                color: isSelected ? scheme.primary : AppColors.neutral80,
+                color: isSelected ? scheme.primary : scheme.onSurfaceVariant,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
               ),
             ),

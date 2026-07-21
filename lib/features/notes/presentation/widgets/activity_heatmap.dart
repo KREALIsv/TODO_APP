@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_surface.dart';
 import '../../../../global/themes/app_colors.dart';
 
 /// Shared layout math for [ActivityHeatmap] height and paint sizing.
@@ -26,6 +27,7 @@ class HeatmapLayout {
     double gap = 2.0,
     double dayLabelWidth = 12,
     double monthLabelHeight = 12,
+    double maxCellSize = double.infinity,
   }) {
     if (weeks <= 0 || width <= 0) return null;
 
@@ -41,7 +43,8 @@ class HeatmapLayout {
         ? ((gridBudget - gap * 6) / 7).clamp(0.0, double.infinity)
         : cellByWidth;
 
-    final cellSize = cellByWidth.clamp(0.0, maxCellByHeight);
+    final cellSize =
+        cellByWidth.clamp(0.0, maxCellByHeight).clamp(0.0, maxCellSize);
     if (hasHeightCap && maxHeight <= monthLabelHeight + monthToGridGap) {
       return null;
     }
@@ -50,6 +53,34 @@ class HeatmapLayout {
     final gridWidth = cellSize * weeks + gap * (weeks - 1);
     final naturalHeight = monthLabelHeight + monthToGridGap + gridHeight;
     final totalHeight = hasHeightCap ? maxHeight : naturalHeight;
+
+    return HeatmapLayout(
+      cellSize: cellSize,
+      gridHeight: gridHeight,
+      gridWidth: gridWidth,
+      totalHeight: totalHeight,
+    );
+  }
+
+  /// Fixed cell size — used in desktop sidebar so squares stay mobile-sized.
+  static HeatmapLayout forFixedCell({
+    required double cellSize,
+    required int weeks,
+    double gap = 2.0,
+    double monthLabelHeight = 12,
+  }) {
+    if (weeks <= 0 || cellSize <= 0) {
+      return HeatmapLayout(
+        cellSize: 0,
+        gridHeight: 0,
+        gridWidth: 0,
+        totalHeight: monthLabelHeight,
+      );
+    }
+
+    final gridHeight = cellSize * 7 + gap * 6;
+    final gridWidth = cellSize * weeks + gap * (weeks - 1);
+    final totalHeight = monthLabelHeight + monthToGridGap + gridHeight;
 
     return HeatmapLayout(
       cellSize: cellSize,
@@ -83,6 +114,7 @@ class HeatmapLayout {
     double gap = 3.0,
     double dayLabelWidth = 12,
     double minCell = 10,
+    double maxCellSize = double.infinity,
     int preferredMax = 26,
     int preferredMid = 18,
   }) {
@@ -92,6 +124,7 @@ class HeatmapLayout {
         weeks: weeks,
         gap: gap,
         dayLabelWidth: dayLabelWidth,
+        maxCellSize: maxCellSize,
       );
       if (layout != null && layout.cellSize >= minCell) return weeks;
     }
@@ -118,6 +151,7 @@ class ActivityHeatmap extends StatelessWidget {
     this.showDayNumbers = false,
     this.onCellTap,
     this.semanticsLabel,
+    this.fixedCellSize,
   });
 
   final List<int> cells;
@@ -126,6 +160,8 @@ class ActivityHeatmap extends StatelessWidget {
   final double gap;
   final double dayLabelWidth;
   final double monthLabelHeight;
+  /// When set, cell size stays fixed (desktop sidebar) instead of filling width.
+  final double? fixedCellSize;
   /// When true, labels every row (L–D) so each square maps to a weekday.
   final bool showAllWeekdayLabels;
   /// Opt-in calendar day numbers inside each cell (Profile / settings).
@@ -169,7 +205,20 @@ class ActivityHeatmap extends StatelessWidget {
       );
 
   static Color colorForCount(int count, ColorScheme scheme) {
-    if (count <= 0) return AppColors.neutral00;
+    final isDark = scheme.brightness == Brightness.dark;
+
+    if (count <= 0) {
+      return AppSurface.heatmapEmpty(scheme);
+    }
+
+    if (isDark) {
+      // Darker greens that read on #2D333B card surfaces.
+      if (count == 1) return AppColors.primary80.withValues(alpha: 0.45);
+      if (count < 10) return AppColors.primary80; // 2–9
+      if (count < 30) return scheme.primary; // 10–29
+      return AppColors.primary40; // 30+
+    }
+
     // Wider bands so the darkest green is reserved for very active days.
     // Thresholds mirror [legendSampleCounts]: 0 / 1 / 5 / 15 / 30.
     if (count == 1) return AppColors.primary20;
@@ -230,8 +279,11 @@ class ActivityHeatmap extends StatelessWidget {
   Widget build(BuildContext context) {
     assert(cells.length == weeks * 7);
     final scheme = Theme.of(context).colorScheme;
+    final labelColor = scheme.brightness == Brightness.dark
+        ? scheme.onSurfaceVariant
+        : AppColors.neutral60;
     final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: AppColors.neutral60,
+          color: labelColor,
           fontSize: 9,
           height: 1,
         );
@@ -253,20 +305,30 @@ class ActivityHeatmap extends StatelessWidget {
                 monthLabelHeight: monthLabelHeight,
               );
 
-        final layout = HeatmapLayout.forConstraints(
-          width: width,
-          weeks: weeks,
-          maxHeight: maxHeight,
-          gap: gap,
-          dayLabelWidth: dayLabelWidth,
-          monthLabelHeight: monthLabelHeight,
-        );
+        final layout = fixedCellSize != null
+            ? HeatmapLayout.forFixedCell(
+                cellSize: fixedCellSize!,
+                weeks: weeks,
+                gap: gap,
+                monthLabelHeight: monthLabelHeight,
+              )
+            : HeatmapLayout.forConstraints(
+                width: width,
+                weeks: weeks,
+                maxHeight: maxHeight,
+                gap: gap,
+                dayLabelWidth: dayLabelWidth,
+                monthLabelHeight: monthLabelHeight,
+              );
         if (layout == null) return const SizedBox.shrink();
 
         final cell = layout.cellSize;
+        final contentWidth = fixedCellSize != null
+            ? dayLabelWidth + HeatmapLayout.dayLabelGap + layout.gridWidth
+            : width;
 
         Widget grid = SizedBox(
-          width: width,
+          width: contentWidth,
           height: layout.totalHeight,
           child: Stack(
             clipBehavior: Clip.hardEdge,
@@ -392,7 +454,11 @@ class _HeatmapPainter extends CustomPainter {
   final bool showDayNumbers;
 
   /// Empty / pale-green cells keep a soft gray label; stronger fills use white.
-  static Color _labelColorFor(int count) {
+  static Color _labelColorFor(int count, ColorScheme scheme) {
+    if (scheme.brightness == Brightness.dark) {
+      if (count <= 1) return scheme.onSurfaceVariant;
+      return count < 30 ? AppColors.white : AppColors.neutral100;
+    }
     return count <= 1 ? AppColors.neutral60 : AppColors.white;
   }
 
@@ -422,7 +488,7 @@ class _HeatmapPainter extends CustomPainter {
           text: TextSpan(
             text: '${date.day}',
             style: TextStyle(
-              color: _labelColorFor(count),
+              color: _labelColorFor(count, scheme),
               fontSize: fontSize,
               fontWeight: FontWeight.w500,
               height: 1,

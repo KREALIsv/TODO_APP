@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
+import '../../../core/theme/app_surface.dart';
 import '../../../global/constants/config.dart';
 import '../../../global/themes/app_colors.dart';
 import '../../../global/widgets/app_alerts.dart';
@@ -20,6 +21,7 @@ class SettingsScreen extends StatelessWidget {
     this.repository,
     this.settings,
     this.onResetSelectedDay,
+    this.embedded = false,
   });
 
   final NotesRepository? repository;
@@ -27,6 +29,7 @@ class SettingsScreen extends StatelessWidget {
 
   /// Restores the home day selector to today, then returns to the root route.
   final VoidCallback? onResetSelectedDay;
+  final bool embedded;
 
   NotesRepository get _repo => repository ?? NotesRepository.instance;
   SettingsRepository get _settings => settings ?? SettingsRepository.instance;
@@ -34,6 +37,7 @@ class SettingsScreen extends StatelessWidget {
   void _goToToday(BuildContext context) {
     onResetSelectedDay?.call();
     if (!context.mounted) return;
+    if (embedded) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
@@ -181,152 +185,172 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final inner = ListenableBuilder(
+      listenable: _settings,
+      builder: (context, _) {
+        final bg = _settings.listBackground;
+        final brightness = Theme.of(context).brightness;
+        final accent = bg.resolveAccent(brightness);
+        return ValueListenableBuilder<Box<Map>>(
+          valueListenable: _repo.listenable(),
+          builder: (context, box, _) {
+            final archivedCount = _repo.getArchived().length;
+            return ListView(
+              padding: EdgeInsets.fromLTRB(16, embedded ? 8 : 16, 16, 32),
+              children: _settingsSections(
+                context: context,
+                textTheme: textTheme,
+                accent: accent,
+                archivedCount: archivedCount,
+                listBackground: bg,
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    final content = embedded
+        ? inner
+        : ListBackgroundScaffoldBody(settings: _settings, child: inner);
+
+    if (embedded) return content;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Ajustes'),
-        backgroundColor: isDark ? const Color(0xFF1C2128) : AppColors.white,
+        backgroundColor: AppSurface.panelOverlay(context),
         surfaceTintColor: Colors.transparent,
       ),
-      body: ListBackgroundScaffoldBody(
-        settings: _settings,
-        child: ListenableBuilder(
-          listenable: _settings,
-          builder: (context, _) {
-            final bg = _settings.listBackground;
-            final brightness = Theme.of(context).brightness;
-            final accent = bg.resolveAccent(brightness);
-            return ValueListenableBuilder<Box<Map>>(
-              valueListenable: _repo.listenable(),
-              builder: (context, box, _) {
-                final archivedCount = _repo.getArchived().length;
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                  children: [
-                    SettingsSectionLabel(
-                      label: 'Apariencia',
-                      textTheme: textTheme,
-                      accent: accent,
-                    ),
-                    SettingsCard(
-                      children: [
-                        SettingsRow(
-                          icon: Icons.brightness_6_outlined,
-                          title: 'Tema',
-                          trailing: _settings.themeModeLabel,
-                          accent: accent,
-                          onTap: () => _pickTheme(context),
-                        ),
-                        const SettingsDivider(),
-                        SettingsRow(
-                          icon: Icons.wallpaper_outlined,
-                          title: 'Fondo de la lista',
-                          trailingWidget: _BackgroundSwatch(option: bg),
-                          accent: accent,
-                          onTap: () => _openFondo(context),
-                        ),
-                        const SettingsDivider(),
-                        SettingsRow(
-                          icon: Icons.calendar_view_month_outlined,
-                          title: 'Números en el heatmap',
-                          trailing: _settings.showHeatmapDayNumbersLabel,
-                          accent: accent,
-                          onTap: () => _pickHeatmapDayNumbers(context),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    SettingsSectionLabel(
-                      label: 'Organización',
-                      textTheme: textTheme,
-                      accent: accent,
-                    ),
-                    SettingsCard(
-                      children: [
-                        SettingsRow(
-                          icon: Icons.inventory_2_outlined,
-                          title: 'Archivadas',
-                          trailing: archivedCount > 0 ? '$archivedCount' : null,
-                          accent: accent,
-                          onTap: () => _openArchived(context),
-                        ),
-                        if (onResetSelectedDay != null) ...[
-                          const SettingsDivider(),
-                          SettingsRow(
-                            icon: Icons.today_outlined,
-                            title: 'Ir a hoy',
-                            trailing: 'Restaurar fecha',
-                            accent: accent,
-                            onTap: () => _goToToday(context),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    SettingsSectionLabel(
-                      label: 'Datos',
-                      textTheme: textTheme,
-                      accent: accent,
-                    ),
-                    SettingsCard(
-                      children: [
-                        SettingsRow(
-                          icon: Icons.upload_outlined,
-                          title: 'Exportar datos',
-                          accent: accent,
-                          onTap: () => _export(context),
-                        ),
-                        const SettingsDivider(),
-                        SettingsRow(
-                          icon: Icons.download_outlined,
-                          title: 'Importar datos',
-                          accent: accent,
-                          onTap: () => _import(context),
-                        ),
-                        const SettingsDivider(),
-                        SettingsRow(
-                          icon: Icons.delete_forever_outlined,
-                          title: 'Borrar todos los datos',
-                          iconColor: AppColors.error,
-                          titleColor: AppColors.error,
-                          onTap: () => _wipe(context),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    SettingsSectionLabel(
-                      label: 'Acerca de',
-                      textTheme: textTheme,
-                      accent: accent,
-                    ),
-                    SettingsCard(
-                      children: [
-                        SettingsRow(
-                          icon: Icons.info_outline,
-                          title: 'Acerca de esta app',
-                          accent: accent,
-                          onTap: () => _openAbout(context),
-                        ),
-                        const SettingsDivider(),
-                        SettingsRow(
-                          icon: Icons.tag_outlined,
-                          title: 'Versión',
-                          trailing: Config.version,
-                          accent: accent,
-                          showChevron: false,
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        ),
-      ),
+      body: content,
     );
+  }
+
+  List<Widget> _settingsSections({
+    required BuildContext context,
+    required TextTheme textTheme,
+    required Color accent,
+    required int archivedCount,
+    required ListBackgroundOption listBackground,
+  }) {
+    return [
+      SettingsSectionLabel(
+        label: 'Apariencia',
+        textTheme: textTheme,
+        accent: accent,
+      ),
+      SettingsCard(
+        children: [
+          SettingsRow(
+            icon: Icons.brightness_6_outlined,
+            title: 'Tema',
+            trailing: _settings.themeModeLabel,
+            accent: accent,
+            onTap: () => _pickTheme(context),
+          ),
+          const SettingsDivider(),
+          SettingsRow(
+            icon: Icons.wallpaper_outlined,
+            title: 'Fondo de la lista',
+            trailingWidget: _BackgroundSwatch(option: listBackground),
+            accent: accent,
+            onTap: () => _openFondo(context),
+          ),
+          const SettingsDivider(),
+          SettingsRow(
+            icon: Icons.calendar_view_month_outlined,
+            title: 'Números en el heatmap',
+            trailing: _settings.showHeatmapDayNumbersLabel,
+            accent: accent,
+            onTap: () => _pickHeatmapDayNumbers(context),
+          ),
+        ],
+      ),
+      const SizedBox(height: 20),
+      SettingsSectionLabel(
+        label: 'Organización',
+        textTheme: textTheme,
+        accent: accent,
+      ),
+      SettingsCard(
+        children: [
+          SettingsRow(
+            icon: Icons.inventory_2_outlined,
+            title: 'Archivadas',
+            trailing: archivedCount > 0 ? '$archivedCount' : null,
+            accent: accent,
+            onTap: () => _openArchived(context),
+          ),
+          if (onResetSelectedDay != null) ...[
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.today_outlined,
+              title: 'Ir a hoy',
+              trailing: 'Restaurar fecha',
+              accent: accent,
+              onTap: () => _goToToday(context),
+            ),
+          ],
+        ],
+      ),
+      const SizedBox(height: 20),
+      SettingsSectionLabel(
+        label: 'Datos',
+        textTheme: textTheme,
+        accent: accent,
+      ),
+      SettingsCard(
+        children: [
+          SettingsRow(
+            icon: Icons.upload_outlined,
+            title: 'Exportar datos',
+            accent: accent,
+            onTap: () => _export(context),
+          ),
+          const SettingsDivider(),
+          SettingsRow(
+            icon: Icons.download_outlined,
+            title: 'Importar datos',
+            accent: accent,
+            onTap: () => _import(context),
+          ),
+          const SettingsDivider(),
+          SettingsRow(
+            icon: Icons.delete_forever_outlined,
+            title: 'Borrar todos los datos',
+            iconColor: AppColors.error,
+            titleColor: AppColors.error,
+            onTap: () => _wipe(context),
+          ),
+        ],
+      ),
+      const SizedBox(height: 20),
+      SettingsSectionLabel(
+        label: 'Acerca de',
+        textTheme: textTheme,
+        accent: accent,
+      ),
+      SettingsCard(
+        children: [
+          SettingsRow(
+            icon: Icons.info_outline,
+            title: 'Acerca de esta app',
+            accent: accent,
+            onTap: () => _openAbout(context),
+          ),
+          const SettingsDivider(),
+          SettingsRow(
+            icon: Icons.tag_outlined,
+            title: 'Versión',
+            trailing: Config.version,
+            accent: accent,
+            showChevron: false,
+          ),
+        ],
+      ),
+    ];
   }
 }
 

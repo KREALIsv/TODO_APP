@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
-import '../../../global/themes/app_colors.dart';
+import '../../../core/layout/adaptive_breakpoints.dart';
+import '../../../core/theme/app_surface.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/date_only.dart';
@@ -23,6 +24,7 @@ import '../../notes/presentation/widgets/task_section_header.dart';
 import '../../profile/presentation/profile_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../settings/presentation/widgets/list_background_layer.dart';
+import '../../shell/presentation/desktop_panel_state.dart';
 import 'widgets/day_selector_header.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -30,10 +32,24 @@ class HomeScreen extends StatefulWidget {
     super.key,
     this.repository,
     this.dayEntriesRepository,
+    this.activeFilter,
+    this.onFilterChanged,
+    this.embeddedInShell = false,
+    this.onOpenSettings,
+    this.onRegisterDayReset,
+    this.onOpenNoteEditor,
+    this.selectedNoteId,
   });
 
   final NotesRepository? repository;
   final DayEntriesRepository? dayEntriesRepository;
+  final NotesFilter? activeFilter;
+  final ValueChanged<NotesFilter>? onFilterChanged;
+  final bool embeddedInShell;
+  final VoidCallback? onOpenSettings;
+  final ValueChanged<VoidCallback>? onRegisterDayReset;
+  final ValueChanged<NoteEditorRequest>? onOpenNoteEditor;
+  final String? selectedNoteId;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -53,6 +69,25 @@ class _HomeScreenState extends State<HomeScreen> {
   late DateTime _selectedDay;
   DateTime? _backfillRequestedFor;
 
+  NotesFilter get _effectiveFilter => widget.activeFilter ?? _activeFilter;
+
+  void _setActiveFilter(NotesFilter filter) {
+    if (widget.onFilterChanged != null) {
+      widget.onFilterChanged!(filter);
+    } else {
+      setState(() => _activeFilter = filter);
+    }
+    _resetSectionExpansion();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.activeFilter != null &&
+        widget.activeFilter != oldWidget.activeFilter) {
+      _resetSectionExpansion();
+    }
+  }
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
   DayEntriesRepository get _dayEntries =>
       widget.dayEntriesRepository ?? DayEntriesRepository.instance;
@@ -75,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
     _clock.start();
+    widget.onRegisterDayReset?.call(_resetSelectedDayToToday);
   }
 
   @override
@@ -121,11 +157,15 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
     if (filter != null && mounted) {
-      setState(() => _activeFilter = filter);
+      _setActiveFilter(filter);
     }
   }
 
   Future<void> _openSettings(BuildContext context) {
+    if (widget.onOpenSettings != null) {
+      widget.onOpenSettings!();
+      return Future.value();
+    }
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SettingsScreen(
@@ -136,13 +176,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  bool get _fabCreatesTask => _activeFilter == NotesFilter.tasks;
+  bool get _fabCreatesTask => _effectiveFilter == NotesFilter.tasks;
 
   Future<void> _openEditor(
     BuildContext context, {
     NoteItem? item,
     NoteType initialType = NoteType.note,
   }) {
+    if (widget.onOpenNoteEditor != null) {
+      widget.onOpenNoteEditor!(
+        NoteEditorRequest(item: item, initialType: initialType),
+      );
+      return Future.value();
+    }
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => NoteEditorScreen(
@@ -155,6 +201,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openNoteComposeSheet(BuildContext context) {
+    if (widget.onOpenNoteEditor != null) {
+      return _openEditor(context, initialType: NoteType.note);
+    }
     return showNoteComposeSheet(context, repository: _repo);
   }
 
@@ -188,7 +237,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget _buildEmptyState(String message, TextTheme textTheme) {
+  Widget _buildEmptyState(
+    BuildContext context,
+    String message,
+    TextTheme textTheme,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
     return SliverFillRemaining(
       hasScrollBody: false,
       child: Center(
@@ -202,13 +256,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? Icons.search_off_outlined
                     : Icons.edit_note_outlined,
                 size: 48,
-                color: AppColors.neutral40,
+                color: scheme.onSurfaceVariant,
               ),
               const SizedBox(height: 12),
               Text(
                 message,
                 style: textTheme.bodyLarge?.copyWith(
-                  color: AppColors.neutral60,
+                  color: scheme.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -233,6 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return SwipeableNoteCard(
             item: item,
             repository: _repo,
+            selected: widget.selectedNoteId == item.id,
             onTap: () => onTap(item),
           );
         },
@@ -292,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            Container(height: 1, color: AppColors.neutral20),
+            Container(height: 1, color: AppSurface.divider(context)),
           ],
         ),
       );
@@ -300,43 +355,52 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return PreferredSize(
       preferredSize: const Size.fromHeight(1),
-      child: Container(height: 1, color: AppColors.neutral20),
+      child: Container(height: 1, color: AppSurface.divider(context)),
     );
   }
 
   Widget _buildSliverAppBar(TextTheme textTheme, String searchQuery) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final barColor = isDark ? const Color(0xFF1C2128) : AppColors.white;
+    final showProfileLeading = !widget.embeddedInShell;
+    final showSettingsAction = widget.embeddedInShell
+        ? false
+        : AdaptiveBreakpoints.showDesktopAffordances(context);
 
     return SliverAppBar(
       pinned: true,
       floating: false,
       centerTitle: true,
+      toolbarHeight: kToolbarHeight,
       titleSpacing: 0,
-      leadingWidth: 56,
-      backgroundColor: barColor,
+      leadingWidth: showProfileLeading ? 56 : 16,
+      backgroundColor: AppSurface.panelOverlay(context),
       surfaceTintColor: Colors.transparent,
-      leading: Center(
-        child: Tooltip(
-          message: 'Perfil · mantén para Ajustes',
-          child: InkWell(
-            onTap: () => _openProfile(context),
-            onLongPress: () => _openSettings(context),
-            customBorder: const CircleBorder(),
-            child: CircleAvatar(
-              radius: 18,
-              backgroundColor: scheme.primaryContainer,
-              child: Icon(
-                Icons.person_outline,
-                color: scheme.primary,
-                size: 20,
+      leading: showProfileLeading
+          ? Center(
+              child: Tooltip(
+                message: showSettingsAction
+                    ? 'Perfil'
+                    : 'Perfil · mantén para Ajustes',
+                child: InkWell(
+                  onTap: () => _openProfile(context),
+                  onLongPress: showSettingsAction
+                      ? null
+                      : () => _openSettings(context),
+                  customBorder: const CircleBorder(),
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: scheme.primaryContainer,
+                    child: Icon(
+                      Icons.person_outline,
+                      color: scheme.primary,
+                      size: 20,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
-      ),
+            )
+          : null,
       title: DaySelectorHeader(
         selectedDay: _selectedDay,
         today: _now,
@@ -346,12 +410,23 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       actions: [
+        if (showSettingsAction)
+          IconButton(
+            tooltip: 'Ajustes',
+            onPressed: () => _openSettings(context),
+            icon: Icon(
+              Icons.settings_outlined,
+              color: AppSurface.secondary(context),
+            ),
+          ),
         IconButton(
           tooltip: _isSearchExpanded ? 'Cerrar búsqueda' : 'Buscar',
           onPressed: _toggleSearch,
           icon: Icon(
             _isSearchExpanded ? Icons.close : Icons.search,
-            color: _isSearchExpanded ? scheme.primary : AppColors.neutral60,
+            color: _isSearchExpanded
+                ? scheme.primary
+                : AppSurface.secondary(context),
           ),
         ),
       ],
@@ -365,22 +440,22 @@ class _HomeScreenState extends State<HomeScreen> {
     required List<NoteItem> all,
   }) {
     final useSectioned = NotesQuery.useSectionedLayout(
-      filter: _activeFilter,
+      filter: _effectiveFilter,
       searchQuery: searchQuery,
     );
     final useGrouped = NotesQuery.useGroupedTasksLayout(
-      filter: _activeFilter,
+      filter: _effectiveFilter,
       searchQuery: searchQuery,
     );
     final filtered = NotesQuery.apply(
       items: all,
-      filter: _activeFilter,
+      filter: _effectiveFilter,
       searchQuery: searchQuery,
     );
     final pinned = NotesQuery.pinnedFrom(filtered);
     final ofDay = NotesQuery.ofDayFrom(filtered, _now, now: _now);
     final emptyMessage = NotesQuery.emptyMessage(
-      filter: _activeFilter,
+      filter: _effectiveFilter,
       searchQuery: searchQuery,
       hasAnyItems: all.isNotEmpty,
     );
@@ -398,13 +473,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: FilterChipsBar(
-            activeFilter: _activeFilter,
-            onFilterChanged: (filter) {
-              setState(() {
-                _activeFilter = filter;
-                _resetSectionExpansion();
-              });
-            },
+            activeFilter: _effectiveFilter,
+            onFilterChanged: _setActiveFilter,
           ),
         ),
       ),
@@ -415,6 +485,7 @@ class _HomeScreenState extends State<HomeScreen> {
           repository: _repo,
           textTheme: textTheme,
           expansion: _groupedExpansion,
+          selectedNoteId: widget.selectedNoteId,
           onToggleSection: (section) {
             setState(() {
               _groupedExpansion = _groupedExpansion.toggle(section);
@@ -423,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
         )
       else if (filtered.isEmpty ||
           (useGrouped && groups != null && groups.isEmpty))
-        _buildEmptyState(emptyMessage, textTheme)
+        _buildEmptyState(context, emptyMessage, textTheme)
       else if (useSectioned) ...() {
         final hasPinned = pinned.isNotEmpty;
         final collapsible = hasPinned;
@@ -473,7 +544,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _buildSectionHeader(
           searchQuery.trim().isNotEmpty
               ? 'Resultados'
-              : _activeFilter.listHeader,
+              : _effectiveFilter.listHeader,
           collapsible: false,
           expanded: true,
           onToggle: () {},
@@ -521,51 +592,21 @@ class _HomeScreenState extends State<HomeScreen> {
     final isLiveDay = selected == today;
     final isPastDay = selected.isBefore(today);
 
+    final scrollBody = _buildScrollBody(
+      textTheme: textTheme,
+      searchQuery: searchQuery,
+      isLiveDay: isLiveDay,
+      isPastDay: isPastDay,
+      selected: selected,
+    );
+
+    final body = widget.embeddedInShell
+        ? scrollBody
+        : ListBackgroundScaffoldBody(child: scrollBody);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: ListBackgroundScaffoldBody(
-        child: SafeArea(
-          top: false,
-          child: ValueListenableBuilder<Box<Map>>(
-            valueListenable: _repo.listenable(),
-            builder: (context, notesBox, _) {
-              return ValueListenableBuilder<Box<Map>>(
-                valueListenable: _dayEntries.listenable(),
-                builder: (context, dayBox, _) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) _clock.schedule();
-                  });
-
-                  final isArchivedFilter =
-                      _activeFilter == NotesFilter.archived;
-                  final all = isArchivedFilter
-                      ? _repo.getArchived()
-                      : _repo.getAll();
-
-                  final bodySlivers = isLiveDay
-                      ? _buildLiveBodySlivers(
-                          textTheme: textTheme,
-                          searchQuery: searchQuery,
-                          all: all,
-                        )
-                      : isPastDay
-                          ? _buildReplaySlivers(selected)
-                          : _buildPlanSlivers(selected);
-
-                  return SlidableAutoCloseBehavior(
-                    child: CustomScrollView(
-                      slivers: [
-                        _buildSliverAppBar(textTheme, searchQuery),
-                        ...bodySlivers,
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ),
+      body: body,
       floatingActionButton: isLiveDay
           ? Tooltip(
               message: _fabCreatesTask ? 'Nueva tarea' : 'Nueva nota',
@@ -585,6 +626,55 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             )
           : null,
+    );
+  }
+
+  Widget _buildScrollBody({
+    required TextTheme textTheme,
+    required String searchQuery,
+    required bool isLiveDay,
+    required bool isPastDay,
+    required DateTime selected,
+  }) {
+    return SafeArea(
+      top: false,
+      child: ValueListenableBuilder<Box<Map>>(
+        valueListenable: _repo.listenable(),
+        builder: (context, notesBox, _) {
+          return ValueListenableBuilder<Box<Map>>(
+            valueListenable: _dayEntries.listenable(),
+            builder: (context, dayBox, _) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _clock.schedule();
+              });
+
+              final isArchivedFilter =
+                  _effectiveFilter == NotesFilter.archived;
+              final all =
+                  isArchivedFilter ? _repo.getArchived() : _repo.getAll();
+
+              final bodySlivers = isLiveDay
+                  ? _buildLiveBodySlivers(
+                      textTheme: textTheme,
+                      searchQuery: searchQuery,
+                      all: all,
+                    )
+                  : isPastDay
+                      ? _buildReplaySlivers(selected)
+                      : _buildPlanSlivers(selected);
+
+              return SlidableAutoCloseBehavior(
+                child: CustomScrollView(
+                  slivers: [
+                    _buildSliverAppBar(textTheme, searchQuery),
+                    ...bodySlivers,
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

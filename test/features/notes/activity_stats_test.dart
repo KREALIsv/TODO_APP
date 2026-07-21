@@ -293,6 +293,21 @@ void main() {
       );
     });
 
+    test('dark mode uses theme-aware empty and activity colors', () {
+      const scheme = ColorScheme.dark();
+      expect(
+        ActivityHeatmap.colorForCount(0, scheme),
+        scheme.outlineVariant,
+      );
+      expect(
+        ActivityHeatmap.colorForCount(1, scheme),
+        AppColors.primary80.withValues(alpha: 0.45),
+      );
+      expect(ActivityHeatmap.colorForCount(5, scheme), AppColors.primary80);
+      expect(ActivityHeatmap.colorForCount(15, scheme), scheme.primary);
+      expect(ActivityHeatmap.colorForCount(30, scheme), AppColors.primary40);
+    });
+
     test('weeksForMinCell prefers 26 then 18 then smaller', () {
       expect(
         HeatmapLayout.weeksForMinCell(width: 900, gap: 3, minCell: 10),

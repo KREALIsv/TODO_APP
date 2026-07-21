@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_surface.dart';
 import '../../../../global/themes/app_colors.dart';
 import '../../../../global/themes/tokens.dart';
 import '../../data/notes_repository.dart';
@@ -184,7 +185,7 @@ class NoteCard extends StatelessWidget {
 
     if (flat) {
       return Material(
-        color: AppColors.white,
+        color: AppSurface.card(context),
         child: content,
       );
     }

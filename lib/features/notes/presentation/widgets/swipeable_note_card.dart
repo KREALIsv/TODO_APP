@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
+import '../../../../core/theme/app_surface.dart';
 import '../../../../global/themes/app_colors.dart';
 import '../../../../global/themes/tokens.dart';
 import '../../../../global/widgets/app_alerts.dart';
@@ -17,12 +18,14 @@ class SwipeableNoteCard extends StatelessWidget {
     required this.onTap,
     this.repository,
     this.enableSwipe = true,
+    this.selected = false,
   });
 
   final NoteItem item;
   final VoidCallback onTap;
   final NotesRepository? repository;
   final bool enableSwipe;
+  final bool selected;
 
   NotesRepository get _repo => repository ?? NotesRepository.instance;
 
@@ -167,10 +170,13 @@ class SwipeableNoteCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: AppColors.white,
+        color: AppSurface.card(context),
         shape: RoundedRectangleBorder(
           borderRadius: ThemeTokens.borderRadius,
-          side: const BorderSide(color: AppColors.neutral20),
+          side: BorderSide(
+            color: selected ? accent : AppColors.neutral20,
+            width: selected ? 2 : 1,
+          ),
         ),
         clipBehavior: Clip.antiAlias,
         child: Slidable(

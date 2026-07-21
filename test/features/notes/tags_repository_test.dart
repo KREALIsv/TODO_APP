@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 import 'package:todos_app/features/notes/data/tags_repository.dart';
 import 'package:todos_app/features/notes/domain/default_tags.dart';

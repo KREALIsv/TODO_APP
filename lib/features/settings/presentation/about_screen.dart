@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../core/theme/app_surface.dart';
 import '../../../global/constants/config.dart';
 import '../../../global/themes/app_colors.dart';
 
@@ -10,12 +11,11 @@ class AboutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Acerca de'),
-        backgroundColor: isDark ? const Color(0xFF1C2128) : AppColors.white,
+        backgroundColor: AppSurface.panelOverlay(context),
         surfaceTintColor: Colors.transparent,
       ),
       body: FutureBuilder<PackageInfo>(

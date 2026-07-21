@@ -232,7 +232,7 @@ class ListBackgrounds {
     label: 'Verde',
     kind: ListBackgroundKind.brandVerde,
     lightColor: AppColors.primary00,
-    darkColor: AppColors.primary00,
+    darkColor: Color(0xFF1A3330),
     lightAccent: AppColors.primary80,
     darkAccent: AppColors.primary40,
   );

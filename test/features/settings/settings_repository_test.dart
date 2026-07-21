@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive.dart';
 
 import 'package:todos_app/features/settings/data/settings_repository.dart';
 import 'package:todos_app/features/settings/domain/list_background.dart';

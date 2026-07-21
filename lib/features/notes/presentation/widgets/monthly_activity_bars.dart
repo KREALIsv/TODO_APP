@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../global/themes/app_colors.dart';
+import '../../../../core/theme/app_surface.dart';
 import '../../domain/activity_stats.dart';
 import 'activity_heatmap.dart';
 
@@ -28,18 +28,14 @@ class MonthlyActivityBars extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.neutral20),
-      ),
+      decoration: AppSurface.cardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             'Registros mensuales',
             style: textTheme.labelLarge?.copyWith(
-              color: AppColors.neutral100,
+              color: AppSurface.title(context),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -62,7 +58,7 @@ class MonthlyActivityBars extends StatelessWidget {
                         barWidth: barWidth,
                         scheme: scheme,
                         labelStyle: textTheme.labelSmall?.copyWith(
-                          color: AppColors.neutral60,
+                          color: AppSurface.secondary(context),
                           fontSize: 10,
                           height: 1,
                         ),

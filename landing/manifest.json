@@ -1,0 +1,31 @@
+{
+  "name": "Wodo",
+  "short_name": "Wodo",
+  "description": "Captura notas y tareas al instante. Tu inbox personal para ideas, recordatorios y acciones — en Android, iOS y web.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "browser",
+  "background_color": "#F2327D",
+  "theme_color": "#F2327D",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_surface.dart';
 import '../../../../global/themes/app_colors.dart';
 
 class SettingsSectionLabel extends StatelessWidget {
@@ -38,15 +39,8 @@ class SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF2D333B) : AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? const Color(0xFF444C56) : AppColors.neutral20,
-        ),
-      ),
+      decoration: AppSurface.cardDecoration(context),
       child: Column(children: children),
     );
   }
@@ -57,10 +51,9 @@ class SettingsDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Divider(
       height: 1,
-      color: isDark ? const Color(0xFF444C56) : AppColors.neutral20,
+      color: AppSurface.divider(context),
     );
   }
 }
@@ -94,7 +87,6 @@ class SettingsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final resolvedIcon =
         iconColor ?? accent ?? Theme.of(context).colorScheme.primary;
 
@@ -115,8 +107,7 @@ class SettingsRow extends StatelessWidget {
               child: Text(
                 title,
                 style: textTheme.titleSmall?.copyWith(
-                  color: titleColor ??
-                      (isDark ? const Color(0xFFE6EDF3) : AppColors.neutral100),
+                  color: titleColor ?? AppSurface.title(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_surface.dart';
 import '../themes/app_colors.dart';
 import '../themes/tokens.dart';
 
@@ -145,7 +146,7 @@ class _AppAlertDialog extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: ThemeTokens.borderRadius,
       ),
-      backgroundColor: AppColors.white,
+      backgroundColor: AppSurface.card(context),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
         child: Column(

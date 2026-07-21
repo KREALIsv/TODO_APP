@@ -85,7 +85,7 @@ class BackgroundPalette {
         style: ButtonStyle(
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) {
-              return AppColors.neutral20;
+              return scheme.outline;
             }
             return accent;
           }),
@@ -96,7 +96,7 @@ class BackgroundPalette {
         style: ButtonStyle(
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) {
-              return AppColors.neutral20;
+              return scheme.outline;
             }
             return accent;
           }),

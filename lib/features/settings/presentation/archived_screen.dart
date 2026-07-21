@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
+import '../../../core/theme/app_surface.dart';
 import '../../../global/themes/app_colors.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/note_item.dart';
@@ -29,13 +30,12 @@ class ArchivedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Archivadas'),
-        backgroundColor: isDark ? const Color(0xFF1C2128) : AppColors.white,
+        backgroundColor: AppSurface.panelOverlay(context),
         surfaceTintColor: Colors.transparent,
       ),
       body: ListBackgroundScaffoldBody(

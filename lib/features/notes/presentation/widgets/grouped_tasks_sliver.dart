@@ -43,6 +43,7 @@ List<Widget> buildGroupedTasksSlivers({
   TextTheme? textTheme,
   GroupedTasksExpansion expansion = const GroupedTasksExpansion(),
   void Function(GroupedTasksSection section)? onToggleSection,
+  String? selectedNoteId,
 }) {
   final hasOther =
       groups.upcoming.isNotEmpty || groups.undated.isNotEmpty;
@@ -95,6 +96,7 @@ List<Widget> buildGroupedTasksSlivers({
           items: groups.today,
           onOpen: onOpen,
           repository: repository,
+          selectedNoteId: selectedNoteId,
         ),
       );
     }
@@ -116,6 +118,7 @@ List<Widget> buildGroupedTasksSlivers({
           items: groups.upcoming,
           onOpen: onOpen,
           repository: repository,
+          selectedNoteId: selectedNoteId,
         ),
       );
     }
@@ -137,6 +140,7 @@ List<Widget> buildGroupedTasksSlivers({
           items: groups.undated,
           onOpen: onOpen,
           repository: repository,
+          selectedNoteId: selectedNoteId,
         ),
       );
     }
@@ -150,6 +154,7 @@ Widget _taskListSliver({
   required List<NoteItem> items,
   required void Function(NoteItem item) onOpen,
   NotesRepository? repository,
+  String? selectedNoteId,
 }) {
   return SliverPadding(
     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -160,6 +165,7 @@ Widget _taskListSliver({
         return SwipeableNoteCard(
           item: item,
           repository: repository,
+          selected: selectedNoteId == item.id,
           onTap: () => onOpen(item),
         );
       },
