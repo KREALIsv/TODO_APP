@@ -17,3 +17,25 @@ String formatAttachmentByteSize(int bytes) {
   }
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
+
+/// Strip thumb size: fixed [height], width follows image aspect (clamped).
+///
+/// Portrait images (`width < height`) get a narrower frame so the content
+/// is not crushed inside a square.
+({double width, double height}) attachmentStripThumbSize({
+  int? imageWidth,
+  int? imageHeight,
+  double height = 64,
+  double minWidth = 44,
+  double maxWidth = 88,
+}) {
+  if (imageWidth == null ||
+      imageHeight == null ||
+      imageWidth <= 0 ||
+      imageHeight <= 0) {
+    return (width: height, height: height);
+  }
+  final aspect = imageWidth / imageHeight;
+  final width = (height * aspect).clamp(minWidth, maxWidth);
+  return (width: width.toDouble(), height: height);
+}

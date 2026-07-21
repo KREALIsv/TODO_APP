@@ -3,13 +3,13 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../global/themes/app_colors.dart';
-import '../../../../global/themes/tokens.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../../../global/widgets/outlined_add_chip.dart';
 import '../../data/attachments_repository.dart';
 import '../../domain/note_attachment.dart';
 import '../attachment_viewer_screen.dart';
 import 'attachment_actions.dart';
+import 'attachment_format.dart';
 import 'attachment_thumb_tile.dart';
 import 'attachments_grid_sheet.dart';
 
@@ -213,13 +213,26 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
                     if (index == items.length) {
-                      return _AddTile(onTap: _busy ? null : _showAddSheet);
+                      return Align(
+                        alignment: Alignment.center,
+                        child: OutlinedAddChip(
+                          label: 'Añadir imagen',
+                          compact: true,
+                          onPressed: _busy ? null : _showAddSheet,
+                        ),
+                      );
                     }
                     final item = items[index];
                     final isCover = item.id == widget.coverAttachmentId;
+                    final thumb = attachmentStripThumbSize(
+                      imageWidth: item.width,
+                      imageHeight: item.height,
+                    );
                     return AttachmentThumbTile(
                       bytes: _repo.bytesFor(item.id),
                       isCover: isCover,
+                      width: thumb.width,
+                      height: thumb.height,
                       onTap: () => _openViewer(items, index),
                       onLongPress: () => _showThumbMenu(item),
                     );
@@ -284,30 +297,6 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
           ),
         );
       },
-    );
-  }
-}
-
-class _AddTile extends StatelessWidget {
-  const _AddTile({this.onTap});
-
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: ThemeTokens.borderRadius,
-      child: Container(
-        width: 64,
-        height: 64,
-        decoration: BoxDecoration(
-          borderRadius: ThemeTokens.borderRadius,
-          border: Border.all(color: AppColors.neutral20),
-          color: AppColors.neutral00,
-        ),
-        child: const Icon(Icons.add, color: AppColors.neutral60),
-      ),
     );
   }
 }

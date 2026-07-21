@@ -13,4 +13,29 @@ void main() {
     final value = DateTime(2026, 7, 21, 15, 8);
     expect(formatAttachmentAddedAt(value), '21/07/2026 · 15:08');
   });
+
+  test('attachmentStripThumbSize narrows portrait frames', () {
+    final portrait = attachmentStripThumbSize(
+      imageWidth: 40,
+      imageHeight: 80,
+      height: 64,
+    );
+    expect(portrait.height, 64);
+    expect(portrait.width, lessThan(64));
+    expect(portrait.width, 44); // clamped to minWidth for 0.5 aspect
+
+    final landscape = attachmentStripThumbSize(
+      imageWidth: 160,
+      imageHeight: 80,
+      height: 64,
+    );
+    expect(landscape.width, 88); // clamped to maxWidth
+
+    final square = attachmentStripThumbSize(
+      imageWidth: 80,
+      imageHeight: 80,
+      height: 64,
+    );
+    expect(square.width, 64);
+  });
 }

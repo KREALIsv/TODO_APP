@@ -13,14 +13,16 @@ class AttachmentThumbTile extends StatelessWidget {
     required this.isCover,
     required this.onTap,
     this.onLongPress,
-    this.size = 64,
+    this.width = 64,
+    this.height = 64,
   });
 
   final Uint8List? bytes;
   final bool isCover;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
-  final double size;
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -32,13 +34,22 @@ class AttachmentThumbTile extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: ThemeTokens.borderRadius,
-            child: Container(
-              width: size,
-              height: size,
+            child: ColoredBox(
               color: AppColors.neutral20,
-              child: bytes == null
-                  ? const Icon(Icons.broken_image_outlined)
-                  : Image.memory(bytes!, fit: BoxFit.cover),
+              child: SizedBox(
+                width: width,
+                height: height,
+                child: bytes == null
+                    ? const Center(child: Icon(Icons.broken_image_outlined))
+                    : Image.memory(
+                        bytes!,
+                        fit: BoxFit.cover,
+                        width: width,
+                        height: height,
+                        gaplessPlayback: true,
+                        alignment: Alignment.center,
+                      ),
+              ),
             ),
           ),
           if (isCover)
