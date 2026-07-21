@@ -1,0 +1,114 @@
+name: Deploy Wodo
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-wodo-production
+  cancel-in-progress: true
+
+jobs:
+  # Detecta qué cambió para desplegar solo lo necesario.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      landing: ${{ steps.filter.outputs.landing }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            app:
+              - 'lib/**'
+              - 'pubspec.yaml'
+              - 'pubspec.lock'
+              - 'web/**'
+              - 'assets/**'
+              - 'deploy/**'
+              - '.github/workflows/deploy.yml'
+            landing:
+              - 'landing/**'
+              - 'deploy/**'
+              - '.github/workflows/deploy.yml'
+
+  deploy:
+    needs: changes
+    # Corre si cambió algo relevante, o si es disparo manual.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          || needs.changes.outputs.app == 'true'
+          || needs.changes.outputs.landing == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      DEPLOY_APP: ${{ needs.changes.outputs.app == 'true' || github.event_name == 'workflow_dispatch' }}
+      DEPLOY_LANDING: ${{ needs.changes.outputs.landing == 'true' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ secrets.DEPLOY_PORT || 22 }}" "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      # Infra ligera (compose + nginx + scripts): barato, se sincroniza siempre.
+      - name: Sync deploy stack (compose + nginx + scripts)
+        run: |
+          rsync -az \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_PORT || 22 }} -o StrictHostKeyChecking=yes" \
+            deploy/docker-compose.yml deploy/nginx-spa.conf \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/"
+          rsync -az \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_PORT || 22 }} -o StrictHostKeyChecking=yes" \
+            deploy/scripts/ \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/scripts/"
+
+      # --- App (Flutter web): solo si cambió lib/pubspec/web/assets/deploy ---
+      - name: Setup Flutter
+        if: env.DEPLOY_APP == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Build Flutter web
+        if: env.DEPLOY_APP == 'true'
+        run: |
+          flutter pub get
+          flutter build web --release
+
+      - name: Sync web app
+        if: env.DEPLOY_APP == 'true'
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_PORT || 22 }} -o StrictHostKeyChecking=yes" \
+            build/web/ \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/sites/web/"
+
+      # --- Landing: solo si cambió landing/ (o deploy/) ---
+      - name: Sync landing site
+        if: env.DEPLOY_LANDING == 'true'
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_PORT || 22 }} -o StrictHostKeyChecking=yes" \
+            landing/ \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/sites/landing/"
+
+      - name: Bring up containers
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT || 22 }}" \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "cd '${{ secrets.DEPLOY_PATH }}' && docker compose up -d"
+
+      # NOTA: el registro en el edge compartido (scripts/setup-wodo-https.sh) es
+      # de una sola vez y ya está aplicado; requiere privilegios para escribir el
+      # Caddyfile compartido, por eso NO se corre en cada deploy. nginx sirve el
+      # contenido nuevo directo desde el volumen.

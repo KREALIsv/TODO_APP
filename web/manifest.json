@@ -1,11 +1,11 @@
 {
-    "name": "todos_app",
-    "short_name": "todos_app",
+    "name": "Todos",
+    "short_name": "Todos",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#F2327D",
     "theme_color": "#F2327D",
-    "description": "A new Flutter project.",
+    "description": "Captura notas y tareas al instante.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
