@@ -1,6 +1,6 @@
 {
-    "name": "Todos",
-    "short_name": "Todos",
+    "name": "WODO",
+    "short_name": "WODO",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#F2327D",

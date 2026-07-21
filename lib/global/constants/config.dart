@@ -1,5 +1,5 @@
 class Config {
-  static const String title = 'Todos';
+  static const String title = 'WODO';
   static const String version = '1.0.0';
 }
 
