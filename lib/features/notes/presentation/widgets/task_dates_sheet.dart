@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/layout/keyboard_insets.dart';
 import '../../../../global/themes/app_colors.dart';
 import '../../data/task_reminders_service.dart';
 import '../../domain/date_only.dart';
@@ -209,7 +210,7 @@ class _TaskDatesSheetState extends State<TaskDatesSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomInset = sheetKeyboardBottomInset(context);
     final maxHeight = MediaQuery.sizeOf(context).height * 0.9;
 
     return Padding(

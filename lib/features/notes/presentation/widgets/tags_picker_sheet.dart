@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/layout/keyboard_insets.dart';
 import '../../../../global/themes/app_colors.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
@@ -261,7 +262,7 @@ class _TagsPickerSheetState extends State<_TagsPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomInset = sheetKeyboardBottomInset(context);
     final screenHeight = MediaQuery.sizeOf(context).height;
     // Buscar: 65%. Crear/editar: 80%.
     final sheetHeight = screenHeight *
