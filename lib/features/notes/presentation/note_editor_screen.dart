@@ -271,6 +271,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           controller: _titleController,
           focusNode: _titleFocus,
           textCapitalization: TextCapitalization.sentences,
+          scrollPadding: const EdgeInsets.only(bottom: 120),
           decoration: const InputDecoration(
             hintText: 'Escribe un título',
           ),
@@ -281,6 +282,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           textCapitalization: TextCapitalization.sentences,
           minLines: 4,
           maxLines: 8,
+          scrollPadding: const EdgeInsets.only(bottom: 120),
           decoration: const InputDecoration(
             hintText: 'Añade detalles (opcional)',
             alignLabelWithHint: true,

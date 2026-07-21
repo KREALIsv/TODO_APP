@@ -55,8 +55,14 @@ jobs:
       - name: Configure SSH
         run: |
           install -m 700 -d ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          # printf '%s\n' garantiza un salto de línea final (OpenSSH lo exige).
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          # Validación temprana con mensaje claro si el secret está malformado.
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null 2>&1; then
+            echo "::error::DEPLOY_SSH_PRIVATE_KEY no es una llave válida. Re-pega el contenido COMPLETO de la llave privada (líneas -----BEGIN----- y -----END----- incluidas) con salto de línea final. En Mac usa: cat ~/wodo-deploy-key | pbcopy"
+            exit 1
+          fi
           ssh-keyscan -p "${{ secrets.DEPLOY_PORT || 22 }}" "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
 
       # Infra ligera (compose + nginx + scripts): barato, se sincroniza siempre.

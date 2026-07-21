@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/layout/keyboard_insets.dart';
 import '../../../../global/themes/app_colors.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../domain/tag_colors.dart';
@@ -293,7 +294,7 @@ Future<TagColorPickerResult?> showTagColorPickerSheet(
     useSafeArea: true,
     showDragHandle: true,
     builder: (context) {
-      final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+      final bottomInset = sheetKeyboardBottomInset(context);
       final maxHeight = MediaQuery.sizeOf(context).height * 0.9;
       return Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
