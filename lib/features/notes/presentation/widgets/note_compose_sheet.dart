@@ -5,12 +5,14 @@ import '../../../../core/layout/keyboard_insets.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/note_item.dart';
+import '../../domain/task_groups.dart';
 import 'note_task_type_switch.dart';
 
-/// Bottom sheet ligero para crear una nota (o tarea sin fecha).
+/// Bottom sheet ligero para crear una nota (o tarea con compromiso de hoy).
 Future<void> showNoteComposeSheet(
   BuildContext context, {
   NotesRepository? repository,
+  bool initialIsTask = false,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -20,15 +22,21 @@ Future<void> showNoteComposeSheet(
     builder: (context) {
       return NoteComposeSheet(
         repository: repository ?? NotesRepository.instance,
+        initialIsTask: initialIsTask,
       );
     },
   );
 }
 
 class NoteComposeSheet extends StatefulWidget {
-  const NoteComposeSheet({super.key, this.repository});
+  const NoteComposeSheet({
+    super.key,
+    this.repository,
+    this.initialIsTask = false,
+  });
 
   final NotesRepository? repository;
+  final bool initialIsTask;
 
   @override
   State<NoteComposeSheet> createState() => _NoteComposeSheetState();
@@ -49,6 +57,9 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialIsTask) {
+      _isTask = true;
+    }
     _titleFocus.addListener(() => _ensureFieldVisible(_titleFieldKey));
     _bodyFocus.addListener(() => _ensureFieldVisible(_bodyFieldKey));
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -78,6 +89,14 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
     });
   }
 
+  String _taskSavedMessage() {
+    final progress = TaskGroupsQuery.from(
+      _repo.getAll().where((n) => n.type == NoteType.task).toList(),
+    ).progress;
+    if (progress.hideIfZero) return 'Sumada a Hoy';
+    return 'Sumada a Hoy · ${progress.done}/${progress.total} done';
+  }
+
   Future<void> _save() async {
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
@@ -92,22 +111,25 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
     }
 
     final now = DateTime.now();
+    final isTask = _isTask;
     await _repo.add(
       NoteItem(
         id: _uuid.v4(),
-        type: _isTask ? NoteType.task : NoteType.note,
+        type: isTask ? NoteType.task : NoteType.note,
         title: title,
         body: body,
         pinned: false,
         completed: false,
         createdAt: now,
         updatedAt: now,
+        todayAt: isTask ? now : null,
       ),
     );
 
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    final savedMessage = _isTask ? 'Tarea guardada' : 'Nota guardada';
+    final savedMessage =
+        isTask ? _taskSavedMessage() : 'Nota guardada';
     Navigator.of(context).pop();
     messenger
       ..hideCurrentSnackBar()

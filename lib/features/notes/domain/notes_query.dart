@@ -43,7 +43,8 @@ class NotesQuery {
   /// Unpinned items that belong to [day] (local calendar day).
   ///
   /// Notes: created or updated that day.
-  /// Tasks: todayAt / dueAt / completedAt on that day, or overdue if [day] is today.
+  /// Tasks: todayAt / dueAt / completedAt on that day, overdue when [day] is
+  /// today, or captured (created) that day so new tasks appear in «Del día».
   static List<NoteItem> ofDayFrom(
     List<NoteItem> items,
     DateTime day, {
@@ -69,6 +70,7 @@ class NotesQuery {
       return dateOnly(item.createdAt) == key || dateOnly(item.updatedAt) == key;
     }
 
+    if (dateOnly(item.createdAt) == key) return true;
     if (item.todayAt != null && dateOnly(item.todayAt!) == key) return true;
     if (item.dueAt != null && dateOnly(item.dueAt!) == key) return true;
     if (item.completedAt != null && dateOnly(item.completedAt!) == key) {

@@ -77,7 +77,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _tags = List<String>.from(item?.tags ?? const []);
     _dueAt = item?.dueAt;
     _dueHasTime = item?.dueHasTime ?? false;
-    _todayOn = item?.isTodayCommitment() ?? false;
+    _todayOn = item?.isTodayCommitment() ??
+        (!_isEditing && (item?.type ?? widget.initialType) == NoteType.task);
     _reminderMinutesBefore = item?.reminderMinutesBefore;
 
     if (!_isEditing) {
@@ -325,7 +326,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           onChanged: (value) {
             setState(() {
               _type = value ? NoteType.task : NoteType.note;
-              if (!value) {
+              if (value) {
+                if (!_isEditing) _todayOn = true;
+              } else {
                 _completed = false;
                 _dueAt = null;
                 _dueHasTime = false;
