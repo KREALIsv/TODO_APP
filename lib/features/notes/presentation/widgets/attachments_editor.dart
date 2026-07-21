@@ -1,12 +1,15 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/theme/app_surface.dart';
 import '../../../../global/themes/app_colors.dart';
 import '../../../../global/themes/tokens.dart';
 import '../../../../global/widgets/app_alerts.dart';
+import '../../../settings/presentation/widgets/list_background_layer.dart';
 import '../../data/attachments_repository.dart';
 import '../../domain/note_attachment.dart';
 
@@ -495,6 +498,7 @@ class _AttachmentViewerScreenState extends State<AttachmentViewerScreen> {
   late final PageController _controller;
   late int _index;
   late String? _coverId;
+  final _focusNode = FocusNode();
 
   AttachmentsRepository get _repo =>
       widget.repository ?? AttachmentsRepository.instance;
@@ -509,69 +513,157 @@ class _AttachmentViewerScreenState extends State<AttachmentViewerScreen> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
 
+  void _close() {
+    if (!mounted) return;
+    final nav = Navigator.of(context);
+    if (nav.canPop()) nav.pop();
+  }
+
+  void _toggleCover(NoteAttachment current) {
+    final next = current.id == _coverId ? null : current.id;
+    setState(() => _coverId = next);
+    widget.onCoverChanged(next);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final items = _repo.forNote(widget.noteId);
     if (items.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: const Center(child: Text('Sin imágenes')),
+      return CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.escape): _close,
+        },
+        child: Focus(
+          focusNode: _focusNode,
+          autofocus: true,
+          child: Scaffold(
+            appBar: AppBar(leading: BackButton(onPressed: _close)),
+            body: const Center(child: Text('Sin imágenes')),
+          ),
+        ),
       );
     }
     final safeIndex = _index.clamp(0, items.length - 1);
     final current = items[safeIndex];
     final isCover = current.id == _coverId;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text('${safeIndex + 1} / ${items.length}'),
-        actions: [
-          IconButton(
-            tooltip: isCover ? 'Quitar portada' : 'Usar como portada',
-            onPressed: () {
-              final next = isCover ? null : current.id;
-              setState(() => _coverId = next);
-              widget.onCoverChanged(next);
-            },
-            icon: Icon(isCover ? Icons.star : Icons.star_outline),
-          ),
-        ],
-      ),
-      body: PageView.builder(
-        controller: _controller,
-        itemCount: items.length,
-        onPageChanged: (i) => setState(() => _index = i),
-        itemBuilder: (context, i) {
-          final bytes = _repo.bytesFor(items[i].id);
-          if (bytes == null) {
-            return const Center(
-              child: Icon(Icons.broken_image, color: Colors.white54, size: 48),
-            );
-          }
-          return InteractiveViewer(
-            child: Center(
-              child: Image.memory(bytes, fit: BoxFit.contain),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): _close,
+      },
+      child: Focus(
+        focusNode: _focusNode,
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: AppSurface.panelOverlay(context),
+            foregroundColor: AppSurface.title(context),
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            leading: BackButton(onPressed: _close),
+            title: Text(
+              '${safeIndex + 1} / ${items.length}',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppSurface.title(context),
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
-          );
-        },
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: FilledButton(
-            onPressed: () {
-              final next = isCover ? null : current.id;
-              setState(() => _coverId = next);
-              widget.onCoverChanged(next);
-            },
-            child: Text(isCover ? 'Quitar portada' : 'Usar como portada'),
+            actions: [
+              IconButton(
+                tooltip: isCover ? 'Quitar portada' : 'Usar como portada',
+                onPressed: () => _toggleCover(current),
+                icon: Icon(
+                  isCover ? Icons.star : Icons.star_outline,
+                  color: isCover
+                      ? scheme.primary
+                      : AppSurface.title(context),
+                ),
+              ),
+            ],
+          ),
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              const ListBackgroundLayer(),
+              // Soft wash so chrome stays readable over any selected fondo.
+              ColoredBox(
+                color: scheme.surface.withValues(
+                  alpha: AppSurface.isDark(context) ? 0.72 : 0.78,
+                ),
+              ),
+              PageView.builder(
+                controller: _controller,
+                itemCount: items.length,
+                onPageChanged: (i) => setState(() => _index = i),
+                itemBuilder: (context, i) {
+                  final bytes = _repo.bytesFor(items[i].id);
+                  if (bytes == null) {
+                    return Center(
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: AppSurface.mutedIcon(context),
+                        size: 48,
+                      ),
+                    );
+                  }
+                  return InteractiveViewer(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: AppSurface.card(context),
+                            borderRadius: ThemeTokens.borderRadius,
+                            border: Border.all(color: AppSurface.border(context)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: scheme.shadow.withValues(alpha: 0.12),
+                                blurRadius: 18,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: ThemeTokens.borderRadius,
+                            child: Image.memory(
+                              bytes,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          bottomNavigationBar: Material(
+            color: AppSurface.panelOverlay(context),
+            elevation: 0,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: FilledButton.tonalIcon(
+                  onPressed: () => _toggleCover(current),
+                  icon: Icon(isCover ? Icons.star : Icons.star_outline),
+                  label: Text(
+                    isCover ? 'Quitar portada' : 'Usar como portada',
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
