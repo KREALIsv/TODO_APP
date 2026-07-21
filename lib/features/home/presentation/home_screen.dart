@@ -182,7 +182,6 @@ class _HomeScreenState extends State<HomeScreen> {
     BuildContext context, {
     NoteItem? item,
     NoteType initialType = NoteType.note,
-    bool initialTodayOn = false,
   }) {
     if (widget.onOpenNoteEditor != null) {
       widget.onOpenNoteEditor!(
@@ -195,7 +194,6 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => NoteEditorScreen(
           item: item,
           initialType: initialType,
-          initialTodayOn: initialTodayOn,
           repository: _repo,
         ),
       ),
@@ -206,20 +204,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (widget.onOpenNoteEditor != null) {
       return _openEditor(context, initialType: NoteType.note);
     }
-    return showNoteComposeSheet(
-      context,
-      repository: _repo,
-      commitTaskToToday: _effectiveFilter == NotesFilter.tasks,
-    );
+    return showNoteComposeSheet(context, repository: _repo);
   }
 
   Future<void> _onFabPressed() {
     if (_fabCreatesTask) {
-      return _openEditor(
-        context,
-        initialType: NoteType.task,
-        initialTodayOn: true,
-      );
+      return _openEditor(context, initialType: NoteType.task);
     }
     return _openNoteComposeSheet(context);
   }

@@ -17,7 +17,6 @@ class NoteEditorScreen extends StatefulWidget {
     super.key,
     this.item,
     this.initialType = NoteType.note,
-    this.initialTodayOn = false,
     this.repository,
     this.tagsRepository,
     this.embedded = false,
@@ -27,8 +26,6 @@ class NoteEditorScreen extends StatefulWidget {
 
   final NoteItem? item;
   final NoteType initialType;
-  /// When creating a new task, pre-select the «Hoy» chip (e.g. from chip Tareas).
-  final bool initialTodayOn;
   final NotesRepository? repository;
   final TagsRepository? tagsRepository;
   final bool embedded;
@@ -81,9 +78,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _dueAt = item?.dueAt;
     _dueHasTime = item?.dueHasTime ?? false;
     _todayOn = item?.isTodayCommitment() ??
-        (!_isEditing &&
-            widget.initialType == NoteType.task &&
-            widget.initialTodayOn);
+        (!_isEditing && (item?.type ?? widget.initialType) == NoteType.task);
     _reminderMinutesBefore = item?.reminderMinutesBefore;
 
     if (!_isEditing) {
@@ -329,7 +324,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           onChanged: (value) {
             setState(() {
               _type = value ? NoteType.task : NoteType.note;
-              if (!value) {
+              if (value) {
+                if (!_isEditing) _todayOn = true;
+              } else {
                 _completed = false;
                 _dueAt = null;
                 _dueHasTime = false;
