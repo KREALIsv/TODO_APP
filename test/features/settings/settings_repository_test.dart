@@ -124,4 +124,11 @@ void main() {
     expect(parseNotesBackup('{"foo":1}'), isNull);
     expect(parseNotesBackup('[{"title":"no-id"}]'), isNull);
   });
+
+  test('backupFileName uses wodo prefix and json extension', () {
+    final name = backupFileName(
+      at: DateTime(2026, 7, 21, 8, 6),
+    );
+    expect(name, 'wodo_backup_2026-07-21T08-06-00.000.json');
+  });
 }

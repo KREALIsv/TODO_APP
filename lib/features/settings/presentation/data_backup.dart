@@ -11,10 +11,31 @@ import '../../notes/domain/note_item.dart';
 
 enum ImportResult { success, cancelled, invalid }
 
+const backupMimeType = 'application/json';
+const backupFileExtension = 'json';
+
+/// Suggested filename for exported backups (`wodo_backup_2026-07-21T12-00-00.json`).
+String backupFileName({DateTime? at}) {
+  final stamp = (at ?? DateTime.now()).toIso8601String().replaceAll(':', '-');
+  return 'wodo_backup_$stamp.$backupFileExtension';
+}
+
+String encodeNotesBackup(NotesRepository repo) {
+  final maps = repo.exportAllMaps();
+  return jsonEncode({
+    'version': 1,
+    'exportedAt': DateTime.now().toIso8601String(),
+    'notes': maps,
+  });
+}
+
 /// Validates and parses a backup JSON payload into [NoteItem] maps.
 List<Map<String, dynamic>>? parseNotesBackup(String raw) {
   try {
-    final decoded = jsonDecode(raw);
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+
+    final decoded = jsonDecode(trimmed);
     List<dynamic> list;
     if (decoded is List) {
       list = decoded;
@@ -40,36 +61,48 @@ List<Map<String, dynamic>>? parseNotesBackup(String raw) {
 }
 
 Future<void> exportNotesData(NotesRepository repo) async {
-  final maps = repo.exportAllMaps();
-  final payload = jsonEncode({
-    'version': 1,
-    'exportedAt': DateTime.now().toIso8601String(),
-    'notes': maps,
-  });
+  final payload = encodeNotesBackup(repo);
+  final fileName = backupFileName();
+  final bytes = utf8.encode(payload);
 
   if (kIsWeb) {
     await SharePlus.instance.share(
-      ShareParams(text: payload, subject: 'Todos backup'),
+      ShareParams(
+        files: [
+          XFile.fromData(
+            bytes,
+            name: fileName,
+            mimeType: backupMimeType,
+          ),
+        ],
+        subject: 'WODO backup',
+      ),
     );
     return;
   }
 
   final dir = await getTemporaryDirectory();
-  final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-  final file = File('${dir.path}/todos_backup_$stamp.json');
+  final file = File('${dir.path}/$fileName');
   await file.writeAsString(payload);
   await SharePlus.instance.share(
     ShareParams(
-      files: [XFile(file.path, mimeType: 'application/json')],
-      subject: 'Todos backup',
+      files: [
+        XFile(
+          file.path,
+          name: fileName,
+          mimeType: backupMimeType,
+        ),
+      ],
+      subject: 'WODO backup',
     ),
   );
 }
 
 Future<ImportResult> importNotesData(NotesRepository repo) async {
+  // Accept any file: exports may be saved as .json, .txt, or without extension
+  // from the system share sheet. Content is validated below.
   final picked = await FilePicker.platform.pickFiles(
-    type: FileType.custom,
-    allowedExtensions: const ['json'],
+    type: FileType.any,
     withData: true,
   );
   if (picked == null || picked.files.isEmpty) {
