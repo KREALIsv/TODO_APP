@@ -196,10 +196,8 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
             if (items.isEmpty)
               Align(
                 alignment: Alignment.centerLeft,
-                child: TextButton.icon(
+                child: _AddAttachmentButton(
                   onPressed: _busy ? null : _showAddSheet,
-                  icon: const Icon(Icons.image_outlined),
-                  label: const Text('Añadir imagen'),
                 ),
               )
             else ...[
@@ -281,6 +279,55 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Same outlined pill shape as the empty-state "Añadir etiqueta" button.
+class _AddAttachmentButton extends StatelessWidget {
+  const _AddAttachmentButton({this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  static final _radius = BorderRadius.circular(10);
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final enabled = onPressed != null;
+
+    return Opacity(
+      opacity: enabled ? 1 : 0.5,
+      child: Material(
+        color: AppColors.neutral00,
+        shape: RoundedRectangleBorder(
+          borderRadius: _radius,
+          side: const BorderSide(color: AppColors.neutral20),
+        ),
+        child: InkWell(
+          borderRadius: _radius,
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.add, size: 18, color: AppColors.neutral60),
+                const SizedBox(width: 4),
+                Text(
+                  'Añadir imagen',
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: AppColors.neutral60,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
