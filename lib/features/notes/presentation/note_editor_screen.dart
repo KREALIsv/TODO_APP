@@ -52,7 +52,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   int? _reminderMinutesBefore;
   String? _coverAttachmentId;
   late final String _noteId;
-  bool _discardDraftAttachments = true;
+  bool _discardUnsavedAttachments = true;
+  final _sessionAddedAttachmentIds = <String>{};
   static const _uuid = Uuid();
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
@@ -88,7 +89,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _reminderMinutesBefore = item?.reminderMinutesBefore;
     _coverAttachmentId = item?.coverAttachmentId;
     _noteId = item?.id ?? _uuid.v4();
-    _discardDraftAttachments = item == null;
+    _discardUnsavedAttachments = true;
 
     if (!_isEditing) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -99,9 +100,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   @override
   void dispose() {
-    if (_discardDraftAttachments) {
-      // Fire-and-forget cleanup of unsaved draft images.
-      _attachments.deleteForNote(_noteId);
+    if (_discardUnsavedAttachments) {
+      // Create: drop the whole draft note's images.
+      // Edit: only drop images added in this session (deletes stay).
+      if (!_isEditing) {
+        _attachments.deleteForNote(_noteId);
+      } else {
+        for (final id in _sessionAddedAttachmentIds) {
+          _attachments.delete(id);
+        }
+      }
     }
     _titleController.dispose();
     _bodyController.dispose();
@@ -186,7 +194,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       await _repo.update(toSave);
     }
 
-    _discardDraftAttachments = false;
+    _discardUnsavedAttachments = false;
 
     if (!mounted) return;
 
@@ -237,7 +245,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     if (!confirmed) return;
     await _repo.delete(item.id);
-    _discardDraftAttachments = false;
+    _discardUnsavedAttachments = false;
     if (!mounted) return;
     _closeAfterMutation();
   }
@@ -343,6 +351,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           noteId: _noteId,
           coverAttachmentId: _coverAttachmentId,
           onCoverChanged: (id) => setState(() => _coverAttachmentId = id),
+          onAttachmentAdded: (id) => _sessionAddedAttachmentIds.add(id),
         ),
         const SizedBox(height: 24),
         NoteTaskTypeSwitch(

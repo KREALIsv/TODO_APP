@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
+import '../../../core/io/share_bytes_file.dart';
 import '../../notes/data/attachments_repository.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
@@ -177,38 +177,12 @@ List<Map<String, dynamic>>? parseNotesBackup(String raw) {
 
 Future<void> _shareBackupFile(String payload) async {
   final fileName = backupFileName();
-  final bytes = utf8.encode(payload);
-
-  if (kIsWeb) {
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [
-          XFile.fromData(
-            bytes,
-            name: fileName,
-            mimeType: backupMimeType,
-          ),
-        ],
-        subject: 'WODO backup',
-      ),
-    );
-    return;
-  }
-
-  final dir = await getTemporaryDirectory();
-  final file = File('${dir.path}/$fileName');
-  await file.writeAsString(payload);
-  await SharePlus.instance.share(
-    ShareParams(
-      files: [
-        XFile(
-          file.path,
-          name: fileName,
-          mimeType: backupMimeType,
-        ),
-      ],
-      subject: 'WODO backup',
-    ),
+  final bytes = Uint8List.fromList(utf8.encode(payload));
+  await shareBytesAsFile(
+    bytes: bytes,
+    fileName: fileName,
+    mimeType: backupMimeType,
+    subject: 'WODO backup',
   );
 }
 
