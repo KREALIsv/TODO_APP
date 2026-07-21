@@ -98,6 +98,8 @@ void main() {
     expect(repo.forNote('note-1').map((e) => e.id), [created.id]);
     expect(repo.bytesFor(created.id), isNotNull);
     expect(repo.countFor('note-1'), 1);
+    expect(created.width, greaterThan(0));
+    expect(created.height, greaterThan(0));
   });
 
   test('deleteForNote removes all attachments', () async {

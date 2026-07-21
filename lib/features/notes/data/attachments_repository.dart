@@ -82,7 +82,7 @@ class AttachmentsRepository {
     }
 
     final compressed = await compressImageBytes(bytes);
-    final storedAsPng = _isPng(compressed);
+    final storedAsPng = _isPng(compressed.bytes);
     final id = _uuid.v4();
     final now = DateTime.now();
     final attachment = NoteAttachment(
@@ -90,12 +90,14 @@ class AttachmentsRepository {
       noteId: noteId,
       fileName: storedAsPng ? _withPngExtension(fileName) : fileName,
       mimeType: storedAsPng ? 'image/png' : mimeType,
-      byteSize: compressed.lengthInBytes,
+      byteSize: compressed.bytes.lengthInBytes,
       createdAt: now,
       sortOrder: existing.isEmpty ? 0 : existing.last.sortOrder + 1,
+      width: compressed.width,
+      height: compressed.height,
     );
 
-    await _blobs.put(id, compressed);
+    await _blobs.put(id, compressed.bytes);
     await _meta.put(id, attachment.toMap());
     return attachment;
   }
@@ -159,7 +161,19 @@ String _withPngExtension(String fileName) {
   return '${fileName.substring(0, dot)}.png';
 }
 
-Future<Uint8List> compressImageBytes(Uint8List input) async {
+class CompressedImage {
+  const CompressedImage({
+    required this.bytes,
+    required this.width,
+    required this.height,
+  });
+
+  final Uint8List bytes;
+  final int width;
+  final int height;
+}
+
+Future<CompressedImage> compressImageBytes(Uint8List input) async {
   try {
     final codec = await instantiateImageCodec(
       input,
@@ -167,12 +181,18 @@ Future<Uint8List> compressImageBytes(Uint8List input) async {
     );
     final frame = await codec.getNextFrame();
     final image = frame.image;
+    final width = image.width;
+    final height = image.height;
     final byteData = await image.toByteData(format: ImageByteFormat.png);
     image.dispose();
-    if (byteData == null) return input;
+    if (byteData == null) {
+      return CompressedImage(bytes: input, width: width, height: height);
+    }
     final png = byteData.buffer.asUint8List();
-    return png.lengthInBytes < input.lengthInBytes * 3 ? png : input;
+    final out =
+        png.lengthInBytes < input.lengthInBytes * 3 ? png : input;
+    return CompressedImage(bytes: out, width: width, height: height);
   } catch (_) {
-    return input;
+    return CompressedImage(bytes: input, width: 0, height: 0);
   }
 }

@@ -55,7 +55,8 @@ class AttachmentsGridSheet extends StatelessWidget {
                 return AttachmentThumbTile(
                   bytes: repo.bytesFor(item.id),
                   isCover: isCover,
-                  size: cell,
+                  width: cell,
+                  height: cell,
                   onTap: () => onOpenViewer(index),
                   onLongPress: () {
                     onCoverChanged(isCover ? null : item.id);
