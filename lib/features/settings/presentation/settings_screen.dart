@@ -5,6 +5,7 @@ import '../../../core/theme/app_surface.dart';
 import '../../../global/constants/config.dart';
 import '../../../global/themes/app_colors.dart';
 import '../../../global/widgets/app_alerts.dart';
+import '../../notes/data/attachments_repository.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
@@ -104,6 +105,7 @@ class SettingsScreen extends StatelessWidget {
         _repo,
         tags: TagsRepository.instance,
         dayEntries: DayEntriesRepository.instance,
+        attachments: AttachmentsRepository.instance,
       );
       if (!context.mounted) return;
       await AppAlerts.show(
@@ -137,6 +139,7 @@ class SettingsScreen extends StatelessWidget {
         _repo,
         tags: TagsRepository.instance,
         dayEntries: DayEntriesRepository.instance,
+        attachments: AttachmentsRepository.instance,
       );
       if (!context.mounted) return;
       if (result == ImportResult.cancelled) return;
@@ -187,6 +190,7 @@ class SettingsScreen extends StatelessWidget {
       notes: _repo,
       tags: TagsRepository.instance,
       dayEntries: DayEntriesRepository.instance,
+      attachments: AttachmentsRepository.instance,
     );
     if (!context.mounted) return;
     await AppAlerts.show(

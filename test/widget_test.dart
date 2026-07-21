@@ -6,6 +6,7 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import 'package:todos_app/app/app.dart';
 import 'package:todos_app/features/home/presentation/home_screen.dart';
+import 'package:todos_app/features/notes/data/attachments_repository.dart';
 import 'package:todos_app/features/notes/data/day_entries_repository.dart';
 import 'package:todos_app/features/notes/data/notes_repository.dart';
 import 'package:todos_app/features/settings/data/settings_repository.dart';
@@ -23,6 +24,13 @@ void main() {
     final dayBox = await Hive.openBox<Map>('day_entries');
     await DayEntriesRepository.instance.initWithBox(dayBox);
     await DayEntriesRepository.instance.clear();
+    final attachmentsMeta = await Hive.openBox<Map>('attachments');
+    final attachmentsBlobs = await Hive.openBox<dynamic>('attachment_blobs');
+    await AttachmentsRepository.instance.initWithBoxes(
+      meta: attachmentsMeta,
+      blobs: attachmentsBlobs,
+    );
+    await AttachmentsRepository.instance.clear();
     final settingsBox = await Hive.openBox('settings');
     await SettingsRepository.instance.initWithBox(settingsBox);
   });

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 
+import 'package:todos_app/features/notes/data/attachments_repository.dart';
 import 'package:todos_app/features/notes/data/day_entries_repository.dart';
 import 'package:todos_app/features/notes/data/notes_repository.dart';
 import 'package:todos_app/features/notes/data/tags_repository.dart';
@@ -37,6 +38,7 @@ void main() {
   late NotesRepository notes;
   late TagsRepository tags;
   late DayEntriesRepository dayEntries;
+  late AttachmentsRepository attachments;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('data_backup_test_');
@@ -45,15 +47,15 @@ void main() {
     notes = NotesRepository.instance;
     tags = TagsRepository.instance;
     dayEntries = DayEntriesRepository.instance;
+    attachments = AttachmentsRepository.instance;
 
-    await notes.initWithBox(
-      await Hive.openBox('notes_${DateTime.now().microsecondsSinceEpoch}'),
-    );
-    await tags.initWithBox(
-      await Hive.openBox('tags_${DateTime.now().microsecondsSinceEpoch}'),
-    );
-    await dayEntries.initWithBox(
-      await Hive.openBox('day_${DateTime.now().microsecondsSinceEpoch}'),
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    await notes.initWithBox(await Hive.openBox('notes_$stamp'));
+    await tags.initWithBox(await Hive.openBox('tags_$stamp'));
+    await dayEntries.initWithBox(await Hive.openBox('day_$stamp'));
+    await attachments.initWithBoxes(
+      meta: await Hive.openBox<Map>('att_meta_$stamp'),
+      blobs: await Hive.openBox<dynamic>('att_blob_$stamp'),
     );
   });
 

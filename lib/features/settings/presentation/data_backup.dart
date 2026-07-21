@@ -6,10 +6,12 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../notes/data/attachments_repository.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
 import '../../notes/domain/day_entry.dart';
+import '../../notes/domain/note_attachment.dart';
 import '../../notes/domain/note_item.dart';
 
 enum ImportResult { success, cancelled, invalid }
@@ -25,12 +27,14 @@ class BackupPayload {
     required this.notes,
     this.tags,
     this.dayEntries = const [],
+    this.attachments = const [],
   });
 
   final int version;
   final List<Map<String, dynamic>> notes;
   final Map<String, dynamic>? tags;
   final List<Map<String, dynamic>> dayEntries;
+  final List<Map<String, dynamic>> attachments;
 }
 
 /// Suggested filename for exported backups (`wodo_backup_2026-07-21T12-00-00.json`).
@@ -43,7 +47,9 @@ String encodeBackup({
   required NotesRepository notes,
   required TagsRepository tags,
   required DayEntriesRepository dayEntries,
+  AttachmentsRepository? attachments,
 }) {
+  final attachmentsRepo = attachments ?? AttachmentsRepository.instance;
   return jsonEncode({
     'version': backupFormatVersion,
     'exportedAt': DateTime.now().toIso8601String(),
@@ -51,6 +57,7 @@ String encodeBackup({
     'notes': notes.exportAllMaps(),
     'tags': tags.exportSnapshot(),
     'dayEntries': dayEntries.exportAllMaps(),
+    'attachments': attachmentsRepo.exportAllMaps(),
   });
 }
 
@@ -94,6 +101,21 @@ List<Map<String, dynamic>>? _parseDayEntryMaps(List<dynamic>? list) {
   return result;
 }
 
+List<Map<String, dynamic>>? _parseAttachmentMaps(List<dynamic>? list) {
+  if (list == null) return const [];
+  final result = <Map<String, dynamic>>[];
+  for (final entry in list) {
+    if (entry is! Map) return null;
+    final map = Map<String, dynamic>.from(entry);
+    if (map['id'] == null || map['noteId'] == null) return null;
+    // Validate shape via fromMap (bytes optional for metadata-only).
+    final copy = Map<String, dynamic>.from(map)..remove('bytesBase64');
+    NoteAttachment.fromMap(copy);
+    result.add(Map<String, dynamic>.from(map));
+  }
+  return result;
+}
+
 Map<String, dynamic>? _parseTagsSnapshot(Object? raw) {
   if (raw == null) return null;
   if (raw is! Map) return null;
@@ -131,11 +153,14 @@ BackupPayload? parseBackup(String raw) {
     if (intVersion >= 2) {
       final dayEntries = _parseDayEntryMaps(map['dayEntries'] as List?);
       if (dayEntries == null) return null;
+      final attachments = _parseAttachmentMaps(map['attachments'] as List?);
+      if (attachments == null) return null;
       return BackupPayload(
         version: intVersion,
         notes: notes,
         tags: _parseTagsSnapshot(map['tags']),
         dayEntries: dayEntries,
+        attachments: attachments,
       );
     }
 
@@ -191,11 +216,13 @@ Future<void> exportNotesData(
   NotesRepository notes, {
   TagsRepository? tags,
   DayEntriesRepository? dayEntries,
+  AttachmentsRepository? attachments,
 }) async {
   final payload = encodeBackup(
     notes: notes,
     tags: tags ?? TagsRepository.instance,
     dayEntries: dayEntries ?? DayEntriesRepository.instance,
+    attachments: attachments ?? AttachmentsRepository.instance,
   );
   await _shareBackupFile(payload);
 }
@@ -224,10 +251,13 @@ Future<void> applyBackupPayload({
   required NotesRepository notes,
   required TagsRepository tags,
   required DayEntriesRepository dayEntries,
+  AttachmentsRepository? attachments,
 }) async {
+  final attachmentsRepo = attachments ?? AttachmentsRepository.instance;
   final notesSnapshot = notes.exportAllMaps();
   final tagsSnapshot = tags.exportSnapshot();
   final daySnapshot = dayEntries.exportAllMaps();
+  final attachmentsSnapshot = attachmentsRepo.exportAllMaps();
 
   try {
     await notes.replaceAllFromMaps(payload.notes);
@@ -240,8 +270,10 @@ Future<void> applyBackupPayload({
 
     if (payload.version >= 2) {
       await dayEntries.replaceAllFromMaps(payload.dayEntries);
+      await attachmentsRepo.replaceAllFromMaps(payload.attachments);
     } else {
       await dayEntries.resetAll();
+      await attachmentsRepo.resetAll();
     }
 
     await notes.syncAllReminders();
@@ -249,6 +281,7 @@ Future<void> applyBackupPayload({
     await notes.replaceAllFromMaps(notesSnapshot);
     await tags.replaceSnapshot(tagsSnapshot);
     await dayEntries.replaceAllFromMaps(daySnapshot);
+    await attachmentsRepo.replaceAllFromMaps(attachmentsSnapshot);
     rethrow;
   }
 }
@@ -257,9 +290,11 @@ Future<ImportResult> importNotesData(
   NotesRepository notes, {
   TagsRepository? tags,
   DayEntriesRepository? dayEntries,
+  AttachmentsRepository? attachments,
 }) async {
   final tagsRepo = tags ?? TagsRepository.instance;
   final dayRepo = dayEntries ?? DayEntriesRepository.instance;
+  final attachmentsRepo = attachments ?? AttachmentsRepository.instance;
 
   final picked = await FilePicker.platform.pickFiles(
     type: FileType.any,
@@ -287,6 +322,7 @@ Future<ImportResult> importNotesData(
       notes: notes,
       tags: tagsRepo,
       dayEntries: dayRepo,
+      attachments: attachmentsRepo,
     );
     return ImportResult.success;
   } catch (_) {
@@ -294,17 +330,20 @@ Future<ImportResult> importNotesData(
   }
 }
 
-/// Wipes all local content boxes (notes, tags, day log). Settings are kept.
+/// Wipes all local content boxes (notes, tags, day log, attachments).
 Future<void> resetAllAppContent({
   NotesRepository? notes,
   TagsRepository? tags,
   DayEntriesRepository? dayEntries,
+  AttachmentsRepository? attachments,
 }) async {
   final notesRepo = notes ?? NotesRepository.instance;
   final tagsRepo = tags ?? TagsRepository.instance;
   final dayRepo = dayEntries ?? DayEntriesRepository.instance;
+  final attachmentsRepo = attachments ?? AttachmentsRepository.instance;
 
   await notesRepo.resetAll();
   await tagsRepo.resetToDefaults();
   await dayRepo.resetAll();
+  await attachmentsRepo.resetAll();
 }
