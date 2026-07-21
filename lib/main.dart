@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import 'app/app.dart';
+import 'features/notes/data/attachments_repository.dart';
 import 'features/notes/data/day_entries_repository.dart';
 import 'features/notes/data/notes_repository.dart';
 import 'features/notes/data/tags_repository.dart';
@@ -16,6 +17,7 @@ Future<void> main() async {
   await NotesRepository.instance.init();
   await DayEntriesRepository.instance.init();
   await TagsRepository.instance.init();
+  await AttachmentsRepository.instance.init();
   await SettingsRepository.instance.init();
   // Migra tags ya usados en notas al catálogo (instalaciones previas).
   await TagsRepository.instance.ensureTags(

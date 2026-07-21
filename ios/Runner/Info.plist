@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Todos App</string>
+	<string>WODO</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -47,6 +47,12 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>WODO necesita la cámara para adjuntar fotos a tus tareas.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>WODO necesita acceso a tus fotos para adjuntarlas a tus tareas.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>WODO puede guardar imágenes relacionadas con tus tareas.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

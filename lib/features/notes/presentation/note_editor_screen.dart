@@ -3,11 +3,13 @@ import 'package:uuid/uuid.dart';
 
 import '../../../global/widgets/app_alerts.dart';
 import '../../shell/presentation/desktop_column_header.dart';
+import '../data/attachments_repository.dart';
 import '../data/notes_repository.dart';
 import '../data/tags_repository.dart';
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
 import '../domain/task_groups.dart';
+import 'widgets/attachments_editor.dart';
 import 'widgets/note_task_type_switch.dart';
 import 'widgets/tags_editor.dart';
 import 'widgets/task_when_field.dart';
@@ -48,11 +50,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   bool _dueHasTime = false;
   bool _todayOn = false;
   int? _reminderMinutesBefore;
+  String? _coverAttachmentId;
+  late final String _noteId;
+  bool _discardDraftAttachments = true;
   static const _uuid = Uuid();
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
   TagsRepository get _tagsRepo =>
       widget.tagsRepository ?? TagsRepository.instance;
+  AttachmentsRepository get _attachments => AttachmentsRepository.instance;
 
   bool get _isEditing => widget.item != null;
 
@@ -80,6 +86,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _todayOn = item?.isTodayCommitment() ??
         (!_isEditing && (item?.type ?? widget.initialType) == NoteType.task);
     _reminderMinutesBefore = item?.reminderMinutesBefore;
+    _coverAttachmentId = item?.coverAttachmentId;
+    _noteId = item?.id ?? _uuid.v4();
+    _discardDraftAttachments = item == null;
 
     if (!_isEditing) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -90,6 +99,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   @override
   void dispose() {
+    if (_discardDraftAttachments) {
+      // Fire-and-forget cleanup of unsaved draft images.
+      _attachments.deleteForNote(_noteId);
+    }
     _titleController.dispose();
     _bodyController.dispose();
     _titleFocus.dispose();
@@ -131,7 +144,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final NoteItem toSave;
     if (existing == null) {
       toSave = NoteItem(
-        id: _uuid.v4(),
+        id: _noteId,
         type: _type,
         title: title,
         body: body,
@@ -146,6 +159,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         completedAt: isTask ? completedAt : null,
         reminderMinutesBefore:
             isTask && _dueAt != null ? _reminderMinutesBefore : null,
+        coverAttachmentId: _coverAttachmentId,
       );
       await _repo.add(toSave);
     } else {
@@ -167,9 +181,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         completedAt: isTask ? completedAt : null,
         reminderMinutesBefore:
             isTask && _dueAt != null ? _reminderMinutesBefore : null,
+        coverAttachmentId: _coverAttachmentId,
       );
       await _repo.update(toSave);
     }
+
+    _discardDraftAttachments = false;
 
     if (!mounted) return;
 
@@ -220,6 +237,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     if (!confirmed) return;
     await _repo.delete(item.id);
+    _discardDraftAttachments = false;
     if (!mounted) return;
     _closeAfterMutation();
   }
@@ -319,6 +337,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             ..._repo.getAllTags(),
           },
           onChanged: (tags) => setState(() => _tags = tags),
+        ),
+        const SizedBox(height: 24),
+        AttachmentsEditor(
+          noteId: _noteId,
+          coverAttachmentId: _coverAttachmentId,
+          onCoverChanged: (id) => setState(() => _coverAttachmentId = id),
         ),
         const SizedBox(height: 24),
         NoteTaskTypeSwitch(

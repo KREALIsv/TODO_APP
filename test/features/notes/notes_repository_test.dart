@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 
+import 'package:todos_app/features/notes/data/attachments_repository.dart';
 import 'package:todos_app/features/notes/data/day_entries_repository.dart';
 import 'package:todos_app/features/notes/data/notes_repository.dart';
 import 'package:todos_app/features/notes/data/task_reminders_service.dart';
@@ -14,6 +15,7 @@ void main() {
   late Directory tempDir;
   late NotesRepository repo;
   late DayEntriesRepository dayEntries;
+  late AttachmentsRepository attachments;
 
   setUp(() async {
     TaskRemindersService.enabled = false;
@@ -24,11 +26,18 @@ void main() {
     final dayBox = await Hive.openBox<Map>('day_entries_test_$stamp');
     repo = NotesRepository.instance;
     dayEntries = DayEntriesRepository.instance;
+    attachments = AttachmentsRepository.instance;
     await repo.initWithBox(box);
     await dayEntries.initWithBox(dayBox);
+    await attachments.initWithBoxes(
+      meta: await Hive.openBox<Map>('att_meta_$stamp'),
+      blobs: await Hive.openBox<dynamic>('att_blob_$stamp'),
+    );
     repo.dayEntriesForTests = dayEntries;
+    repo.attachmentsForTests = attachments;
     await repo.clear();
     await dayEntries.clear();
+    await attachments.clear();
   });
 
   tearDownAll(() {
