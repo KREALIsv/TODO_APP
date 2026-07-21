@@ -1,7 +1,7 @@
 {
-  "name": "Wodo",
-  "short_name": "Wodo",
-  "description": "Captura notas y tareas al instante. Tu inbox personal para ideas, recordatorios y acciones — en Android, iOS y web.",
+  "name": "WODO",
+  "short_name": "WODO",
+  "description": "WODO — captura notas y tareas al instante. Disponible en Android, iOS y web.",
   "start_url": "/",
   "scope": "/",
   "display": "browser",
