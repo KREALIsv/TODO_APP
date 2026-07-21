@@ -103,6 +103,26 @@ class NotesRepository {
   Future<void> add(NoteItem item) async {
     await _box.put(item.id, item.toMap());
     await _syncReminder(item);
+    if (item.type != NoteType.task) return;
+
+    final now = DateTime.now();
+    await _syncDayEntry(() async {
+      if (item.isTodayCommitment(now) && item.todayAt != null) {
+        await _dayEntries.ensurePlanned(
+          noteId: item.id,
+          day: dateOnly(item.todayAt!),
+          via: DayVia.todaySwitch,
+          now: now,
+        );
+      } else if (item.dueAt != null) {
+        await _dayEntries.ensurePlanned(
+          noteId: item.id,
+          day: dateOnly(item.dueAt!),
+          via: DayVia.due,
+          now: now,
+        );
+      }
+    }, 'add');
   }
 
   Future<void> update(NoteItem item) async {

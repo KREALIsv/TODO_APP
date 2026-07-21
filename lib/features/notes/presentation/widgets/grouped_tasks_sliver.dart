@@ -35,7 +35,7 @@ class GroupedTasksExpansion {
   }
 }
 
-/// Builds slivers for grouped tasks (Hoy / Próximas / Sin fecha).
+/// Builds slivers for grouped tasks (Hoy / Próximas / Backlog).
 List<Widget> buildGroupedTasksSlivers({
   required TaskGroups groups,
   required void Function(NoteItem item) onOpen,
@@ -128,7 +128,7 @@ List<Widget> buildGroupedTasksSlivers({
     slivers.add(
       SliverToBoxAdapter(
         child: TaskSectionHeader(
-          title: 'Sin fecha',
+          title: 'Backlog',
           expanded: collapsible ? expansion.undated : null,
           onToggle: toggle(GroupedTasksSection.undated),
         ),

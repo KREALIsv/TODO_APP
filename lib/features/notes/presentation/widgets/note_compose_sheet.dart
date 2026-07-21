@@ -4,12 +4,14 @@ import 'package:uuid/uuid.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/note_item.dart';
+import '../../domain/task_groups.dart';
 import 'note_task_type_switch.dart';
 
 /// Bottom sheet ligero para crear una nota (o tarea sin fecha).
 Future<void> showNoteComposeSheet(
   BuildContext context, {
   NotesRepository? repository,
+  bool commitTaskToToday = false,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -19,15 +21,23 @@ Future<void> showNoteComposeSheet(
     builder: (context) {
       return NoteComposeSheet(
         repository: repository ?? NotesRepository.instance,
+        commitTaskToToday: commitTaskToToday,
       );
     },
   );
 }
 
 class NoteComposeSheet extends StatefulWidget {
-  const NoteComposeSheet({super.key, this.repository});
+  const NoteComposeSheet({
+    super.key,
+    this.repository,
+    this.commitTaskToToday = false,
+  });
 
   final NotesRepository? repository;
+
+  /// When true, tasks saved from this sheet get a Hoy commitment (chip Tareas).
+  final bool commitTaskToToday;
 
   @override
   State<NoteComposeSheet> createState() => _NoteComposeSheetState();
@@ -45,6 +55,9 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
   @override
   void initState() {
     super.initState();
+    if (widget.commitTaskToToday) {
+      _isTask = true;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _titleFocus.requestFocus();
     });
@@ -56,6 +69,16 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
     _bodyController.dispose();
     _titleFocus.dispose();
     super.dispose();
+  }
+
+  String? _taskSavedMessage({required bool committedToToday}) {
+    if (!_isTask) return null;
+    if (!committedToToday) return 'Tarea guardada';
+    final progress = TaskGroupsQuery.from(
+      _repo.getAll().where((n) => n.type == NoteType.task).toList(),
+    ).progress;
+    if (progress.hideIfZero) return 'Sumada a Hoy';
+    return 'Sumada a Hoy · ${progress.done}/${progress.total} done';
   }
 
   Future<void> _save() async {
@@ -72,22 +95,27 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
     }
 
     final now = DateTime.now();
+    final isTask = _isTask;
+    final commitToToday = isTask && widget.commitTaskToToday;
     await _repo.add(
       NoteItem(
         id: _uuid.v4(),
-        type: _isTask ? NoteType.task : NoteType.note,
+        type: isTask ? NoteType.task : NoteType.note,
         title: title,
         body: body,
         pinned: false,
         completed: false,
         createdAt: now,
         updatedAt: now,
+        todayAt: commitToToday ? now : null,
       ),
     );
 
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    final savedMessage = _isTask ? 'Tarea guardada' : 'Nota guardada';
+    final savedMessage =
+        _taskSavedMessage(committedToToday: commitToToday) ??
+            (isTask ? 'Tarea guardada' : 'Nota guardada');
     Navigator.of(context).pop();
     messenger
       ..hideCurrentSnackBar()

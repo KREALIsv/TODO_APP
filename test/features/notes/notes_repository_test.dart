@@ -122,6 +122,18 @@ void main() {
     expect(repo.getArchived(), isEmpty);
   });
 
+  test('add with todayAt creates an open DayEntry', () async {
+    final now = DateTime.now();
+    await repo.add(
+      buildItem(id: 'task', type: NoteType.task).copyWith(todayAt: now),
+    );
+
+    final entry = dayEntries.findForNoteDay('task', dateOnly(now));
+    expect(entry, isNotNull);
+    expect(entry!.outcome, DayOutcome.open);
+    expect(entry.via, DayVia.todaySwitch);
+  });
+
   test('setTodayCommitment toggles todayAt and clears due when on', () async {
     await repo.add(
       buildItem(id: 't', type: NoteType.task).copyWith(

@@ -225,5 +225,24 @@ void main() {
       final ofDay = NotesQuery.ofDayFrom(items, today, now: today);
       expect(ofDay.map((e) => e.id).toList(), ['today-note', 'task-today']);
     });
+
+    test('ofDayFrom includes tasks captured today without a date commitment', () {
+      final today = DateTime(2026, 7, 20, 15);
+      final items = [
+        NoteItem(
+          id: 'new-task',
+          type: NoteType.task,
+          title: 'Capturada hoy',
+          body: '',
+          pinned: false,
+          completed: false,
+          createdAt: today,
+          updatedAt: today,
+        ),
+      ];
+
+      final ofDay = NotesQuery.ofDayFrom(items, today, now: today);
+      expect(ofDay.map((e) => e.id).toList(), ['new-task']);
+    });
   });
 }
