@@ -644,10 +644,6 @@ class _HomeScreenState extends State<HomeScreen> {
           return ValueListenableBuilder<Box<Map>>(
             valueListenable: _dayEntries.listenable(),
             builder: (context, dayBox, _) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) _clock.schedule();
-              });
-
               final isArchivedFilter =
                   _effectiveFilter == NotesFilter.archived;
               final all =

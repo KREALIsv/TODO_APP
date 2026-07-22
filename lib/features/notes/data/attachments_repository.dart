@@ -65,7 +65,13 @@ class AttachmentsRepository {
     return null;
   }
 
-  int countFor(String noteId) => forNote(noteId).length;
+  int countFor(String noteId) {
+    var count = 0;
+    for (final raw in _meta.values) {
+      if (raw['noteId'] == noteId) count++;
+    }
+    return count;
+  }
 
   Future<NoteAttachment> addImage({
     required String noteId,

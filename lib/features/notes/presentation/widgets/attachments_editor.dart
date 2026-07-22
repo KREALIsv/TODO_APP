@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../global/themes/app_colors.dart';
 import '../../../../global/widgets/app_alerts.dart';
+import '../../../../global/widgets/app_loading.dart';
 import '../../../../global/widgets/outlined_add_chip.dart';
 import '../../data/attachments_repository.dart';
 import '../../domain/note_attachment.dart';
@@ -186,11 +187,7 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
                   TextButton.icon(
                     onPressed: _busy ? null : _showAddSheet,
                     icon: _busy
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
+                        ? const AppLoading(size: 16)
                         : const Icon(Icons.add, size: 18),
                     label: const Text('Añadir'),
                   ),

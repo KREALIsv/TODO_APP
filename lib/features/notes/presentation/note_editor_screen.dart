@@ -101,15 +101,22 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   @override
   void dispose() {
     if (_discardUnsavedAttachments) {
-      // Create: drop the whole draft note's images.
-      // Edit: only drop images added in this session (deletes stay).
-      if (!_isEditing) {
-        _attachments.deleteForNote(_noteId);
-      } else {
-        for (final id in _sessionAddedAttachmentIds) {
-          _attachments.delete(id);
-        }
-      }
+      // Defer Hive writes so they don't contend with Home's first paint.
+      final noteId = _noteId;
+      final editing = _isEditing;
+      final sessionIds = List<String>.from(_sessionAddedAttachmentIds);
+      final attachments = _attachments;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future<void>(() async {
+          if (!editing) {
+            await attachments.deleteForNote(noteId);
+          } else {
+            for (final id in sessionIds) {
+              await attachments.delete(id);
+            }
+          }
+        });
+      });
     }
     _titleController.dispose();
     _bodyController.dispose();
