@@ -145,16 +145,24 @@ jobs:
             landing/ \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/sites/landing/"
 
-      - name: Pull and bring up containers
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Stream API image to VPS
+        if: env.DEPLOY_API == 'true'
+        run: |
+          SSH=(ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT || 22 }}" -o StrictHostKeyChecking=yes "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}")
+          # Avoid GHCR pull on the VPS (private package + token scope). The runner
+          # is already authenticated after build/push; stream the image over SSH.
+          docker pull ghcr.io/krealisv/wodo-api:latest
+          docker save ghcr.io/krealisv/wodo-api:latest | "${SSH[@]}" 'docker load'
+
+      - name: Bring up containers
         run: |
           REMOTE="cd '${{ secrets.DEPLOY_PATH }}'"
           SSH=(ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT || 22 }}" -o StrictHostKeyChecking=yes "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}")
           if [ "${{ env.DEPLOY_API }}" = "true" ]; then
-            # GHCR package is private by default; VPS must auth before pull.
-            printf '%s' "$GHCR_TOKEN" | "${SSH[@]}" 'docker login ghcr.io -u krealisv --password-stdin'
-            "${SSH[@]}" "${REMOTE} && docker compose pull api"
+            "${SSH[@]}" "test -r '${{ secrets.DEPLOY_PATH }}/.env'" || {
+              echo "::error::${{ secrets.DEPLOY_USER }} cannot read ${{ secrets.DEPLOY_PATH }}/.env. On the VPS as root run: chown ${{ secrets.DEPLOY_USER }}:${{ secrets.DEPLOY_USER }} ${{ secrets.DEPLOY_PATH }}/.env && chmod 600 ${{ secrets.DEPLOY_PATH }}/.env"
+              exit 1
+            }
           fi
           "${SSH[@]}" "${REMOTE} && docker compose up -d"
 
