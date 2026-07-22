@@ -21,6 +21,12 @@ Copy from `deploy/.env.example` and fill in production values:
 PostgreSQL is **not** in production `docker-compose.yml`; provision it separately
 (managed DB or a Postgres container on the VPS with a private network).
 
+Important on the VPS:
+
+- `/opt/wodo/.env` must be readable by the deploy user (`wododeploy`):
+  `chown wododeploy:wododeploy /opt/wodo/.env && chmod 600 /opt/wodo/.env`
+- `DATABASE_URL` password must match the Postgres user password exactly.
+
 ## Edge (one-time)
 
 Re-run on the VPS (needs access to the shared Caddyfile):
