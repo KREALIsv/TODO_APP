@@ -6,7 +6,7 @@ puedes eliminar su fila en Postgres para que vuelva a **registrarse** con el mis
 ## Requisitos
 
 - SSH al VPS (`144.91.71.215`)
-- Contenedor Postgres `wodo-db` en ejecución (red `syvar_default`)
+- Contenedor Postgres `wodo-postgres` en ejecución (red `syvar_default`)
 - Credenciales en `/opt/wodo/.env` → `DATABASE_URL`
 
 ## Opción A — Script (recomendado)
@@ -26,7 +26,7 @@ Copia y pega en la terminal del VPS (cambia el correo):
 
 ```bash
 # 1. Entrar al contenedor Postgres
-docker exec -it wodo-db psql -U wodo_user -d wodo
+docker exec -it wodo-postgres psql -U wodo_user -d wodo
 
 # 2. Dentro de psql — verificar usuario (minúsculas)
 SELECT id, email, created_at FROM users WHERE email = 'tu@correo.com';
@@ -48,5 +48,5 @@ DELETE FROM users WHERE email = 'tu@correo.com';
 ## Notas
 
 - Esto **no** borra datos locales del dispositivo del usuario.
-- Si el contenedor no se llama `wodo-db`, lista contenedores: `docker ps --format '{{.Names}}'`
+- Si el contenedor tiene otro nombre, lista contenedores: `docker ps --format '{{.Names}}' | grep wodo`
 - Usuario/contraseña DB: revisa `DATABASE_URL` en `/opt/wodo/.env`

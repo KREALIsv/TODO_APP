@@ -4,12 +4,12 @@
 # Usage (on the VPS as root or a user with docker access):
 #   sudo bash scripts/delete-wodo-user.sh tu@correo.com
 #
-# Requires: wodo-db container on syvar_default (see deploy/AUTH_SYNC_ROLLOUT.md).
+# Requires: wodo-postgres container on syvar_default (see deploy/AUTH_SYNC_ROLLOUT.md).
 
 set -euo pipefail
 
 EMAIL="${1:-}"
-CONTAINER="${WODO_DB_CONTAINER:-wodo-db}"
+CONTAINER="${WODO_DB_CONTAINER:-wodo-postgres}"
 DB_USER="${WODO_DB_USER:-wodo_user}"
 DB_NAME="${WODO_DB_NAME:-wodo}"
 
