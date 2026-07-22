@@ -69,11 +69,7 @@ Future<void> exportNotesData(NotesRepository repo) async {
     await SharePlus.instance.share(
       ShareParams(
         files: [
-          XFile.fromData(
-            bytes,
-            name: fileName,
-            mimeType: backupMimeType,
-          ),
+          XFile.fromData(bytes, name: fileName, mimeType: backupMimeType),
         ],
         subject: 'WODO backup',
       ),
@@ -86,13 +82,7 @@ Future<void> exportNotesData(NotesRepository repo) async {
   await file.writeAsString(payload);
   await SharePlus.instance.share(
     ShareParams(
-      files: [
-        XFile(
-          file.path,
-          name: fileName,
-          mimeType: backupMimeType,
-        ),
-      ],
+      files: [XFile(file.path, name: fileName, mimeType: backupMimeType)],
       subject: 'WODO backup',
     ),
   );

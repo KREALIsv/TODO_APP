@@ -7,12 +7,14 @@
 #   CADDY_CONTAINER  Nombre del contenedor Caddy   (default: syvar-uat-caddy)
 #   LANDING_DOMAIN   Dominio landing               (default: wodo.app)
 #   APP_DOMAIN       Dominio app                   (default: app.wodo.app)
+#   API_DOMAIN       Dominio api                   (default: api.wodo.app)
 set -euo pipefail
 
 CADDYFILE="${CADDYFILE:-/opt/syvar/ops/Caddyfile}"
 CADDY_CONTAINER="${CADDY_CONTAINER:-syvar-uat-caddy}"
 LANDING_DOMAIN="${LANDING_DOMAIN:-wodo.app}"
 APP_DOMAIN="${APP_DOMAIN:-app.wodo.app}"
+API_DOMAIN="${API_DOMAIN:-api.wodo.app}"
 
 BEGIN="# --- wodo (managed by deploy/scripts/setup-wodo-https.sh) ---"
 END="# --- end wodo ---"
@@ -50,6 +52,11 @@ $APP_DOMAIN {
 	encode gzip zstd
 	reverse_proxy wodo-web:80
 }
+
+$API_DOMAIN {
+	encode gzip zstd
+	reverse_proxy wodo-api:3000
+}
 $END
 EOF
 
@@ -64,4 +71,4 @@ rm -f "$tmp"
 docker exec "$CADDY_CONTAINER" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 docker exec "$CADDY_CONTAINER" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
 
-echo "OK: bloque wodo aplicado y Caddy recargado ($LANDING_DOMAIN, www.$LANDING_DOMAIN, $APP_DOMAIN)."
+echo "OK: bloque wodo aplicado y Caddy recargado ($LANDING_DOMAIN, www.$LANDING_DOMAIN, $APP_DOMAIN, $API_DOMAIN)."

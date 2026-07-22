@@ -17,6 +17,7 @@ jobs:
     outputs:
       app: ${{ steps.filter.outputs.app }}
       landing: ${{ steps.filter.outputs.landing }}
+      api: ${{ steps.filter.outputs.api }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -35,6 +36,11 @@ jobs:
               - 'landing/**'
               - 'deploy/**'
               - '.github/workflows/deploy.yml'
+            api:
+              - 'backend/**'
+              - 'prisma/**'
+              - 'deploy/**'
+              - '.github/workflows/deploy.yml'
 
   deploy:
     needs: changes
@@ -42,15 +48,39 @@ jobs:
     if: >-
       ${{ github.event_name == 'workflow_dispatch'
           || needs.changes.outputs.app == 'true'
-          || needs.changes.outputs.landing == 'true' }}
+          || needs.changes.outputs.landing == 'true'
+          || needs.changes.outputs.api == 'true' }}
     runs-on: ubuntu-latest
     environment: production
     env:
       DEPLOY_APP: ${{ needs.changes.outputs.app == 'true' || github.event_name == 'workflow_dispatch' }}
       DEPLOY_LANDING: ${{ needs.changes.outputs.landing == 'true' || github.event_name == 'workflow_dispatch' }}
+      DEPLOY_API: ${{ needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        if: env.DEPLOY_API == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: env.DEPLOY_API == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        if: env.DEPLOY_API == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/wodo-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Configure SSH
         run: |
@@ -108,11 +138,18 @@ jobs:
             landing/ \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/sites/landing/"
 
-      - name: Bring up containers
+      - name: Pull and bring up containers
         run: |
           ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT || 22 }}" \
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            "cd '${{ secrets.DEPLOY_PATH }}' && docker compose up -d"
+            "cd '${{ secrets.DEPLOY_PATH }}' && docker compose pull && docker compose up -d"
+
+      - name: Run Prisma migrations
+        if: env.DEPLOY_API == 'true'
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT || 22 }}" \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "cd '${{ secrets.DEPLOY_PATH }}' && docker compose exec -T api npx prisma migrate deploy"
 
       # NOTA: el registro en el edge compartido (scripts/setup-wodo-https.sh) es
       # de una sola vez y ya está aplicado; requiere privilegios para escribir el

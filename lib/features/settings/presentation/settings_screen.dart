@@ -5,8 +5,14 @@ import '../../../core/theme/app_surface.dart';
 import '../../../global/constants/config.dart';
 import '../../../global/themes/app_colors.dart';
 import '../../../global/widgets/app_alerts.dart';
+import '../../auth/data/auth_service.dart';
+import '../../auth/presentation/auth_screen.dart';
+import '../../billing/presentation/billing_diagnostics_screen.dart';
+import '../../billing/data/subscription_service.dart';
+import '../../billing/presentation/plan_management_screen.dart';
 import '../../notes/data/notes_repository.dart';
 import '../data/settings_repository.dart';
+import '../../sync/data/sync_service.dart';
 import '../domain/list_background.dart';
 import 'about_screen.dart';
 import 'archived_screen.dart';
@@ -62,10 +68,7 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       title: 'Números en el heatmap',
       groupValue: _settings.showHeatmapDayNumbers,
-      options: const [
-        (true, 'Visibles'),
-        (false, 'Ocultos'),
-      ],
+      options: const [(true, 'Visibles'), (false, 'Ocultos')],
     );
     if (selected != null) {
       await _settings.setShowHeatmapDayNumbers(selected);
@@ -89,11 +92,50 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _openAbout(BuildContext context) {
+    return Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const AboutScreen()));
+  }
+
+  Future<void> _openBillingDiagnostics(BuildContext context) {
     return Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const AboutScreen(),
-      ),
+      MaterialPageRoute<void>(builder: (_) => const BillingDiagnosticsScreen()),
     );
+  }
+
+  Future<void> _openPlan(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const PlanManagementScreen()),
+    );
+  }
+
+  Future<void> _openAccount(BuildContext context) {
+    return Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const AuthScreen()));
+  }
+
+  Future<void> _syncNow(BuildContext context) async {
+    await SyncService.instance.syncNow();
+    if (!context.mounted) return;
+    final error = SyncService.instance.errorMessage;
+    await AppAlerts.show(
+      context,
+      message: error ?? 'Tus datos están actualizados.',
+      type: error == null ? AppAlertType.success : AppAlertType.error,
+    );
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    final confirmed = await AppAlerts.confirm(
+      context,
+      title: 'Cerrar sesión',
+      message: 'Tus datos locales se conservarán en este dispositivo.',
+      confirmLabel: 'Cerrar sesión',
+      isDestructive: true,
+    );
+    if (!confirmed) return;
+    await AuthService.instance.logout();
   }
 
   Future<void> _export(BuildContext context) async {
@@ -119,8 +161,7 @@ class SettingsScreen extends StatelessWidget {
     final confirmed = await AppAlerts.confirm(
       context,
       title: 'Importar datos',
-      message:
-          'Esto reemplazará tus notas y tareas actuales. ¿Continuar?',
+      message: 'Esto reemplazará tus notas y tareas actuales. ¿Continuar?',
       confirmLabel: 'Continuar',
       isDestructive: true,
     );
@@ -187,7 +228,12 @@ class SettingsScreen extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     final inner = ListenableBuilder(
-      listenable: _settings,
+      listenable: Listenable.merge([
+        _settings,
+        AuthService.instance,
+        SyncService.instance,
+        SubscriptionService.instance,
+      ]),
       builder: (context, _) {
         final bg = _settings.listBackground;
         final brightness = Theme.of(context).brightness;
@@ -328,6 +374,73 @@ class SettingsScreen extends StatelessWidget {
       ),
       const SizedBox(height: 20),
       SettingsSectionLabel(
+        label: 'Cuenta y sincronización',
+        textTheme: textTheme,
+        accent: accent,
+      ),
+      SettingsCard(
+        children: [
+          SettingsRow(
+            icon: Icons.account_circle_outlined,
+            title: AuthService.instance.isAuthenticated
+                ? 'Cuenta WODO'
+                : 'Iniciar sesión',
+            trailing: AuthService.instance.isAuthenticated
+                ? 'Conectada'
+                : 'Local',
+            accent: accent,
+            onTap: () => AuthService.instance.isAuthenticated
+                ? _openPlan(context)
+                : _openAccount(context),
+          ),
+          const SettingsDivider(),
+          SettingsRow(
+            icon: Icons.workspace_premium_outlined,
+            title: 'WODO Plus',
+            trailing: SubscriptionService.instance.planLabel,
+            accent: accent,
+            onTap: () => _openPlan(context),
+          ),
+          if (AuthService.instance.isAuthenticated) ...[
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.sync_outlined,
+              title: 'Sincronizar ahora',
+              trailing: _syncLabel(),
+              accent: accent,
+              onTap: () => _syncNow(context),
+            ),
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.logout_outlined,
+              title: 'Cerrar sesión',
+              accent: accent,
+              onTap: () => _logout(context),
+            ),
+          ],
+        ],
+      ),
+      const SizedBox(height: 20),
+      if (Config.version.contains('dev')) ...[
+        SettingsSectionLabel(
+          label: 'Desarrollo',
+          textTheme: textTheme,
+          accent: accent,
+        ),
+        SettingsCard(
+          children: [
+            SettingsRow(
+              icon: Icons.science_outlined,
+              title: 'Diagnóstico de billing heredado',
+              trailing: 'Sandbox',
+              accent: accent,
+              onTap: () => _openBillingDiagnostics(context),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+      ],
+      SettingsSectionLabel(
         label: 'Acerca de',
         textTheme: textTheme,
         accent: accent,
@@ -352,6 +465,16 @@ class SettingsScreen extends StatelessWidget {
       ),
     ];
   }
+
+  String _syncLabel() {
+    if (!AuthService.instance.isConfigured) return 'Pendiente';
+    return switch (SyncService.instance.state) {
+      SyncState.unavailable => 'Inicia sesión',
+      SyncState.idle => 'Actualizado',
+      SyncState.syncing => 'Sincronizando',
+      SyncState.error => 'Error',
+    };
+  }
 }
 
 class _BackgroundSwatch extends StatelessWidget {
@@ -372,7 +495,7 @@ class _BackgroundSwatch extends StatelessWidget {
               Image.asset(
                 option.assetPath!,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
+                errorBuilder: (_, _, _) =>
                     ColoredBox(color: option.resolveSolid(brightness)),
               ),
               ColoredBox(
@@ -384,19 +507,17 @@ class _BackgroundSwatch extends StatelessWidget {
           fill = ColoredBox(color: option.resolveSolid(brightness));
         }
       case ListBackgroundKind.gradient:
-        final colors = option.resolveGradient(brightness) ??
+        final colors =
+            option.resolveGradient(brightness) ??
             [AppColors.neutral00, AppColors.neutral20];
         fill = DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: colors),
-          ),
+          decoration: BoxDecoration(gradient: LinearGradient(colors: colors)),
         );
       case ListBackgroundKind.brandRosa:
         fill = Image.asset(
           ListBackgrounds.rosaAsset,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) =>
-              const ColoredBox(color: Color(0xFFF2327D)),
+          errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFFF2327D)),
         );
       case ListBackgroundKind.brandVerde:
         fill = const ColoredBox(color: AppColors.primary00);
