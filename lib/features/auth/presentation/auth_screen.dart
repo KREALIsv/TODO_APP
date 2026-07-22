@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_surface.dart';
 import '../../../global/widgets/app_alerts.dart';
 import '../../settings/presentation/widgets/settings_section.dart';
-import '../../billing/data/subscription_service.dart';
 import '../../sync/data/sync_service.dart';
 import '../data/auth_service.dart';
 
@@ -43,7 +42,6 @@ class _AuthScreenState extends State<AuthScreen> {
         await _auth.login(email: _email.text, password: _password.text);
       }
       await SyncService.instance.syncNow();
-      await SubscriptionService.instance.refresh();
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {

@@ -136,51 +136,6 @@ CREATE TABLE "sync_mutations" (
     CONSTRAINT "sync_mutations_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "subscriptions" (
-    "id" UUID NOT NULL,
-    "user_id" UUID NOT NULL,
-    "original_app_user_id" VARCHAR(64),
-    "store" VARCHAR(32),
-    "product_id" VARCHAR(128),
-    "status" VARCHAR(32) NOT NULL,
-    "expires_at" TIMESTAMPTZ(6),
-    "event_count" INTEGER NOT NULL DEFAULT 0,
-    "last_event_at" TIMESTAMPTZ(6),
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL,
-
-    CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "entitlements" (
-    "id" UUID NOT NULL,
-    "user_id" UUID NOT NULL,
-    "entitlement_id" VARCHAR(64) NOT NULL,
-    "is_active" BOOLEAN NOT NULL,
-    "expires_at" TIMESTAMPTZ(6),
-    "updated_at" TIMESTAMPTZ(6) NOT NULL,
-
-    CONSTRAINT "entitlements_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "billing_events" (
-    "id" UUID NOT NULL,
-    "event_id" VARCHAR(128) NOT NULL,
-    "event_type" VARCHAR(64) NOT NULL,
-    "app_user_id" VARCHAR(64) NOT NULL,
-    "user_id" UUID,
-    "store" VARCHAR(32),
-    "product_id" VARCHAR(128),
-    "status" VARCHAR(32),
-    "raw_payload" JSONB NOT NULL,
-    "processed_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "billing_events_pkey" PRIMARY KEY ("id")
-);
-
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
@@ -255,27 +210,6 @@ CREATE INDEX "sync_mutations_user_id_entity_type_entity_id_idx" ON "sync_mutatio
 
 -- CreateIndex
 CREATE UNIQUE INDEX "sync_mutations_user_id_client_mutation_id_key" ON "sync_mutations"("user_id", "client_mutation_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "subscriptions_user_id_key" ON "subscriptions"("user_id");
-
--- CreateIndex
-CREATE INDEX "subscriptions_user_id_idx" ON "subscriptions"("user_id");
-
--- CreateIndex
-CREATE INDEX "entitlements_user_id_idx" ON "entitlements"("user_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "entitlements_user_id_entitlement_id_key" ON "entitlements"("user_id", "entitlement_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "billing_events_event_id_key" ON "billing_events"("event_id");
-
--- CreateIndex
-CREATE INDEX "billing_events_app_user_id_idx" ON "billing_events"("app_user_id");
-
--- CreateIndex
-CREATE INDEX "billing_events_event_id_idx" ON "billing_events"("event_id");
 
 -- AddForeignKey
 ALTER TABLE "user_identities" ADD CONSTRAINT "user_identities_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

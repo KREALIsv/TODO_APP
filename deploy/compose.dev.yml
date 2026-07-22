@@ -42,8 +42,6 @@ services:
       CORS_ALLOWED_ORIGINS: http://localhost:8080
       THROTTLE_TTL: 60
       THROTTLE_LIMIT: 1000
-      REVENUECAT_WEBHOOK_AUTHORIZATION: ${REVENUECAT_WEBHOOK_AUTHORIZATION:-Bearer dev}
-      REVENUECAT_WEBHOOK_SIGNING_SECRET: ${REVENUECAT_WEBHOOK_SIGNING_SECRET:-dev}
     env_file:
       - ../backend/.env
     volumes:

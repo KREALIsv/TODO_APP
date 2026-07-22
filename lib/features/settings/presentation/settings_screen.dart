@@ -7,9 +7,6 @@ import '../../../global/themes/app_colors.dart';
 import '../../../global/widgets/app_alerts.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/auth_screen.dart';
-import '../../billing/presentation/billing_diagnostics_screen.dart';
-import '../../billing/data/subscription_service.dart';
-import '../../billing/presentation/plan_management_screen.dart';
 import '../../notes/data/notes_repository.dart';
 import '../data/settings_repository.dart';
 import '../../sync/data/sync_service.dart';
@@ -95,18 +92,6 @@ class SettingsScreen extends StatelessWidget {
     return Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const AboutScreen()));
-  }
-
-  Future<void> _openBillingDiagnostics(BuildContext context) {
-    return Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const BillingDiagnosticsScreen()),
-    );
-  }
-
-  Future<void> _openPlan(BuildContext context) {
-    return Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const PlanManagementScreen()),
-    );
   }
 
   Future<void> _openAccount(BuildContext context) {
@@ -232,7 +217,6 @@ class SettingsScreen extends StatelessWidget {
         _settings,
         AuthService.instance,
         SyncService.instance,
-        SubscriptionService.instance,
       ]),
       builder: (context, _) {
         final bg = _settings.listBackground;
@@ -389,17 +373,10 @@ class SettingsScreen extends StatelessWidget {
                 ? 'Conectada'
                 : 'Local',
             accent: accent,
-            onTap: () => AuthService.instance.isAuthenticated
-                ? _openPlan(context)
-                : _openAccount(context),
-          ),
-          const SettingsDivider(),
-          SettingsRow(
-            icon: Icons.workspace_premium_outlined,
-            title: 'WODO Plus',
-            trailing: SubscriptionService.instance.planLabel,
-            accent: accent,
-            onTap: () => _openPlan(context),
+            onTap: AuthService.instance.isAuthenticated
+                ? null
+                : () => _openAccount(context),
+            showChevron: !AuthService.instance.isAuthenticated,
           ),
           if (AuthService.instance.isAuthenticated) ...[
             const SettingsDivider(),
@@ -421,25 +398,6 @@ class SettingsScreen extends StatelessWidget {
         ],
       ),
       const SizedBox(height: 20),
-      if (Config.version.contains('dev')) ...[
-        SettingsSectionLabel(
-          label: 'Desarrollo',
-          textTheme: textTheme,
-          accent: accent,
-        ),
-        SettingsCard(
-          children: [
-            SettingsRow(
-              icon: Icons.science_outlined,
-              title: 'Diagnóstico de billing heredado',
-              trailing: 'Sandbox',
-              accent: accent,
-              onTap: () => _openBillingDiagnostics(context),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-      ],
       SettingsSectionLabel(
         label: 'Acerca de',
         textTheme: textTheme,
