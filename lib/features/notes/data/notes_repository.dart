@@ -137,6 +137,11 @@ class NotesRepository {
     await _syncReminder(item);
   }
 
+  Future<void> saveFromSync(NoteItem item) async {
+    await _box.put(item.id, item.toMap());
+    await _syncReminder(item);
+  }
+
   Future<void> delete(String id) async {
     await _cancelReminder(id);
     try {
@@ -151,10 +156,7 @@ class NotesRepository {
     final current = getById(id);
     if (current == null) return;
     await update(
-      current.copyWith(
-        pinned: !current.pinned,
-        updatedAt: DateTime.now(),
-      ),
+      current.copyWith(pinned: !current.pinned, updatedAt: DateTime.now()),
     );
   }
 
@@ -173,11 +175,7 @@ class NotesRepository {
     );
     await _syncDayEntry(() async {
       if (nextCompleted) {
-        await _dayEntries.markCompleted(
-          noteId: id,
-          day: day,
-          outcomeAt: now,
-        );
+        await _dayEntries.markCompleted(noteId: id, day: day, outcomeAt: now);
       } else {
         await _dayEntries.reopen(noteId: id, day: day);
       }
@@ -195,8 +193,7 @@ class NotesRepository {
         todayAt: on ? now : null,
         dueAt: on ? null : current.dueAt,
         dueHasTime: on ? false : current.dueHasTime,
-        reminderMinutesBefore:
-            on ? null : current.reminderMinutesBefore,
+        reminderMinutesBefore: on ? null : current.reminderMinutesBefore,
         updatedAt: now,
       ),
     );
@@ -238,8 +235,7 @@ class NotesRepository {
         todayAt: nextTodayAt,
         dueAt: dueAt,
         dueHasTime: dueHasTime,
-        reminderMinutesBefore:
-            dueAt != null ? reminderMinutesBefore : null,
+        reminderMinutesBefore: dueAt != null ? reminderMinutesBefore : null,
         updatedAt: now,
       ),
     );
@@ -406,23 +402,13 @@ class NotesRepository {
     final current = getById(id);
     if (current == null || current.isArchived) return;
     final now = DateTime.now();
-    await update(
-      current.copyWith(
-        archivedAt: now,
-        updatedAt: now,
-      ),
-    );
+    await update(current.copyWith(archivedAt: now, updatedAt: now));
   }
 
   Future<void> restore(String id) async {
     final current = getById(id);
     if (current == null || !current.isArchived) return;
-    await update(
-      current.copyWith(
-        archivedAt: null,
-        updatedAt: DateTime.now(),
-      ),
-    );
+    await update(current.copyWith(archivedAt: null, updatedAt: DateTime.now()));
   }
 
   /// Unique tags across active notes, for autocomplete.
@@ -466,8 +452,9 @@ class NotesRepository {
 
     for (final item in _readAllRaw()) {
       if (!item.tags.any((t) => t.toLowerCase() == key)) continue;
-      final next =
-          item.tags.where((t) => t.toLowerCase() != key).toList(growable: false);
+      final next = item.tags
+          .where((t) => t.toLowerCase() != key)
+          .toList(growable: false);
       await update(item.copyWith(tags: next, updatedAt: DateTime.now()));
     }
   }

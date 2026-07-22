@@ -58,9 +58,9 @@ class DayEntriesRepository {
 
   /// Open pending rows for [day].
   List<DayEntry> openPendingForDay(DateTime day) {
-    return entriesForDay(day)
-        .where((e) => e.outcome == DayOutcome.open)
-        .toList(growable: false);
+    return entriesForDay(
+      day,
+    ).where((e) => e.outcome == DayOutcome.open).toList(growable: false);
   }
 
   /// Upsert by (noteId, day): updates existing or inserts [entry].
@@ -76,6 +76,13 @@ class DayEntriesRepository {
     await _box.put(toSave.id, toSave.toMap());
     return toSave;
   }
+
+  Future<void> saveFromSync(Map<String, dynamic> map) async {
+    final entry = DayEntry.fromMap(map);
+    await _box.put(entry.id, entry.toMap());
+  }
+
+  Future<void> deleteFromSync(String id) => _box.delete(id);
 
   /// Idempotent: ensure an open planned entry exists for (note, day).
   Future<DayEntry> ensurePlanned({

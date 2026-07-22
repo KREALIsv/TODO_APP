@@ -5,11 +5,15 @@ import '../../../core/theme/app_surface.dart';
 import '../../../global/constants/config.dart';
 import '../../../global/themes/app_colors.dart';
 import '../../../global/widgets/app_alerts.dart';
+import '../../auth/data/auth_service.dart';
+import '../../auth/presentation/auth_screen.dart';
 import '../../notes/data/attachments_repository.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
 import '../data/settings_repository.dart';
+import '../../sync/data/device_identity.dart';
+import '../../sync/data/sync_service.dart';
 import '../domain/list_background.dart';
 import 'about_screen.dart';
 import 'archived_screen.dart';
@@ -65,10 +69,7 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       title: 'Números en el heatmap',
       groupValue: _settings.showHeatmapDayNumbers,
-      options: const [
-        (true, 'Visibles'),
-        (false, 'Ocultos'),
-      ],
+      options: const [(true, 'Visibles'), (false, 'Ocultos')],
     );
     if (selected != null) {
       await _settings.setShowHeatmapDayNumbers(selected);
@@ -92,11 +93,58 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _openAbout(BuildContext context) {
-    return Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const AboutScreen(),
+    return Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const AboutScreen()));
+  }
+
+  Future<void> _openAccount(BuildContext context) {
+    return Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const AuthScreen()));
+  }
+
+  Future<void> _syncNow(BuildContext context) async {
+    await SyncService.instance.syncNow();
+    if (!context.mounted) return;
+    final error = SyncService.instance.errorMessage;
+    await AppAlerts.show(
+      context,
+      message: error ?? 'Tus datos están actualizados.',
+      type: error == null ? AppAlertType.success : AppAlertType.error,
+    );
+  }
+
+  Future<void> _toggleDeviceSync(BuildContext context) async {
+    final next = !DeviceIdentity.instance.syncEnabled;
+    await DeviceIdentity.instance.setSyncEnabled(next);
+    if (!context.mounted) return;
+    if (next && AuthService.instance.isAuthenticated) {
+      await SyncService.instance.syncNow();
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          next
+              ? 'Sincronización activa en este dispositivo'
+              : 'Sincronización pausada en este dispositivo',
+        ),
+        behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    final confirmed = await AppAlerts.confirm(
+      context,
+      title: 'Cerrar sesión',
+      message: 'Tus datos locales se conservarán en este dispositivo.',
+      confirmLabel: 'Cerrar sesión',
+      isDestructive: true,
+    );
+    if (!confirmed) return;
+    await AuthService.instance.logout();
   }
 
   Future<void> _export(BuildContext context) async {
@@ -127,8 +175,7 @@ class SettingsScreen extends StatelessWidget {
     final confirmed = await AppAlerts.confirm(
       context,
       title: 'Importar datos',
-      message:
-          'Esto reemplazará tus notas y tareas actuales. ¿Continuar?',
+      message: 'Esto reemplazará tus notas y tareas actuales. ¿Continuar?',
       confirmLabel: 'Continuar',
       isDestructive: true,
     );
@@ -205,7 +252,12 @@ class SettingsScreen extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     final inner = ListenableBuilder(
-      listenable: _settings,
+      listenable: Listenable.merge([
+        _settings,
+        AuthService.instance,
+        SyncService.instance,
+        DeviceIdentity.instance,
+      ]),
       builder: (context, _) {
         final bg = _settings.listBackground;
         final brightness = Theme.of(context).brightness;
@@ -346,6 +398,65 @@ class SettingsScreen extends StatelessWidget {
       ),
       const SizedBox(height: 20),
       SettingsSectionLabel(
+        label: 'Cuenta y sincronización',
+        textTheme: textTheme,
+        accent: accent,
+      ),
+      SettingsCard(
+        children: [
+          SettingsRow(
+            icon: Icons.account_circle_outlined,
+            title: AuthService.instance.isAuthenticated
+                ? 'Cuenta WODO'
+                : 'Iniciar sesión',
+            trailing: AuthService.instance.isAuthenticated
+                ? 'Conectada'
+                : 'Local',
+            accent: accent,
+            onTap: AuthService.instance.isAuthenticated
+                ? null
+                : () => _openAccount(context),
+            showChevron: !AuthService.instance.isAuthenticated,
+          ),
+          if (AuthService.instance.isAuthenticated) ...[
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.devices_outlined,
+              title: 'Este dispositivo',
+              trailing: DeviceIdentity.instance.platformLabel,
+              accent: accent,
+              showChevron: false,
+            ),
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.cloud_sync_outlined,
+              title: 'Sincronizar aquí',
+              trailing: DeviceIdentity.instance.syncEnabled ? 'Activa' : 'Pausada',
+              accent: accent,
+              onTap: () => _toggleDeviceSync(context),
+            ),
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.sync_outlined,
+              title: 'Sincronizar ahora',
+              trailing: _syncLabel(),
+              accent: accent,
+              onTap: DeviceIdentity.instance.syncEnabled
+                  ? () => _syncNow(context)
+                  : null,
+            ),
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.logout_outlined,
+              title: 'Cerrar sesión',
+              accent: accent,
+              onTap: () => _logout(context),
+            ),
+          ],
+        ],
+      ),
+      const SizedBox(height: 20),
+      SettingsSectionLabel(
         label: 'Acerca de',
         textTheme: textTheme,
         accent: accent,
@@ -370,6 +481,17 @@ class SettingsScreen extends StatelessWidget {
       ),
     ];
   }
+
+  String _syncLabel() {
+    if (!AuthService.instance.isConfigured) return 'Pendiente';
+    if (!DeviceIdentity.instance.syncEnabled) return 'Pausada';
+    return switch (SyncService.instance.state) {
+      SyncState.unavailable => 'Inicia sesión',
+      SyncState.idle => 'Actualizado',
+      SyncState.syncing => 'Sincronizando',
+      SyncState.error => 'Error',
+    };
+  }
 }
 
 class _BackgroundSwatch extends StatelessWidget {
@@ -390,7 +512,7 @@ class _BackgroundSwatch extends StatelessWidget {
               Image.asset(
                 option.assetPath!,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
+                errorBuilder: (_, _, _) =>
                     ColoredBox(color: option.resolveSolid(brightness)),
               ),
               ColoredBox(
@@ -402,19 +524,17 @@ class _BackgroundSwatch extends StatelessWidget {
           fill = ColoredBox(color: option.resolveSolid(brightness));
         }
       case ListBackgroundKind.gradient:
-        final colors = option.resolveGradient(brightness) ??
+        final colors =
+            option.resolveGradient(brightness) ??
             [AppColors.neutral00, AppColors.neutral20];
         fill = DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: colors),
-          ),
+          decoration: BoxDecoration(gradient: LinearGradient(colors: colors)),
         );
       case ListBackgroundKind.brandRosa:
         fill = Image.asset(
           ListBackgrounds.rosaAsset,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) =>
-              const ColoredBox(color: Color(0xFFF2327D)),
+          errorBuilder: (_, _, _) => const ColoredBox(color: Color(0xFFF2327D)),
         );
       case ListBackgroundKind.brandVerde:
         fill = const ColoredBox(color: AppColors.primary00);

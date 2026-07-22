@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Auth & identity
+// ---------------------------------------------------------------------------
+
+enum AuthProvider {
+  email
+  google
+  apple
+}
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique @db.VarChar(255)
+  passwordHash  String?  @map("password_hash") @db.VarChar(255)
+  emailVerified Boolean  @default(false) @map("email_verified")
+  isAdmin       Boolean  @default(false) @map("is_admin")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  identities  UserIdentity[]
+  sessions    Session[]
+  devices     Device[]
+  notes       Note[]
+  tags        Tag[]
+  dayEntries  DayEntry[]
+  syncCursors SyncCursor[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model UserIdentity {
+  id           String      @id @default(uuid()) @db.Uuid
+  userId       String      @map("user_id") @db.Uuid
+  provider     AuthProvider
+  providerId   String      @map("provider_id") @db.VarChar(255)
+  email        String?     @db.VarChar(255)
+  displayName  String?     @map("display_name") @db.VarChar(255)
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@map("user_identities")
+}
+
+model Session {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  refreshToken String    @unique @map("refresh_token") @db.VarChar(512)
+  sessionUuid  String    @unique @map("session_uuid") @db.VarChar(64)
+  ipAddress    String?   @map("ip_address") @db.VarChar(45)
+  userAgent    String?   @map("user_agent") @db.Text
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshToken])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Device {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  appUserId    String    @unique @map("app_user_id") @db.VarChar(64)
+  platform     String?   @db.VarChar(32)
+  osVersion    String?   @map("os_version") @db.VarChar(32)
+  appVersion   String?   @map("app_version") @db.VarChar(32)
+  lastSyncedAt DateTime? @map("last_synced_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([appUserId])
+  @@map("devices")
+}
+
+// ---------------------------------------------------------------------------
+// User data (synced entities)
+// ---------------------------------------------------------------------------
+
+model Note {
+  id           String    @id @db.VarChar(64) // client-generated stable id
+  userId       String    @map("user_id") @db.Uuid
+  content      String    @db.Text
+  archivedAt   DateTime? @map("archived_at") @db.Timestamptz(6)
+  dueAt        DateTime? @map("due_at") @db.Timestamptz(6)
+  reminderOffset String? @map("reminder_offset") @db.VarChar(16)
+  tagIds       String[]  @map("tag_ids") @db.VarChar(64)
+  serverRevision BigInt  @map("server_revision")
+  serverUpdatedAt DateTime @map("server_updated_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId, serverUpdatedAt])
+  @@index([userId, serverRevision])
+  @@map("notes")
+}
+
+model Tag {
+  id            String    @id @db.VarChar(64)
+  userId        String    @map("user_id") @db.Uuid
+  name          String    @db.VarChar(255)
+  colorId       String?   @map("color_id") @db.VarChar(32)
+  opacity       Float?
+  serverRevision BigInt   @map("server_revision")
+  serverUpdatedAt DateTime @map("server_updated_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId, serverUpdatedAt])
+  @@map("tags")
+}
+
+model DayEntry {
+  id            String    @id @db.VarChar(64)
+  userId        String    @map("user_id") @db.Uuid
+  noteId        String    @map("note_id") @db.VarChar(64)
+  day           DateTime  @db.Date
+  outcome       String?   @db.VarChar(16)
+  serverRevision BigInt   @map("server_revision")
+  serverUpdatedAt DateTime @map("server_updated_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId, noteId, day])
+  @@index([userId, serverUpdatedAt])
+  @@map("day_entries")
+}
+
+model SyncCursor {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  deviceId    String?  @map("device_id") @db.Uuid
+  entityType  String   @map("entity_type") @db.VarChar(32)
+  serverRevision BigInt @map("server_revision")
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId, entityType])
+  @@index([userId])
+  @@map("sync_cursors")
+}
+
+// ---------------------------------------------------------------------------
+// Sync audit (conflicts, tombstones)
+// ---------------------------------------------------------------------------
+
+model SyncMutation {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  deviceId          String?  @map("device_id") @db.Uuid
+  clientMutationId  String   @map("client_mutation_id") @db.VarChar(128)
+  entityType        String   @map("entity_type") @db.VarChar(32)
+  entityId          String   @map("entity_id") @db.VarChar(64)
+  operation         String   @db.VarChar(16) // CREATE, UPDATE, DELETE
+  payload           Json?
+  serverRevision    BigInt   @map("server_revision")
+  serverUpdatedAt   DateTime @default(now()) @map("server_updated_at") @db.Timestamptz(6)
+  appliedAt         DateTime @default(now()) @map("applied_at") @db.Timestamptz(6)
+  conflictCopyId    String?  @map("conflict_copy_id") @db.VarChar(64)
+
+  @@unique([userId, clientMutationId])
+  @@index([userId, serverUpdatedAt])
+  @@index([userId, entityType, entityId])
+  @@map("sync_mutations")
+}

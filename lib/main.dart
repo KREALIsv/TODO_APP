@@ -7,12 +7,15 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'app/app.dart';
 import 'core/theme/theme.dart';
 import 'core/web/boot_ready.dart';
+import 'features/auth/data/auth_session_repository.dart';
 import 'features/notes/data/attachments_repository.dart';
 import 'features/notes/data/day_entries_repository.dart';
 import 'features/notes/data/notes_repository.dart';
 import 'features/notes/data/tags_repository.dart';
 import 'features/notes/data/task_reminders_service.dart';
 import 'features/settings/data/settings_repository.dart';
+import 'features/sync/data/device_identity.dart';
+import 'features/sync/data/sync_service.dart';
 import 'global/widgets/app_boot_splash.dart';
 
 Future<void> main() async {
@@ -43,17 +46,18 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     try {
       HiveLogger.level = HiveLoggerLevel.warn;
       await Hive.initFlutter();
-      // Open every Hive box in parallel — first paint only needs boxes ready.
       await Future.wait([
         NotesRepository.instance.init(),
         DayEntriesRepository.instance.init(),
         TagsRepository.instance.init(),
         AttachmentsRepository.instance.init(),
         SettingsRepository.instance.init(),
+        AuthSessionRepository.instance.init(),
+        DeviceIdentity.instance.init(),
       ]);
+      await SyncService.instance.init();
       if (!mounted) return;
       setState(() => _ready = true);
-      // Keep the HTML splash until TodosApp has painted its first frame.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifyWebAppReady();
       });
@@ -66,7 +70,6 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     }
   }
 
-  /// Non-blocking work that must not delay the home screen.
   Future<void> _postBootstrap() async {
     try {
       await TagsRepository.instance.ensureTags(
