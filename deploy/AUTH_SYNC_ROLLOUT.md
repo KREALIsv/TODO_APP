@@ -80,3 +80,8 @@ flutter run -d chrome \
 - Local reminders
 
 Local data remains on-device; sync covers notes, tags, and day entries.
+
+## Unblock locked account (forgot password, phase 0)
+
+Until password reset email is live, delete the user in Postgres so they can
+register again. See [DELETE_WODO_USER.md](./DELETE_WODO_USER.md).
