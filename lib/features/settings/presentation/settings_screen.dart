@@ -307,6 +307,65 @@ class SettingsScreen extends StatelessWidget {
   }) {
     return [
       SettingsSectionLabel(
+        label: 'Cuenta y sincronización',
+        textTheme: textTheme,
+        accent: accent,
+      ),
+      SettingsCard(
+        children: [
+          SettingsRow(
+            icon: Icons.account_circle_outlined,
+            title: AuthService.instance.isAuthenticated
+                ? 'Cuenta WODO'
+                : 'Iniciar sesión',
+            trailing: AuthService.instance.isAuthenticated
+                ? 'Conectada'
+                : 'Local',
+            accent: accent,
+            onTap: AuthService.instance.isAuthenticated
+                ? null
+                : () => _openAccount(context),
+            showChevron: !AuthService.instance.isAuthenticated,
+          ),
+          if (AuthService.instance.isAuthenticated) ...[
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.devices_outlined,
+              title: 'Este dispositivo',
+              trailing: DeviceIdentity.instance.platformLabel,
+              accent: accent,
+              showChevron: false,
+            ),
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.cloud_sync_outlined,
+              title: 'Sincronizar aquí',
+              trailing: DeviceIdentity.instance.syncEnabled ? 'Activa' : 'Pausada',
+              accent: accent,
+              onTap: () => _toggleDeviceSync(context),
+            ),
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.sync_outlined,
+              title: 'Sincronizar ahora',
+              trailing: _syncLabel(),
+              accent: accent,
+              onTap: DeviceIdentity.instance.syncEnabled
+                  ? () => _syncNow(context)
+                  : null,
+            ),
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.logout_outlined,
+              title: 'Cerrar sesión',
+              accent: accent,
+              onTap: () => _logout(context),
+            ),
+          ],
+        ],
+      ),
+      const SizedBox(height: 20),
+      SettingsSectionLabel(
         label: 'Apariencia',
         textTheme: textTheme,
         accent: accent,
@@ -394,65 +453,6 @@ class SettingsScreen extends StatelessWidget {
             titleColor: AppColors.error,
             onTap: () => _wipe(context),
           ),
-        ],
-      ),
-      const SizedBox(height: 20),
-      SettingsSectionLabel(
-        label: 'Cuenta y sincronización',
-        textTheme: textTheme,
-        accent: accent,
-      ),
-      SettingsCard(
-        children: [
-          SettingsRow(
-            icon: Icons.account_circle_outlined,
-            title: AuthService.instance.isAuthenticated
-                ? 'Cuenta WODO'
-                : 'Iniciar sesión',
-            trailing: AuthService.instance.isAuthenticated
-                ? 'Conectada'
-                : 'Local',
-            accent: accent,
-            onTap: AuthService.instance.isAuthenticated
-                ? null
-                : () => _openAccount(context),
-            showChevron: !AuthService.instance.isAuthenticated,
-          ),
-          if (AuthService.instance.isAuthenticated) ...[
-            const SettingsDivider(),
-            SettingsRow(
-              icon: Icons.devices_outlined,
-              title: 'Este dispositivo',
-              trailing: DeviceIdentity.instance.platformLabel,
-              accent: accent,
-              showChevron: false,
-            ),
-            const SettingsDivider(),
-            SettingsRow(
-              icon: Icons.cloud_sync_outlined,
-              title: 'Sincronizar aquí',
-              trailing: DeviceIdentity.instance.syncEnabled ? 'Activa' : 'Pausada',
-              accent: accent,
-              onTap: () => _toggleDeviceSync(context),
-            ),
-            const SettingsDivider(),
-            SettingsRow(
-              icon: Icons.sync_outlined,
-              title: 'Sincronizar ahora',
-              trailing: _syncLabel(),
-              accent: accent,
-              onTap: DeviceIdentity.instance.syncEnabled
-                  ? () => _syncNow(context)
-                  : null,
-            ),
-            const SettingsDivider(),
-            SettingsRow(
-              icon: Icons.logout_outlined,
-              title: 'Cerrar sesión',
-              accent: accent,
-              onTap: () => _logout(context),
-            ),
-          ],
         ],
       ),
       const SizedBox(height: 20),
