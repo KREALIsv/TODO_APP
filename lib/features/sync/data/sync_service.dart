@@ -12,6 +12,8 @@ import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
 import '../../notes/domain/note_item.dart';
+import 'device_identity.dart';
+import 'device_registry.dart';
 import 'wodo_api_config.dart';
 
 enum SyncState { unavailable, idle, syncing, error }
@@ -38,7 +40,10 @@ class SyncService extends ChangeNotifier {
 
   SyncState get state => _state;
   String? get errorMessage => _errorMessage;
-  bool get isAvailable => WodoApiConfig.isConfigured && _auth.isAuthenticated;
+  bool get isAvailable =>
+      WodoApiConfig.isConfigured &&
+      _auth.isAuthenticated &&
+      DeviceIdentity.instance.syncEnabled;
 
   Future<void> init() async {
     _box = await Hive.openBox<dynamic>(_boxName);
@@ -46,6 +51,7 @@ class SyncService extends ChangeNotifier {
     _notes.listenable().addListener(_scheduleSync);
     _tags.listenable().addListener(_scheduleSync);
     _dayEntries.listenable().addListener(_scheduleSync);
+    DeviceIdentity.instance.addListener(_scheduleSync);
     Timer.periodic(const Duration(seconds: 30), (_) => syncNow());
     _wasAuthenticated = _auth.isAuthenticated;
     _onAuthChanged();
@@ -60,6 +66,7 @@ class SyncService extends ChangeNotifier {
     try {
       final token = await _auth.accessToken();
       if (token == null) return;
+      await DeviceRegistry.instance.register(token);
       final beforePull = _snapshot();
       await _push(token, beforePull);
       await _pull(token, beforePull);
@@ -143,7 +150,10 @@ class SyncService extends ChangeNotifier {
       final payload = await _request(
         'sync/pull',
         token: token,
-        query: {'cursor': ?cursor},
+        query: {
+          if (cursor != null) 'cursor': cursor,
+          'appUserId': DeviceIdentity.instance.appUserId,
+        },
       );
       final data = payload['data'];
       if (data is! List) return;

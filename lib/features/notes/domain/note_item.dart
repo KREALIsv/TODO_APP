@@ -20,6 +20,7 @@ class NoteItem {
     this.completedAt,
     this.archivedAt,
     this.reminderMinutesBefore,
+    this.coverAttachmentId,
   });
 
   final String id;
@@ -40,6 +41,9 @@ class NoteItem {
   /// Minutes before [dueAt] to fire a local reminder.
   /// `null` = none; `0` = at due time. See [ReminderOffset].
   final int? reminderMinutesBefore;
+
+  /// Optional cover image from [AttachmentsRepository].
+  final String? coverAttachmentId;
 
   String get preview {
     final source = title.trim().isNotEmpty ? title : body;
@@ -75,6 +79,7 @@ class NoteItem {
       'completedAt': completedAt?.toIso8601String(),
       'archivedAt': archivedAt?.toIso8601String(),
       'reminderMinutesBefore': reminderMinutesBefore,
+      'coverAttachmentId': coverAttachmentId,
     };
   }
 
@@ -118,6 +123,7 @@ class NoteItem {
       completedAt: _parseOptionalDate(map['completedAt']),
       archivedAt: _parseOptionalDate(map['archivedAt']),
       reminderMinutesBefore: reminder,
+      coverAttachmentId: map['coverAttachmentId'] as String?,
     );
   }
 
@@ -137,6 +143,7 @@ class NoteItem {
     Object? completedAt = _unset,
     Object? archivedAt = _unset,
     Object? reminderMinutesBefore = _unset,
+    Object? coverAttachmentId = _unset,
   }) {
     return NoteItem(
       id: id ?? this.id,
@@ -160,6 +167,9 @@ class NoteItem {
       reminderMinutesBefore: identical(reminderMinutesBefore, _unset)
           ? this.reminderMinutesBefore
           : reminderMinutesBefore as int?,
+      coverAttachmentId: identical(coverAttachmentId, _unset)
+          ? this.coverAttachmentId
+          : coverAttachmentId as String?,
     );
   }
 }

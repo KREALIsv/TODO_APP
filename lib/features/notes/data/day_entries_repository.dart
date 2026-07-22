@@ -264,4 +264,22 @@ class DayEntriesRepository {
   Future<void> clear() async {
     await _box.clear();
   }
+
+  /// All day log rows for backup v2.
+  List<Map<String, dynamic>> exportAllMaps() {
+    return getAll().map((entry) => entry.toMap()).toList(growable: false);
+  }
+
+  /// Replaces all entries with [maps]. Invalid maps throw via [DayEntry.fromMap].
+  Future<void> replaceAllFromMaps(List<Map<String, dynamic>> maps) async {
+    await _box.clear();
+    for (final map in maps) {
+      final entry = DayEntry.fromMap(map);
+      await _box.put(entry.id, entry.toMap());
+    }
+  }
+
+  Future<void> resetAll() async {
+    await _box.clear();
+  }
 }

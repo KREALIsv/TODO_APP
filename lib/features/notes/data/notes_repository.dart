@@ -8,6 +8,7 @@ import '../domain/day_log.dart';
 import '../domain/day_migration.dart';
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
+import 'attachments_repository.dart';
 import 'day_entries_repository.dart';
 import 'task_reminders_service.dart';
 
@@ -22,6 +23,7 @@ class NotesRepository {
   late Box<Map> _box;
   TaskRemindersService _reminders = TaskRemindersService.instance;
   DayEntriesRepository _dayEntries = DayEntriesRepository.instance;
+  AttachmentsRepository _attachments = AttachmentsRepository.instance;
 
   Future<void> init() async {
     _box = await Hive.openBox<Map>(_boxName);
@@ -41,6 +43,11 @@ class NotesRepository {
   @visibleForTesting
   set dayEntriesForTests(DayEntriesRepository repo) {
     _dayEntries = repo;
+  }
+
+  @visibleForTesting
+  set attachmentsForTests(AttachmentsRepository repo) {
+    _attachments = repo;
   }
 
   ValueListenable<Box<Map>> listenable() => _box.listenable();
@@ -137,6 +144,11 @@ class NotesRepository {
 
   Future<void> delete(String id) async {
     await _cancelReminder(id);
+    try {
+      await _attachments.deleteForNote(id);
+    } catch (e, st) {
+      debugPrint('Attachment cleanup failed for $id: $e\n$st');
+    }
     await _box.delete(id);
   }
 
@@ -350,19 +362,37 @@ class NotesRepository {
     }
   }
 
-  /// Copies content/tags/dates; resets pin, completion and archive. Returns the copy.
+  /// Copies content/tags/dates/attachments; resets pin, completion and archive.
   Future<NoteItem?> duplicate(String id) async {
     final current = getById(id);
     if (current == null) return null;
     final now = DateTime.now();
+    final newId = _uuid.v4();
+    String? newCoverId;
+
+    for (final attachment in _attachments.forNote(id)) {
+      final bytes = _attachments.bytesFor(attachment.id);
+      if (bytes == null) continue;
+      final created = await _attachments.addImage(
+        noteId: newId,
+        bytes: bytes,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+      );
+      if (attachment.id == current.coverAttachmentId) {
+        newCoverId = created.id;
+      }
+    }
+
     final copy = current.copyWith(
-      id: _uuid.v4(),
+      id: newId,
       pinned: false,
       completed: false,
       completedAt: null,
       archivedAt: null,
       createdAt: now,
       updatedAt: now,
+      coverAttachmentId: newCoverId,
     );
     await add(copy);
     return copy;

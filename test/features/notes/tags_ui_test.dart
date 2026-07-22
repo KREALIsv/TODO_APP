@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 
+import 'package:todos_app/features/notes/data/attachments_repository.dart';
 import 'package:todos_app/features/notes/data/tags_repository.dart';
 import 'package:todos_app/features/notes/domain/note_item.dart';
 import 'package:todos_app/features/notes/presentation/widgets/note_card.dart';
@@ -25,6 +26,15 @@ void main() {
     await tagsRepo.initWithBox(box);
     await tagsRepo.clear();
     await tagsRepo.ensureTags(['Work', 'Personal', 'Ideas', 'A', 'B', 'C', 'D']);
+
+    await AttachmentsRepository.instance.initWithBoxes(
+      meta: await Hive.openBox<Map>(
+        'att_meta_${DateTime.now().microsecondsSinceEpoch}',
+      ),
+      blobs: await Hive.openBox<dynamic>(
+        'att_blob_${DateTime.now().microsecondsSinceEpoch}',
+      ),
+    );
   });
 
   tearDown(() async {

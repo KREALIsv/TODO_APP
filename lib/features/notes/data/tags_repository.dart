@@ -240,4 +240,62 @@ class TagsRepository {
   Future<void> clear() async {
     await _box.clear();
   }
+
+  /// Full catalog snapshot for backup v2.
+  Map<String, dynamic> exportSnapshot() {
+    return {
+      'names': getAll(),
+      'colors': getColorMap(),
+      'opacities': getOpacityMap(),
+    };
+  }
+
+  /// Restores [snapshot] from backup. Invalid color ids fall back per tag.
+  Future<void> replaceSnapshot(Map<String, dynamic> snapshot) async {
+    final names = _parseNameList(snapshot['names']);
+    final colors = _sanitizeColorMap(snapshot['colors'] as Map?);
+    final opacities = _sanitizeOpacityMap(snapshot['opacities'] as Map?);
+
+    await _box.put(_namesKey, names);
+    await _box.put(_colorsKey, colors);
+    await _box.put(_opacitiesKey, opacities);
+    await _ensureColorsFor(names);
+  }
+
+  /// Wipes custom tags and restores product defaults (Settings → borrar todo).
+  Future<void> resetToDefaults() async {
+    await _box.clear();
+    await ensureDefaults();
+  }
+
+  List<String> _parseNameList(Object? raw) {
+    if (raw is! List) return const [];
+    return raw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  Map<String, String> _sanitizeColorMap(Map? raw) {
+    if (raw == null) return const {};
+    final out = <String, String>{};
+    for (final entry in raw.entries) {
+      final key = entry.key.toString().toLowerCase();
+      final id = entry.value.toString();
+      if (key.isEmpty) continue;
+      out[key] = TagColors.byId(id) != null
+          ? id
+          : TagColors.defaultIdForTag(key);
+    }
+    return out;
+  }
+
+  Map<String, double> _sanitizeOpacityMap(Map? raw) {
+    if (raw == null) return const {};
+    return {
+      for (final entry in raw.entries)
+        entry.key.toString().toLowerCase():
+            TagColors.clampOpacity(_parseOpacity(entry.value)),
+    };
+  }
 }

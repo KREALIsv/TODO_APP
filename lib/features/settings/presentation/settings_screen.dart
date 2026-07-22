@@ -7,8 +7,12 @@ import '../../../global/themes/app_colors.dart';
 import '../../../global/widgets/app_alerts.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/auth_screen.dart';
+import '../../notes/data/attachments_repository.dart';
+import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
+import '../../notes/data/tags_repository.dart';
 import '../data/settings_repository.dart';
+import '../../sync/data/device_identity.dart';
 import '../../sync/data/sync_service.dart';
 import '../domain/list_background.dart';
 import 'about_screen.dart';
@@ -111,6 +115,26 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _toggleDeviceSync(BuildContext context) async {
+    final next = !DeviceIdentity.instance.syncEnabled;
+    await DeviceIdentity.instance.setSyncEnabled(next);
+    if (!context.mounted) return;
+    if (next && AuthService.instance.isAuthenticated) {
+      await SyncService.instance.syncNow();
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          next
+              ? 'Sincronización activa en este dispositivo'
+              : 'Sincronización pausada en este dispositivo',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _logout(BuildContext context) async {
     final confirmed = await AppAlerts.confirm(
       context,
@@ -125,7 +149,12 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _export(BuildContext context) async {
     try {
-      await exportNotesData(_repo);
+      await exportNotesData(
+        _repo,
+        tags: TagsRepository.instance,
+        dayEntries: DayEntriesRepository.instance,
+        attachments: AttachmentsRepository.instance,
+      );
       if (!context.mounted) return;
       await AppAlerts.show(
         context,
@@ -153,7 +182,12 @@ class SettingsScreen extends StatelessWidget {
     if (!confirmed || !context.mounted) return;
 
     try {
-      final result = await importNotesData(_repo);
+      final result = await importNotesData(
+        _repo,
+        tags: TagsRepository.instance,
+        dayEntries: DayEntriesRepository.instance,
+        attachments: AttachmentsRepository.instance,
+      );
       if (!context.mounted) return;
       if (result == ImportResult.cancelled) return;
       if (result == ImportResult.invalid) {
@@ -199,7 +233,12 @@ class SettingsScreen extends StatelessWidget {
     );
     if (!second || !context.mounted) return;
 
-    await _repo.resetAll();
+    await resetAllAppContent(
+      notes: _repo,
+      tags: TagsRepository.instance,
+      dayEntries: DayEntriesRepository.instance,
+      attachments: AttachmentsRepository.instance,
+    );
     if (!context.mounted) return;
     await AppAlerts.show(
       context,
@@ -217,6 +256,7 @@ class SettingsScreen extends StatelessWidget {
         _settings,
         AuthService.instance,
         SyncService.instance,
+        DeviceIdentity.instance,
       ]),
       builder: (context, _) {
         final bg = _settings.listBackground;
@@ -381,11 +421,29 @@ class SettingsScreen extends StatelessWidget {
           if (AuthService.instance.isAuthenticated) ...[
             const SettingsDivider(),
             SettingsRow(
+              icon: Icons.devices_outlined,
+              title: 'Este dispositivo',
+              trailing: DeviceIdentity.instance.platformLabel,
+              accent: accent,
+              showChevron: false,
+            ),
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.cloud_sync_outlined,
+              title: 'Sincronizar aquí',
+              trailing: DeviceIdentity.instance.syncEnabled ? 'Activa' : 'Pausada',
+              accent: accent,
+              onTap: () => _toggleDeviceSync(context),
+            ),
+            const SettingsDivider(),
+            SettingsRow(
               icon: Icons.sync_outlined,
               title: 'Sincronizar ahora',
               trailing: _syncLabel(),
               accent: accent,
-              onTap: () => _syncNow(context),
+              onTap: DeviceIdentity.instance.syncEnabled
+                  ? () => _syncNow(context)
+                  : null,
             ),
             const SettingsDivider(),
             SettingsRow(
@@ -426,6 +484,7 @@ class SettingsScreen extends StatelessWidget {
 
   String _syncLabel() {
     if (!AuthService.instance.isConfigured) return 'Pendiente';
+    if (!DeviceIdentity.instance.syncEnabled) return 'Pausada';
     return switch (SyncService.instance.state) {
       SyncState.unavailable => 'Inicia sesión',
       SyncState.idle => 'Actualizado',

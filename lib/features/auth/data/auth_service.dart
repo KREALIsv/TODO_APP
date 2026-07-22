@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../../sync/data/device_registry.dart';
 import '../../sync/data/wodo_api_config.dart';
 import 'auth_session_repository.dart';
 
@@ -68,6 +69,10 @@ class AuthService extends ChangeNotifier {
     );
     final payload = _responseData(response);
     await _saveSession(payload);
+    final token = _sessions.session?.accessToken;
+    if (token != null) {
+      await DeviceRegistry.instance.register(token);
+    }
     notifyListeners();
   }
 

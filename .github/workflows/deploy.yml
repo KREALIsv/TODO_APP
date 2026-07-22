@@ -38,7 +38,6 @@ jobs:
               - '.github/workflows/deploy.yml'
             api:
               - 'backend/**'
-              - 'prisma/**'
               - 'deploy/**'
               - '.github/workflows/deploy.yml'
 
@@ -119,7 +118,8 @@ jobs:
         if: env.DEPLOY_APP == 'true'
         run: |
           flutter pub get
-          flutter build web --release
+          flutter build web --release --pwa-strategy=none \
+            --dart-define=WODO_API_URL=https://api.wodo.app/api/v1
 
       - name: Sync web app
         if: env.DEPLOY_APP == 'true'
