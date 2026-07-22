@@ -4,6 +4,7 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import '../../../../core/theme/app_surface.dart';
 import '../../../../global/themes/app_colors.dart';
 import '../../../../global/themes/tokens.dart';
+import '../../../../global/widgets/app_loading.dart';
 import '../../data/attachments_repository.dart';
 import '../../data/notes_repository.dart';
 import '../../data/tags_repository.dart';
@@ -206,15 +207,18 @@ class NoteCard extends StatelessWidget {
     final bytes = _attachments.bytesFor(coverId);
     if (bytes == null) return null;
 
+    final width = MediaQuery.sizeOf(context).width;
+
     return Opacity(
       opacity: completed ? 0.55 : 1,
       child: SizedBox(
         height: coverHeight,
         width: double.infinity,
-        child: Image.memory(
-          bytes,
+        child: AppMemoryImage(
+          bytes: bytes,
           fit: BoxFit.cover,
-          gaplessPlayback: true,
+          width: width,
+          height: coverHeight,
         ),
       ),
     );

@@ -121,6 +121,13 @@ class ListBackgroundScaffoldBody extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
+        // Instant theme underpaint so route pops never flash blank white
+        // while the decorative background / list paint catch up.
+        Positioned.fill(
+          child: ColoredBox(
+            color: Theme.of(context).colorScheme.surface,
+          ),
+        ),
         Positioned.fill(
           child: ListBackgroundLayer(settings: settings),
         ),

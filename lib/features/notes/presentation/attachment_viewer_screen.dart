@@ -6,6 +6,7 @@ import '../../../core/io/share_bytes_file.dart';
 import '../../../core/theme/app_surface.dart';
 import '../../../global/themes/tokens.dart';
 import '../../../global/widgets/app_alerts.dart';
+import '../../../global/widgets/app_loading.dart';
 import '../../settings/presentation/widgets/list_background_layer.dart';
 import '../data/attachments_repository.dart';
 import '../domain/note_attachment.dart';
@@ -256,13 +257,25 @@ class _AttachmentViewerScreenState extends State<AttachmentViewerScreen> {
                         child: Center(
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                            child: ClipRRect(
-                              borderRadius: ThemeTokens.borderRadius,
-                              child: Image.memory(
-                                bytes,
-                                fit: BoxFit.contain,
-                                gaplessPlayback: true,
-                              ),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final maxW = constraints.maxWidth.isFinite
+                                    ? constraints.maxWidth
+                                    : MediaQuery.sizeOf(context).width;
+                                final maxH = constraints.maxHeight.isFinite
+                                    ? constraints.maxHeight
+                                    : MediaQuery.sizeOf(context).height * 0.7;
+                                return ClipRRect(
+                                  borderRadius: ThemeTokens.borderRadius,
+                                  child: AppMemoryImage(
+                                    bytes: bytes,
+                                    fit: BoxFit.contain,
+                                    width: maxW,
+                                    height: maxH,
+                                    filterQuality: FilterQuality.medium,
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ),

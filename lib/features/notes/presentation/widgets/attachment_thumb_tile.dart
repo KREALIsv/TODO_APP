@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../global/themes/app_colors.dart';
 import '../../../../global/themes/tokens.dart';
+import '../../../../global/widgets/app_loading.dart';
 
 /// Shared thumbnail used by the editor strip and “Ver más” grid.
 class AttachmentThumbTile extends StatelessWidget {
@@ -34,23 +35,24 @@ class AttachmentThumbTile extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: ThemeTokens.borderRadius,
-            child: ColoredBox(
-              color: AppColors.neutral20,
-              child: SizedBox(
-                width: width,
-                height: height,
-                child: bytes == null
-                    ? const Center(child: Icon(Icons.broken_image_outlined))
-                    : Image.memory(
-                        bytes!,
-                        fit: BoxFit.cover,
-                        width: width,
-                        height: height,
-                        gaplessPlayback: true,
-                        alignment: Alignment.center,
+            child: bytes == null
+                ? ColoredBox(
+                    color: AppColors.neutral20,
+                    child: SizedBox(
+                      width: width,
+                      height: height,
+                      child: const Center(
+                        child: Icon(Icons.broken_image_outlined),
                       ),
-              ),
-            ),
+                    ),
+                  )
+                : AppMemoryImage(
+                    bytes: bytes!,
+                    fit: BoxFit.cover,
+                    width: width,
+                    height: height,
+                    placeholderColor: AppColors.neutral20,
+                  ),
           ),
           if (isCover)
             Positioned(
