@@ -51,6 +51,10 @@ jobs:
           || needs.changes.outputs.api == 'true' }}
     runs-on: ubuntu-latest
     environment: production
+    # GHCR exige owner en minúsculas; GITHUB_TOKEN necesita packages:write para push.
+    permissions:
+      contents: read
+      packages: write
     env:
       DEPLOY_APP: ${{ needs.changes.outputs.app == 'true' || github.event_name == 'workflow_dispatch' }}
       DEPLOY_LANDING: ${{ needs.changes.outputs.landing == 'true' || github.event_name == 'workflow_dispatch' }}
@@ -71,13 +75,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Owner del repo puede tener mayúsculas (KREALIsv); GHCR solo acepta minúsculas.
       - name: Build and push API image
         if: env.DEPLOY_API == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/wodo-api:latest
+          tags: ghcr.io/krealisv/wodo-api:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
