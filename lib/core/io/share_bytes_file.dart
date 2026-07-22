@@ -1,8 +1,7 @@
-import 'dart:io';
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'share_bytes_file_io.dart'
+    if (dart.library.html) 'share_bytes_file_web.dart' as impl;
 
 /// Shares [bytes] as a named file (web: in-memory XFile; native: temp file).
 ///
@@ -13,36 +12,11 @@ Future<void> shareBytesAsFile({
   required String fileName,
   required String mimeType,
   String? subject,
-}) async {
-  if (kIsWeb) {
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [
-          XFile.fromData(
-            bytes,
-            name: fileName,
-            mimeType: mimeType,
-          ),
-        ],
-        subject: subject ?? fileName,
-      ),
-    );
-    return;
-  }
-
-  final dir = await getTemporaryDirectory();
-  final file = File('${dir.path}/$fileName');
-  await file.writeAsBytes(bytes, flush: true);
-  await SharePlus.instance.share(
-    ShareParams(
-      files: [
-        XFile(
-          file.path,
-          name: fileName,
-          mimeType: mimeType,
-        ),
-      ],
-      subject: subject ?? fileName,
-    ),
+}) {
+  return impl.shareBytesAsFile(
+    bytes: bytes,
+    fileName: fileName,
+    mimeType: mimeType,
+    subject: subject,
   );
 }

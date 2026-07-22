@@ -3,7 +3,7 @@
 Publica en un **VPS compartido**:
 
 - `https://wodo.app` → landing estática (`landing/`)
-- `https://app.wodo.app` → Flutter web (`flutter build web`)
+- `https://app.wodo.app` → Flutter web (`flutter build web --release --pwa-strategy=none`)
 - `https://www.wodo.app` → redirección permanente a `wodo.app`
 
 ## Contexto del servidor (importante)
@@ -63,7 +63,7 @@ Variables opcionales del script (con defaults para este VPS):
 `.github/workflows/deploy.yml` corre en cada push a `main` (o manual con
 **Run workflow**):
 
-1. `flutter build web --release`
+1. `flutter build web --release --pwa-strategy=none`
 2. `rsync` de `deploy/` (compose + nginx + scripts), `landing/` y `build/web/`
 3. `docker compose up -d` en `/opt/wodo`
 4. `setup-wodo-https.sh` (idempotente) para asegurar el enrutado en el edge
