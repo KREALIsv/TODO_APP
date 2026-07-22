@@ -1,21 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import 'app/app.dart';
 import 'core/theme/theme.dart';
+import 'core/web/boot_ready.dart';
 import 'features/notes/data/attachments_repository.dart';
 import 'features/notes/data/day_entries_repository.dart';
 import 'features/notes/data/notes_repository.dart';
 import 'features/notes/data/tags_repository.dart';
 import 'features/notes/data/task_reminders_service.dart';
 import 'features/settings/data/settings_repository.dart';
-import 'global/widgets/app_loading.dart';
+import 'global/widgets/app_boot_splash.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Paint a themed shell immediately so web/Safari never sits on a blank
-  // white page while Hive / IndexedDB finish opening.
+  // Paint immediately: on web the HTML splash (logo) stays until
+  // [notifyWebAppReady]; on native we show the same branding in Flutter.
   runApp(const _BootstrapApp());
 }
 
@@ -38,32 +41,41 @@ class _BootstrapAppState extends State<_BootstrapApp> {
 
   Future<void> _bootstrap() async {
     try {
-      // Silence IndexedDB open chatter ("Got object store…") in web consoles.
       HiveLogger.level = HiveLoggerLevel.warn;
       await Hive.initFlutter();
-      await NotesRepository.instance.init();
-      await DayEntriesRepository.instance.init();
-      await TagsRepository.instance.init();
-      await AttachmentsRepository.instance.init();
-      await SettingsRepository.instance.init();
-      // Migra tags ya usados en notas al catálogo (instalaciones previas).
-      await TagsRepository.instance.ensureTags(
-        NotesRepository.instance.getAllTags(),
-      );
-      // Best-effort: MissingPluginException after hot-reload is swallowed;
-      // a full `flutter run` registers the native channel.
-      try {
-        await TaskRemindersService.instance.init();
-        await NotesRepository.instance.syncAllReminders();
-      } catch (e, st) {
-        debugPrint('Reminders bootstrap skipped: $e\n$st');
-      }
+      // Open every Hive box in parallel — first paint only needs boxes ready.
+      await Future.wait([
+        NotesRepository.instance.init(),
+        DayEntriesRepository.instance.init(),
+        TagsRepository.instance.init(),
+        AttachmentsRepository.instance.init(),
+        SettingsRepository.instance.init(),
+      ]);
       if (!mounted) return;
       setState(() => _ready = true);
+      // Keep the HTML splash until TodosApp has painted its first frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyWebAppReady();
+      });
+      unawaited(_postBootstrap());
     } catch (e, st) {
       debugPrint('App bootstrap failed: $e\n$st');
       if (!mounted) return;
       setState(() => _error = e);
+      notifyWebAppReady();
+    }
+  }
+
+  /// Non-blocking work that must not delay the home screen.
+  Future<void> _postBootstrap() async {
+    try {
+      await TagsRepository.instance.ensureTags(
+        NotesRepository.instance.getAllTags(),
+      );
+      await TaskRemindersService.instance.init();
+      await NotesRepository.instance.syncAllReminders();
+    } catch (e, st) {
+      debugPrint('Post-bootstrap skipped: $e\n$st');
     }
   }
 
@@ -77,7 +89,9 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
       home: _error == null
-          ? const AppLoadingScreen(message: 'Cargando…')
+          ? (kIsWeb
+              ? const SizedBox.shrink()
+              : const AppBootSplash())
           : _BootstrapErrorScreen(
               error: _error!,
               onRetry: () {
