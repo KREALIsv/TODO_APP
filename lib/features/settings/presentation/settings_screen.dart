@@ -245,9 +245,9 @@ class SettingsScreen extends StatelessWidget {
         final bg = _settings.listBackground;
         final brightness = Theme.of(context).brightness;
         final accent = bg.resolveAccent(brightness);
-        return ValueListenableBuilder<Box<Map>>(
-          valueListenable: _repo.listenable(),
-          builder: (context, box, _) {
+        return ListenableBuilder(
+          listenable: _repo.changes,
+          builder: (context, _) {
             final archivedCount = _repo.getArchived().length;
             return ListView(
               padding: EdgeInsets.fromLTRB(16, embedded ? 8 : 16, 16, 32),

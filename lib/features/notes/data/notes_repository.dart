@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/storage/hive_repo_notifier.dart';
 import '../domain/date_only.dart';
 import '../domain/day_entry.dart';
 import '../domain/day_log.dart';
@@ -21,18 +22,32 @@ class NotesRepository {
   static const _uuid = Uuid();
 
   late Box<Map> _box;
+  final _changes = HiveRepoNotifier();
   TaskRemindersService _reminders = TaskRemindersService.instance;
   DayEntriesRepository _dayEntries = DayEntriesRepository.instance;
   AttachmentsRepository _attachments = AttachmentsRepository.instance;
 
   Future<void> init() async {
     _box = await Hive.openBox<Map>(_boxName);
+    _changes.bind(_box.listenable());
   }
+
+  /// Re-read Hive after another tab on the same origin wrote to storage (web).
+  Future<void> reloadFromPeerTab() async {
+    if (!Hive.isBoxOpen(_boxName)) return;
+    await _box.close();
+    _box = await Hive.openBox<Map>(_boxName);
+    _changes.bind(_box.listenable());
+    _changes.reloadComplete();
+  }
+
+  Listenable get changes => _changes;
 
   /// For tests: inject an already-opened box.
   @visibleForTesting
   Future<void> initWithBox(Box<Map> box) async {
     _box = box;
+    _changes.bind(_box.listenable());
   }
 
   @visibleForTesting

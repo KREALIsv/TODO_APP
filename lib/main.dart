@@ -15,6 +15,7 @@ import 'features/notes/data/tags_repository.dart';
 import 'features/notes/data/task_reminders_service.dart';
 import 'features/settings/data/settings_repository.dart';
 import 'features/sync/data/device_identity.dart';
+import 'features/sync/data/local_tab_sync_service.dart';
 import 'features/sync/data/sync_service.dart';
 import 'global/widgets/app_boot_splash.dart';
 
@@ -56,6 +57,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
         DeviceIdentity.instance.init(),
       ]);
       await SyncService.instance.init();
+      await LocalTabSyncService.instance.init();
       if (!mounted) return;
       setState(() => _ready = true);
       WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import '../../../core/theme/app_surface.dart';
 import '../../../global/themes/app_colors.dart';
@@ -39,9 +38,9 @@ class ArchivedScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
       ),
       body: ListBackgroundScaffoldBody(
-        child: ValueListenableBuilder<Box<Map>>(
-          valueListenable: _repo.listenable(),
-          builder: (context, box, _) {
+        child: ListenableBuilder(
+          listenable: _repo.changes,
+          builder: (context, _) {
             final items = _repo.getArchived();
             if (items.isEmpty) {
               return Center(
