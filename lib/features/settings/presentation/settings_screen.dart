@@ -306,20 +306,10 @@ class SettingsScreen extends StatelessWidget {
                 syncEnabled: DeviceIdentity.instance.syncEnabled,
                 syncState: SyncService.instance.state,
               ),
-              trailing: 'Conectada',
+              trailing: 'Ver cuenta',
               accent: accent,
-              showChevron: false,
+              onTap: () => AuthFlow.openAccount(context),
             ),
-            const SettingsDivider(),
-          ] else
-            SettingsRow(
-              icon: Icons.account_circle_outlined,
-              title: 'Iniciar sesión',
-              trailing: 'Local',
-              accent: accent,
-              onTap: () => _openAccount(context),
-            ),
-          if (AuthService.instance.isAuthenticated) ...[
             const SettingsDivider(),
             SettingsRow(
               icon: Icons.devices_outlined,
@@ -346,7 +336,14 @@ class SettingsScreen extends StatelessWidget {
                   ? () => _syncNow(context)
                   : null,
             ),
-          ],
+          ] else
+            SettingsRow(
+              icon: Icons.account_circle_outlined,
+              title: 'Iniciar sesión',
+              trailing: 'Local',
+              accent: accent,
+              onTap: () => _openAccount(context),
+            ),
         ],
       ),
       const SizedBox(height: 20),

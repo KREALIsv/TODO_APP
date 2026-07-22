@@ -62,6 +62,7 @@ class ProfileAccountSection extends StatelessWidget {
           compact: isSidebar,
           syncEnabled: DeviceIdentity.instance.syncEnabled,
           syncing: SyncService.instance.state == SyncState.syncing,
+          onOpenAccount: () => AuthFlow.openAccount(context),
           onSyncNow: DeviceIdentity.instance.syncEnabled
               ? () => AuthFlow.syncNow(context)
               : null,
@@ -157,6 +158,7 @@ class _LoggedInCard extends StatelessWidget {
     required this.compact,
     required this.syncEnabled,
     required this.syncing,
+    required this.onOpenAccount,
     required this.onSyncNow,
     required this.onLogout,
   });
@@ -169,108 +171,140 @@ class _LoggedInCard extends StatelessWidget {
   final bool compact;
   final bool syncEnabled;
   final bool syncing;
+  final VoidCallback onOpenAccount;
   final VoidCallback? onSyncNow;
   final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(compact ? 14 : 16),
       decoration: AppSurface.cardDecoration(context),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _AccountAvatar(
-                initials: initials,
-                compact: compact,
+          InkWell(
+            onTap: onOpenAccount,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                compact ? 14 : 16,
+                compact ? 14 : 16,
+                compact ? 14 : 16,
+                0,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      email,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppSurface.title(context),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _AccountAvatar(
+                    initials: initials,
+                    compact: compact,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _StatusChip(
-                          label: 'Conectada',
-                          color: AppColors.primary,
+                        Text(
+                          email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: AppSurface.title(context),
+                          ),
                         ),
-                        _StatusChip(
-                          label: deviceLabel,
-                          color: AppColors.neutral60,
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _StatusChip(
+                              label: 'Conectada',
+                              color: AppColors.primary,
+                            ),
+                            _StatusChip(
+                              label: deviceLabel,
+                              color: AppColors.neutral60,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          status,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: AppSurface.secondary(context),
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Text(
+                              'Ver datos de cuenta',
+                              style: textTheme.labelLarge?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              size: 18,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      status,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: AppSurface.secondary(context),
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: compact ? 12 : 14),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: syncing ? null : onSyncNow,
-                  icon: syncing
-                      ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        )
-                      : const Icon(Icons.sync_rounded, size: 18),
-                  label: Text(syncing ? 'Sincronizando…' : 'Sincronizar'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextButton.icon(
-                  onPressed: onLogout,
-                  icon: const Icon(Icons.logout_rounded, size: 18),
-                  label: const Text('Salir'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.error,
                   ),
-                ),
-              ),
-            ],
-          ),
-          if (!syncEnabled) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Activa la sincronización en Ajustes → Sincronizar aquí.',
-              style: textTheme.labelSmall?.copyWith(
-                color: AppSurface.secondary(context),
+                ],
               ),
             ),
-          ],
+          ),
+          Padding(
+            padding: EdgeInsets.all(compact ? 14 : 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: syncing ? null : onSyncNow,
+                    icon: syncing
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          )
+                        : const Icon(Icons.sync_rounded, size: 18),
+                    label: Text(syncing ? 'Sincronizando…' : 'Sincronizar'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: onLogout,
+                    icon: const Icon(Icons.logout_rounded, size: 18),
+                    label: const Text('Salir'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!syncEnabled)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Text(
+                'Activa la sincronización en Ajustes → Sincronizar aquí.',
+                style: textTheme.labelSmall?.copyWith(
+                  color: AppSurface.secondary(context),
+                ),
+              ),
+            ),
         ],
       ),
     );

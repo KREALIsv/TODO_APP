@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../../sync/data/device_registry.dart';
 import '../../sync/data/wodo_api_config.dart';
+import '../domain/user_profile.dart';
 import 'auth_session_repository.dart';
 
 class AuthService extends ChangeNotifier {
@@ -47,6 +48,51 @@ class AuthService extends ChangeNotifier {
     }
     await _sessions.clear();
     notifyListeners();
+  }
+
+  Future<UserProfile> fetchProfile() async {
+    if (!WodoApiConfig.isConfigured) {
+      throw StateError('La sincronización aún no está configurada.');
+    }
+    final response = await _authorizedGet('users/me');
+    return UserProfile.fromJson(_responseData(response));
+  }
+
+  /// Deletes the remote account and all synced cloud data (cascade on server).
+  Future<void> deleteRemoteAccount() async {
+    if (!WodoApiConfig.isConfigured) {
+      throw StateError('La sincronización aún no está configurada.');
+    }
+    await _authorizedDelete('users/me');
+  }
+
+  Future<http.Response> _authorizedGet(String path) async {
+    final token = await accessToken();
+    if (token == null) {
+      throw StateError('No hay sesión activa.');
+    }
+    return http.get(
+      WodoApiConfig.uri(path),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+  }
+
+  Future<void> _authorizedDelete(String path) async {
+    final token = await accessToken();
+    if (token == null) {
+      throw StateError('No hay sesión activa.');
+    }
+    final response = await http.delete(
+      WodoApiConfig.uri(path),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (response.statusCode == 204) return;
+
+    final decoded = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
+    final error = decoded['message'] ?? 'No se pudo completar la solicitud.';
+    throw StateError(error.toString());
   }
 
   Future<String?> accessToken() async {
