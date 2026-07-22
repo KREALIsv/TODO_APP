@@ -132,6 +132,7 @@ class AuthService extends ChangeNotifier {
     if (token != null) {
       await DeviceRegistry.instance.register(token);
     }
+    await _sessions.rememberLoginEmail(email.trim().toLowerCase());
     notifyListeners();
   }
 

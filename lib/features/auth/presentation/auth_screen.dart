@@ -5,6 +5,9 @@ import '../../../global/widgets/app_alerts.dart';
 import '../../settings/presentation/widgets/settings_section.dart';
 import '../../sync/data/sync_service.dart';
 import '../data/auth_service.dart';
+import '../data/auth_session_repository.dart';
+import '../domain/auth_errors.dart';
+import 'forgot_password_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key, this.contextTitle, this.contextMessage});
@@ -24,13 +27,21 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _submitting = false;
   bool _obscurePassword = true;
   bool _passwordHasText = false;
+  bool _showRememberedEmailHint = false;
 
   AuthService get _auth => AuthService.instance;
+  AuthSessionRepository get _sessions => AuthSessionRepository.instance;
 
   @override
   void initState() {
     super.initState();
     _password.addListener(_onPasswordChanged);
+    _email.addListener(_onEmailChanged);
+    final remembered = _sessions.lastLoginEmail;
+    if (remembered != null && remembered.isNotEmpty) {
+      _email.text = remembered;
+      _showRememberedEmailHint = true;
+    }
   }
 
   void _onPasswordChanged() {
@@ -40,12 +51,22 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _password.removeListener(_onPasswordChanged);
-    _email.dispose();
-    _password.dispose();
-    super.dispose();
+  void _onEmailChanged() {
+    if (_showRememberedEmailHint &&
+        _email.text.trim().toLowerCase() !=
+            (_sessions.lastLoginEmail ?? '').trim().toLowerCase()) {
+      setState(() => _showRememberedEmailHint = false);
+    }
+  }
+
+  Future<void> _useAnotherAccount() async {
+    await _sessions.clearRememberedLoginEmail();
+    _email.clear();
+    _password.clear();
+    setState(() {
+      _showRememberedEmailHint = false;
+      _obscurePassword = true;
+    });
   }
 
   Future<void> _submit() async {
@@ -54,22 +75,51 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       if (_registering) {
         await _auth.register(email: _email.text, password: _password.text);
+        await SyncService.instance.syncNow();
+        if (!mounted) return;
+        await AppAlerts.show(
+          context,
+          title: 'Cuenta creada',
+          message:
+              'Guarda tu contraseña en un lugar seguro. Por ahora no hay '
+              'recuperación por correo; si la olvidas, tendrás que volver a '
+              'registrar la cuenta.',
+          type: AppAlertType.success,
+        );
       } else {
         await _auth.login(email: _email.text, password: _password.text);
+        await SyncService.instance.syncNow();
       }
-      await SyncService.instance.syncNow();
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
       await AppAlerts.show(
         context,
-        message: error.toString().replaceFirst('Bad state: ', ''),
+        message: AuthErrors.message(error, registering: _registering),
         type: AppAlertType.error,
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  void _openForgotPassword() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const ForgotPasswordScreen()),
+    );
+  }
+
+  bool get _canUseAnotherAccount =>
+      !_registering && _email.text.trim().isNotEmpty;
+
+  @override
+  void dispose() {
+    _password.removeListener(_onPasswordChanged);
+    _email.removeListener(_onEmailChanged);
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
   }
 
   @override
@@ -104,6 +154,34 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ],
           ),
+          if (_showRememberedEmailHint && !_registering) ...[
+            const SizedBox(height: 12),
+            Material(
+              color: Theme.of(context).colorScheme.primaryContainer.withValues(
+                    alpha: 0.35,
+                  ),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Última cuenta usada en este dispositivo',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: AppSurface.secondary(context),
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _submitting ? null : _useAnotherAccount,
+                      child: const Text('Usar otra cuenta'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           Form(
             key: _formKey,
@@ -115,11 +193,14 @@ class _AuthScreenState extends State<AuthScreen> {
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [AutofillHints.email],
+                    textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
                       labelText: 'Correo electrónico',
+                      hintText: 'tu@correo.com',
                     ),
                     validator: (value) {
-                      if (value == null || !value.contains('@')) {
+                      final trimmed = value?.trim() ?? '';
+                      if (trimmed.isEmpty || !trimmed.contains('@')) {
                         return 'Ingresa un correo válido.';
                       }
                       return null;
@@ -133,6 +214,10 @@ class _AuthScreenState extends State<AuthScreen> {
                     controller: _password,
                     obscureText: _obscurePassword,
                     autofillHints: const [AutofillHints.password],
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) {
+                      if (!_submitting) _submit();
+                    },
                     decoration: InputDecoration(
                       labelText: 'Contraseña',
                       suffixIcon: _passwordHasText
@@ -162,13 +247,27 @@ class _AuthScreenState extends State<AuthScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          if (!_registering) ...[
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _submitting ? null : _openForgotPassword,
+                child: const Text('¿Olvidaste tu contraseña?'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
           FilledButton(
             onPressed: _submitting ? null : _submit,
             child: Text(
               _registering ? 'Crear cuenta y sincronizar' : 'Iniciar sesión',
             ),
           ),
+          if (_canUseAnotherAccount && !_showRememberedEmailHint)
+            TextButton(
+              onPressed: _submitting ? null : _useAnotherAccount,
+              child: const Text('Usar otra cuenta'),
+            ),
           TextButton(
             onPressed: _submitting
                 ? null

@@ -72,6 +72,7 @@ class AuthSessionRepository extends ChangeNotifier {
   static const _refreshTokenKey = 'wodo.auth.refresh_token.v1';
   static const _expiresAtKey = 'wodo.auth.expires_at.v1';
   static const _emailKey = 'wodo.auth.email.v1';
+  static const _lastLoginEmailKey = 'wodo.auth.last_login_email.v1';
 
   // Keys used by releases that stored the session in Hive.
   static const _legacyAccessTokenKey = 'access_token';
@@ -81,9 +82,11 @@ class AuthSessionRepository extends ChangeNotifier {
   AuthSessionStore? _store;
   AuthSession? _session;
   String? _email;
+  String? _lastLoginEmail;
 
   AuthSession? get session => _session;
   String? get userEmail => _email;
+  String? get lastLoginEmail => _lastLoginEmail;
   bool get isAuthenticated => _session != null;
 
   Future<void> init() async {
@@ -100,6 +103,7 @@ class AuthSessionRepository extends ChangeNotifier {
     required AuthSessionStore legacyStore,
   }) async {
     _store = secureStore;
+    _lastLoginEmail = await secureStore.read(_lastLoginEmailKey);
 
     final secureSession = await _readSession(
       secureStore,
@@ -157,6 +161,20 @@ class AuthSessionRepository extends ChangeNotifier {
     _email = null;
     notifyListeners();
     await _clearSecure(store);
+  }
+
+  Future<void> rememberLoginEmail(String email) async {
+    final store = _requireStore();
+    _lastLoginEmail = email.trim().toLowerCase();
+    await store.write(_lastLoginEmailKey, _lastLoginEmail!);
+    notifyListeners();
+  }
+
+  Future<void> clearRememberedLoginEmail() async {
+    final store = _requireStore();
+    _lastLoginEmail = null;
+    await store.delete(_lastLoginEmailKey);
+    notifyListeners();
   }
 
   AuthSessionStore _requireStore() {
