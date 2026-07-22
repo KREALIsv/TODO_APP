@@ -16,6 +16,11 @@ enum AuthProvider {
   apple
 }
 
+enum MailFlow {
+  welcome
+  password_reset
+}
+
 model User {
   id            String   @id @default(uuid()) @db.Uuid
   email         String   @unique @db.VarChar(255)
@@ -33,9 +38,40 @@ model User {
   tags        Tag[]
   dayEntries  DayEntry[]
   syncCursors SyncCursor[]
+  passwordResetTokens PasswordResetToken[]
+  mailSendLogs MailSendLog[]
 
   @@index([email])
   @@map("users")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(128)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model MailSendLog {
+  id     String   @id @default(uuid()) @db.Uuid
+  userId String?  @map("user_id") @db.Uuid
+  email  String   @db.VarChar(255)
+  flow   MailFlow
+  sentAt DateTime @default(now()) @map("sent_at") @db.Timestamptz(6)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email, flow, sentAt])
+  @@index([userId, flow, sentAt])
+  @@map("mail_send_logs")
 }
 
 model UserIdentity {

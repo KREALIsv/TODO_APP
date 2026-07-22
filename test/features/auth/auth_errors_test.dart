@@ -18,4 +18,26 @@ void main() {
       contains('Usar otra cuenta'),
     );
   });
+
+  test('maps email quota exceeded', () {
+    expect(
+      AuthErrors.message(
+        StateError(
+          'Has alcanzado el límite de correos para este proceso. Inténtalo más tarde.',
+        ),
+        registering: false,
+      ),
+      'Has alcanzado el límite de correos para este proceso. Inténtalo más tarde.',
+    );
+  });
+
+  test('maps invalid reset token', () {
+    expect(
+      AuthErrors.message(
+        StateError('Invalid or expired reset token'),
+        registering: false,
+      ),
+      contains('caducado'),
+    );
+  });
 }
