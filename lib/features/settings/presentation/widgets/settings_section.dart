@@ -63,6 +63,7 @@ class SettingsRow extends StatelessWidget {
     super.key,
     required this.icon,
     required this.title,
+    this.subtitle,
     this.trailing,
     this.trailingWidget,
     this.onTap,
@@ -74,6 +75,7 @@ class SettingsRow extends StatelessWidget {
 
   final IconData icon;
   final String title;
+  final String? subtitle;
   final String? trailing;
   final Widget? trailingWidget;
   final VoidCallback? onTap;
@@ -104,12 +106,26 @@ class SettingsRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                title,
-                style: textTheme.titleSmall?.copyWith(
-                  color: titleColor ?? AppSurface.title(context),
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: textTheme.titleSmall?.copyWith(
+                      color: titleColor ?? AppSurface.title(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppSurface.secondary(context),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             if (trailingWidget != null) ...[

@@ -6,7 +6,7 @@ import '../../../global/constants/config.dart';
 import '../../../global/themes/app_colors.dart';
 import '../../../global/widgets/app_alerts.dart';
 import '../../auth/data/auth_service.dart';
-import '../../auth/presentation/auth_screen.dart';
+import '../../auth/presentation/auth_flow.dart';
 import '../../notes/data/attachments_repository.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
@@ -99,21 +99,16 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _openAccount(BuildContext context) {
-    return Navigator.of(
+    return AuthFlow.openLogin(
       context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const AuthScreen()));
-  }
-
-  Future<void> _syncNow(BuildContext context) async {
-    await SyncService.instance.syncNow();
-    if (!context.mounted) return;
-    final error = SyncService.instance.errorMessage;
-    await AppAlerts.show(
-      context,
-      message: error ?? 'Tus datos están actualizados.',
-      type: error == null ? AppAlertType.success : AppAlertType.error,
+      contextTitle: 'Sincronización multidispositivo',
+      contextMessage:
+          'Tus notas siguen disponibles sin conexión. Al iniciar sesión se '
+          'combinarán de forma segura con tu cuenta.',
     );
   }
+
+  Future<void> _syncNow(BuildContext context) => AuthFlow.syncNow(context);
 
   Future<void> _toggleDeviceSync(BuildContext context) async {
     final next = !DeviceIdentity.instance.syncEnabled;
@@ -133,18 +128,6 @@ class SettingsScreen extends StatelessWidget {
         behavior: SnackBarBehavior.floating,
       ),
     );
-  }
-
-  Future<void> _logout(BuildContext context) async {
-    final confirmed = await AppAlerts.confirm(
-      context,
-      title: 'Cerrar sesión',
-      message: 'Tus datos locales se conservarán en este dispositivo.',
-      confirmLabel: 'Cerrar sesión',
-      isDestructive: true,
-    );
-    if (!confirmed) return;
-    await AuthService.instance.logout();
   }
 
   Future<void> _export(BuildContext context) async {
@@ -307,6 +290,64 @@ class SettingsScreen extends StatelessWidget {
   }) {
     return [
       SettingsSectionLabel(
+        label: 'Cuenta y sincronización',
+        textTheme: textTheme,
+        accent: accent,
+      ),
+      SettingsCard(
+        children: [
+          if (AuthService.instance.isAuthenticated) ...[
+            SettingsRow(
+              icon: Icons.account_circle_outlined,
+              title: AuthService.instance.userEmail ?? 'Cuenta WODO',
+              subtitle: AuthFlow.accountStatusLabel(
+                isConfigured: AuthService.instance.isConfigured,
+                isAuthenticated: true,
+                syncEnabled: DeviceIdentity.instance.syncEnabled,
+                syncState: SyncService.instance.state,
+              ),
+              trailing: 'Ver cuenta',
+              accent: accent,
+              onTap: () => AuthFlow.openAccount(context),
+            ),
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.devices_outlined,
+              title: 'Este dispositivo',
+              trailing: DeviceIdentity.instance.platformLabel,
+              accent: accent,
+              showChevron: false,
+            ),
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.cloud_sync_outlined,
+              title: 'Sincronizar aquí',
+              trailing: DeviceIdentity.instance.syncEnabled ? 'Activa' : 'Pausada',
+              accent: accent,
+              onTap: () => _toggleDeviceSync(context),
+            ),
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.sync_outlined,
+              title: 'Sincronizar ahora',
+              trailing: _syncLabel(),
+              accent: accent,
+              onTap: DeviceIdentity.instance.syncEnabled
+                  ? () => _syncNow(context)
+                  : null,
+            ),
+          ] else
+            SettingsRow(
+              icon: Icons.account_circle_outlined,
+              title: 'Iniciar sesión',
+              trailing: 'Local',
+              accent: accent,
+              onTap: () => _openAccount(context),
+            ),
+        ],
+      ),
+      const SizedBox(height: 20),
+      SettingsSectionLabel(
         label: 'Apariencia',
         textTheme: textTheme,
         accent: accent,
@@ -394,65 +435,6 @@ class SettingsScreen extends StatelessWidget {
             titleColor: AppColors.error,
             onTap: () => _wipe(context),
           ),
-        ],
-      ),
-      const SizedBox(height: 20),
-      SettingsSectionLabel(
-        label: 'Cuenta y sincronización',
-        textTheme: textTheme,
-        accent: accent,
-      ),
-      SettingsCard(
-        children: [
-          SettingsRow(
-            icon: Icons.account_circle_outlined,
-            title: AuthService.instance.isAuthenticated
-                ? 'Cuenta WODO'
-                : 'Iniciar sesión',
-            trailing: AuthService.instance.isAuthenticated
-                ? 'Conectada'
-                : 'Local',
-            accent: accent,
-            onTap: AuthService.instance.isAuthenticated
-                ? null
-                : () => _openAccount(context),
-            showChevron: !AuthService.instance.isAuthenticated,
-          ),
-          if (AuthService.instance.isAuthenticated) ...[
-            const SettingsDivider(),
-            SettingsRow(
-              icon: Icons.devices_outlined,
-              title: 'Este dispositivo',
-              trailing: DeviceIdentity.instance.platformLabel,
-              accent: accent,
-              showChevron: false,
-            ),
-            const SettingsDivider(),
-            SettingsRow(
-              icon: Icons.cloud_sync_outlined,
-              title: 'Sincronizar aquí',
-              trailing: DeviceIdentity.instance.syncEnabled ? 'Activa' : 'Pausada',
-              accent: accent,
-              onTap: () => _toggleDeviceSync(context),
-            ),
-            const SettingsDivider(),
-            SettingsRow(
-              icon: Icons.sync_outlined,
-              title: 'Sincronizar ahora',
-              trailing: _syncLabel(),
-              accent: accent,
-              onTap: DeviceIdentity.instance.syncEnabled
-                  ? () => _syncNow(context)
-                  : null,
-            ),
-            const SettingsDivider(),
-            SettingsRow(
-              icon: Icons.logout_outlined,
-              title: 'Cerrar sesión',
-              accent: accent,
-              onTap: () => _logout(context),
-            ),
-          ],
         ],
       ),
       const SizedBox(height: 20),

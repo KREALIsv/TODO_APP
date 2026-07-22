@@ -22,11 +22,27 @@ class _AuthScreenState extends State<AuthScreen> {
   final _password = TextEditingController();
   bool _registering = false;
   bool _submitting = false;
+  bool _obscurePassword = true;
+  bool _passwordHasText = false;
 
   AuthService get _auth => AuthService.instance;
 
   @override
+  void initState() {
+    super.initState();
+    _password.addListener(_onPasswordChanged);
+  }
+
+  void _onPasswordChanged() {
+    final hasText = _password.text.isNotEmpty;
+    if (hasText != _passwordHasText) {
+      setState(() => _passwordHasText = hasText);
+    }
+  }
+
+  @override
   void dispose() {
+    _password.removeListener(_onPasswordChanged);
     _email.dispose();
     _password.dispose();
     super.dispose();
@@ -115,9 +131,26 @@ class _AuthScreenState extends State<AuthScreen> {
                   padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
                   child: TextFormField(
                     controller: _password,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     autofillHints: const [AutofillHints.password],
-                    decoration: const InputDecoration(labelText: 'Contraseña'),
+                    decoration: InputDecoration(
+                      labelText: 'Contraseña',
+                      suffixIcon: _passwordHasText
+                          ? IconButton(
+                              tooltip: _obscurePassword
+                                  ? 'Mostrar contraseña'
+                                  : 'Ocultar contraseña',
+                              onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                            )
+                          : null,
+                    ),
                     validator: (value) {
                       if (value == null || value.length < 8) {
                         return 'Usa al menos 8 caracteres.';
@@ -139,7 +172,10 @@ class _AuthScreenState extends State<AuthScreen> {
           TextButton(
             onPressed: _submitting
                 ? null
-                : () => setState(() => _registering = !_registering),
+                : () => setState(() {
+                      _registering = !_registering;
+                      _obscurePassword = true;
+                    }),
             child: Text(
               _registering ? 'Ya tengo una cuenta' : 'Crear una cuenta nueva',
             ),
