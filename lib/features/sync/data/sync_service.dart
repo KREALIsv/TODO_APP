@@ -48,9 +48,9 @@ class SyncService extends ChangeNotifier {
   Future<void> init() async {
     _box = await Hive.openBox<dynamic>(_boxName);
     _auth.addListener(_onAuthChanged);
-    _notes.listenable().addListener(_scheduleSync);
-    _tags.listenable().addListener(_scheduleSync);
-    _dayEntries.listenable().addListener(_scheduleSync);
+    _notes.changes.addListener(_scheduleSync);
+    _tags.changes.addListener(_scheduleSync);
+    _dayEntries.changes.addListener(_scheduleSync);
     DeviceIdentity.instance.addListener(_scheduleSync);
     Timer.periodic(const Duration(seconds: 30), (_) => syncNow());
     _wasAuthenticated = _auth.isAuthenticated;

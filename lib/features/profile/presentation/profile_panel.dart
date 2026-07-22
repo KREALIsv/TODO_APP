@@ -58,9 +58,9 @@ class ProfilePanel extends StatelessWidget {
       child: ListenableBuilder(
         listenable: _settings,
         builder: (context, _) {
-          return ValueListenableBuilder<Box<Map>>(
-            valueListenable: _repo.listenable(),
-            builder: (context, box, child) {
+          return ListenableBuilder(
+            listenable: _repo.changes,
+            builder: (context, _) {
               final items = _repo.getAll();
               final counts = contentCounts(items);
               final metrics = activityMetricsFrom(items);

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
+import '../../../core/storage/hive_repo_notifier.dart';
 import '../domain/default_tags.dart';
 import '../domain/tag_colors.dart';
 
@@ -20,16 +21,29 @@ class TagsRepository {
   static const String _opacitiesKey = 'opacities';
 
   late Box<dynamic> _box;
+  final _changes = HiveRepoNotifier();
 
   Future<void> init() async {
     _box = await Hive.openBox<dynamic>(_boxName);
+    _changes.bind(_box.listenable());
     await ensureDefaults();
   }
+
+  Future<void> reloadFromPeerTab() async {
+    if (!Hive.isBoxOpen(_boxName)) return;
+    await _box.close();
+    _box = await Hive.openBox<dynamic>(_boxName);
+    _changes.bind(_box.listenable());
+    _changes.reloadComplete();
+  }
+
+  Listenable get changes => _changes;
 
   /// For tests: inject an already-opened box.
   @visibleForTesting
   Future<void> initWithBox(Box<dynamic> box) async {
     _box = box;
+    _changes.bind(_box.listenable());
     await ensureDefaults();
   }
 

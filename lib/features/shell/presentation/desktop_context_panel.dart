@@ -114,9 +114,9 @@ class _EditorBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<Box<Map>>(
-      valueListenable: repository.listenable(),
-      builder: (context, box, _) {
+    return ListenableBuilder(
+      listenable: repository.changes,
+      builder: (context, _) {
         final item = itemId != null ? repository.getById(itemId!) : null;
 
         if (itemId != null && item == null) {
@@ -151,9 +151,9 @@ class _SummaryBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return ValueListenableBuilder<Box<Map>>(
-      valueListenable: repository.listenable(),
-      builder: (context, box, _) {
+    return ListenableBuilder(
+      listenable: repository.changes,
+      builder: (context, _) {
         final items = repository.getAll();
         final metrics = activityMetricsFrom(items);
         final stats = ActivityStats.fromNotes(items, weeks: 1);

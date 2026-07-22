@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import '../../../core/layout/adaptive_breakpoints.dart';
 import '../../../core/theme/app_surface.dart';
@@ -657,36 +656,32 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     return SafeArea(
       top: false,
-      child: ValueListenableBuilder<Box<Map>>(
-        valueListenable: _repo.listenable(),
-        builder: (context, notesBox, _) {
-          return ValueListenableBuilder<Box<Map>>(
-            valueListenable: _dayEntries.listenable(),
-            builder: (context, dayBox, _) {
-              final isArchivedFilter =
-                  _effectiveFilter == NotesFilter.archived;
-              final all =
-                  isArchivedFilter ? _repo.getArchived() : _repo.getAll();
+      child: ListenableBuilder(
+        listenable: Listenable.merge([
+          _repo.changes,
+          _dayEntries.changes,
+        ]),
+        builder: (context, _) {
+          final isArchivedFilter = _effectiveFilter == NotesFilter.archived;
+          final all = isArchivedFilter ? _repo.getArchived() : _repo.getAll();
 
-              final bodySlivers = isLiveDay
-                  ? _buildLiveBodySlivers(
-                      textTheme: textTheme,
-                      searchQuery: searchQuery,
-                      all: all,
-                    )
-                  : isPastDay
-                      ? _buildReplaySlivers(selected)
-                      : _buildPlanSlivers(selected);
+          final bodySlivers = isLiveDay
+              ? _buildLiveBodySlivers(
+                  textTheme: textTheme,
+                  searchQuery: searchQuery,
+                  all: all,
+                )
+              : isPastDay
+                  ? _buildReplaySlivers(selected)
+                  : _buildPlanSlivers(selected);
 
-              return SlidableAutoCloseBehavior(
-                child: CustomScrollView(
-                  slivers: [
-                    _buildSliverAppBar(textTheme, searchQuery),
-                    ...bodySlivers,
-                  ],
-                ),
-              );
-            },
+          return SlidableAutoCloseBehavior(
+            child: CustomScrollView(
+              slivers: [
+                _buildSliverAppBar(textTheme, searchQuery),
+                ...bodySlivers,
+              ],
+            ),
           );
         },
       ),

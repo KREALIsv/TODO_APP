@@ -61,6 +61,13 @@ void main() {
     expect(secure.values['wodo.auth.email.v1'], 'maria@example.com');
     expect(legacy.values, isEmpty);
 
+    await repository.rememberLoginEmail('other@example.com');
+    expect(repository.lastLoginEmail, 'other@example.com');
+    expect(secure.values['wodo.auth.last_login_email.v1'], 'other@example.com');
+
+    await repository.clearRememberedLoginEmail();
+    expect(repository.lastLoginEmail, isNull);
+
     await repository.clear();
     expect(repository.isAuthenticated, isFalse);
     expect(repository.userEmail, isNull);
