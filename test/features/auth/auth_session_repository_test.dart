@@ -52,14 +52,18 @@ void main() {
       accessToken: 'new-access',
       refreshToken: 'new-refresh',
       expiresInSeconds: 900,
+      email: 'maria@example.com',
     );
 
     expect(repository.isAuthenticated, isTrue);
+    expect(repository.userEmail, 'maria@example.com');
     expect(secure.values['wodo.auth.access_token.v1'], 'new-access');
+    expect(secure.values['wodo.auth.email.v1'], 'maria@example.com');
     expect(legacy.values, isEmpty);
 
     await repository.clear();
     expect(repository.isAuthenticated, isFalse);
+    expect(repository.userEmail, isNull);
     expect(secure.values, isEmpty);
   });
 

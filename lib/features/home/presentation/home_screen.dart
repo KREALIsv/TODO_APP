@@ -4,7 +4,9 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import '../../../core/layout/adaptive_breakpoints.dart';
 import '../../../core/theme/app_surface.dart';
+import '../../auth/data/auth_service.dart';
 import '../../notes/data/day_entries_repository.dart';
+import '../../notes/domain/tag_colors.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/date_only.dart';
 import '../../notes/domain/day_log.dart';
@@ -377,26 +379,46 @@ class _HomeScreenState extends State<HomeScreen> {
       surfaceTintColor: Colors.transparent,
       leading: showProfileLeading
           ? Center(
-              child: Tooltip(
-                message: showSettingsAction
-                    ? 'Perfil'
-                    : 'Perfil · mantén para Ajustes',
-                child: InkWell(
-                  onTap: () => _openProfile(context),
-                  onLongPress: showSettingsAction
-                      ? null
-                      : () => _openSettings(context),
-                  customBorder: const CircleBorder(),
-                  child: CircleAvatar(
-                    radius: 18,
-                    backgroundColor: scheme.primaryContainer,
-                    child: Icon(
-                      Icons.person_outline,
-                      color: scheme.primary,
-                      size: 20,
+              child: ListenableBuilder(
+                listenable: AuthService.instance,
+                builder: (context, _) {
+                  final auth = AuthService.instance;
+                  final initials = auth.userInitials;
+                  return Tooltip(
+                    message: showSettingsAction
+                        ? auth.isAuthenticated
+                            ? 'Perfil · ${auth.userEmail ?? 'Conectada'}'
+                            : 'Perfil'
+                        : 'Perfil · mantén para Ajustes',
+                    child: InkWell(
+                      onTap: () => _openProfile(context),
+                      onLongPress: showSettingsAction
+                          ? null
+                          : () => _openSettings(context),
+                      customBorder: const CircleBorder(),
+                      child: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: auth.isAuthenticated
+                            ? TagColors.brandPink
+                            : scheme.primaryContainer,
+                        child: auth.isAuthenticated && initials.isNotEmpty
+                            ? Text(
+                                initials,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              )
+                            : Icon(
+                                Icons.person_outline,
+                                color: scheme.primary,
+                                size: 20,
+                              ),
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             )
           : null,

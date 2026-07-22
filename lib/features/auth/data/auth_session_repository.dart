@@ -71,6 +71,7 @@ class AuthSessionRepository extends ChangeNotifier {
   static const _accessTokenKey = 'wodo.auth.access_token.v1';
   static const _refreshTokenKey = 'wodo.auth.refresh_token.v1';
   static const _expiresAtKey = 'wodo.auth.expires_at.v1';
+  static const _emailKey = 'wodo.auth.email.v1';
 
   // Keys used by releases that stored the session in Hive.
   static const _legacyAccessTokenKey = 'access_token';
@@ -79,8 +80,10 @@ class AuthSessionRepository extends ChangeNotifier {
 
   AuthSessionStore? _store;
   AuthSession? _session;
+  String? _email;
 
   AuthSession? get session => _session;
+  String? get userEmail => _email;
   bool get isAuthenticated => _session != null;
 
   Future<void> init() async {
@@ -106,6 +109,7 @@ class AuthSessionRepository extends ChangeNotifier {
     );
     if (secureSession != null) {
       _session = secureSession;
+      _email = await secureStore.read(_emailKey);
       await _clearLegacy(legacyStore);
       return;
     }
@@ -120,11 +124,12 @@ class AuthSessionRepository extends ChangeNotifier {
     if (legacySession == null) {
       await _clearLegacy(legacyStore);
       _session = null;
+      _email = null;
       return;
     }
 
     // Delete the Hive values only after all secure writes complete.
-    await _writeSession(secureStore, legacySession);
+    await _writeSession(secureStore, legacySession, email: _email);
     await _clearLegacy(legacyStore);
     _session = legacySession;
   }
@@ -133,6 +138,7 @@ class AuthSessionRepository extends ChangeNotifier {
     required String accessToken,
     required String refreshToken,
     required int expiresInSeconds,
+    String? email,
   }) async {
     final store = _requireStore();
     final nextSession = AuthSession(
@@ -140,7 +146,7 @@ class AuthSessionRepository extends ChangeNotifier {
       refreshToken: refreshToken,
       expiresAt: DateTime.now().add(Duration(seconds: expiresInSeconds)),
     );
-    await _writeSession(store, nextSession);
+    await _writeSession(store, nextSession, email: email);
     _session = nextSession;
     notifyListeners();
   }
@@ -148,6 +154,7 @@ class AuthSessionRepository extends ChangeNotifier {
   Future<void> clear() async {
     final store = _requireStore();
     _session = null;
+    _email = null;
     notifyListeners();
     await _clearSecure(store);
   }
@@ -186,17 +193,24 @@ class AuthSessionRepository extends ChangeNotifier {
 
   Future<void> _writeSession(
     AuthSessionStore store,
-    AuthSession session,
-  ) async {
+    AuthSession session, {
+    String? email,
+  }) async {
     await store.write(_accessTokenKey, session.accessToken);
     await store.write(_refreshTokenKey, session.refreshToken);
     await store.write(_expiresAtKey, session.expiresAt.toIso8601String());
+    final resolvedEmail = email ?? _email;
+    if (resolvedEmail != null && resolvedEmail.isNotEmpty) {
+      _email = resolvedEmail.trim().toLowerCase();
+      await store.write(_emailKey, _email!);
+    }
   }
 
   Future<void> _clearSecure(AuthSessionStore store) async {
     await store.delete(_accessTokenKey);
     await store.delete(_refreshTokenKey);
     await store.delete(_expiresAtKey);
+    await store.delete(_emailKey);
   }
 
   Future<void> _clearLegacy(AuthSessionStore store) async {

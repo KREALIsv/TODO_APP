@@ -16,6 +16,16 @@ class AuthService extends ChangeNotifier {
 
   bool get isConfigured => WodoApiConfig.isConfigured;
   bool get isAuthenticated => _sessions.isAuthenticated;
+  String? get userEmail => _sessions.userEmail;
+
+  String get userInitials {
+    final email = userEmail;
+    if (email == null || email.isEmpty) return '';
+    final local = email.split('@').first.trim();
+    if (local.isEmpty) return '?';
+    if (local.length >= 2) return local.substring(0, 2).toUpperCase();
+    return local.substring(0, 1).toUpperCase();
+  }
 
   Future<void> register({required String email, required String password}) {
     return _authenticate('auth/register', email: email, password: password);
@@ -68,7 +78,10 @@ class AuthService extends ChangeNotifier {
       body: jsonEncode({'email': email.trim(), 'password': password}),
     );
     final payload = _responseData(response);
-    await _saveSession(payload);
+    await _saveSession(
+      payload,
+      email: email.trim().toLowerCase(),
+    );
     final token = _sessions.session?.accessToken;
     if (token != null) {
       await DeviceRegistry.instance.register(token);
@@ -76,7 +89,10 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _saveSession(Map<String, dynamic> payload) {
+  Future<void> _saveSession(
+    Map<String, dynamic> payload, {
+    String? email,
+  }) {
     final accessToken = payload['accessToken'];
     final refreshToken = payload['refreshToken'];
     final expiresIn = payload['expiresIn'];
@@ -91,6 +107,7 @@ class AuthService extends ChangeNotifier {
       accessToken: accessToken,
       refreshToken: refreshToken,
       expiresInSeconds: expiresIn.toInt(),
+      email: email,
     );
   }
 
