@@ -118,6 +118,8 @@ jobs:
         if: env.DEPLOY_APP == 'true'
         run: |
           flutter pub get
+          # pwa-strategy=none: do not register Flutter's deprecated service
+          # worker (uninstall stub + client.navigate can white-screen Safari).
           flutter build web --release --pwa-strategy=none \
             --dart-define=WODO_API_URL=https://api.wodo.app/api/v1
 

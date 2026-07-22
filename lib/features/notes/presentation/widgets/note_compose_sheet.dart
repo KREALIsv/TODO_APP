@@ -159,6 +159,7 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
           children: [
             Flexible(
               child: SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -205,7 +206,12 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + MediaQuery.paddingOf(context).bottom,
+              ),
               child: Row(
                 children: [
                   Expanded(

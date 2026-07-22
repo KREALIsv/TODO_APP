@@ -3,7 +3,7 @@
 Publica en un **VPS compartido**:
 
 - `https://wodo.app` → landing estática (`landing/`)
-- `https://app.wodo.app` → Flutter web (`flutter build web`)
+- `https://app.wodo.app` → Flutter web (`flutter build web --release --pwa-strategy=none`)
 - `https://api.wodo.app` → API NestJS (auth + sync multi-dispositivo)
 - `https://www.wodo.app` → redirección permanente a `wodo.app`
 
@@ -67,10 +67,11 @@ Variables opcionales del script (con defaults para este VPS):
 `.github/workflows/deploy.yml` corre en cada push a `main` (o manual con
 **Run workflow**):
 
-1. `flutter build web --release`
-2. `rsync` de `deploy/` (compose + nginx + scripts), `landing/` y `build/web/`
-3. `docker compose up -d` en `/opt/wodo`
-4. `setup-wodo-https.sh` (idempotente) para asegurar el enrutado en el edge
+1. `flutter build web --release --pwa-strategy=none` (con `WODO_API_URL=https://api.wodo.app/api/v1`)
+2. Build/push imagen API + `rsync` de `deploy/`, `landing/` y `build/web/`
+3. `docker compose pull && up -d` en `/opt/wodo`
+4. `prisma migrate deploy` cuando cambia el backend
+5. `setup-wodo-https.sh` (idempotente) para asegurar el enrutado en el edge
 
 Secrets requeridos (**GitHub → Settings → Secrets → Actions**):
 

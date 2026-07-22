@@ -176,12 +176,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  bool get _fabCreatesTask => _effectiveFilter == NotesFilter.tasks;
-
   Future<void> _openEditor(
     BuildContext context, {
     NoteItem? item,
-    NoteType initialType = NoteType.note,
+    NoteType initialType = NoteType.task,
   }) {
     if (widget.onOpenNoteEditor != null) {
       widget.onOpenNoteEditor!(
@@ -200,26 +198,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _openNoteComposeSheet(BuildContext context) {
+  Future<void> _openNoteComposeSheet(
+    BuildContext context, {
+    bool initialIsTask = true,
+  }) {
     if (widget.onOpenNoteEditor != null) {
-      return _openEditor(context, initialType: NoteType.note);
+      return _openEditor(
+        context,
+        initialType: initialIsTask ? NoteType.task : NoteType.note,
+      );
     }
-    return showNoteComposeSheet(context, repository: _repo);
+    return showNoteComposeSheet(
+      context,
+      repository: _repo,
+      initialIsTask: initialIsTask,
+    );
   }
 
-  Future<void> _onFabPressed() {
-    if (_fabCreatesTask) {
-      return _openEditor(context, initialType: NoteType.task);
-    }
-    return _openNoteComposeSheet(context);
-  }
+  Future<void> _onFabPressed() => _openNoteComposeSheet(context);
 
-  Future<void> _onFabLongPress() {
-    if (_fabCreatesTask) {
-      return _openNoteComposeSheet(context);
-    }
-    return _openEditor(context, initialType: NoteType.task);
-  }
+  Future<void> _onFabLongPress() =>
+      _openNoteComposeSheet(context, initialIsTask: false);
 
   void _toggleSearch() {
     setState(() {
@@ -609,13 +608,11 @@ class _HomeScreenState extends State<HomeScreen> {
       body: body,
       floatingActionButton: isLiveDay
           ? Tooltip(
-              message: _fabCreatesTask ? 'Nueva tarea' : 'Nueva nota',
+              message: 'Nueva tarea',
               child: Semantics(
                 button: true,
-                label: _fabCreatesTask ? 'Nueva tarea' : 'Nueva nota',
-                hint: _fabCreatesTask
-                    ? 'Mantén pulsado para crear una nota'
-                    : 'Mantén pulsado para crear una tarea',
+                label: 'Nueva tarea',
+                hint: 'Mantén pulsado para crear una nota',
                 child: GestureDetector(
                   onLongPress: _onFabLongPress,
                   child: FloatingActionButton(
