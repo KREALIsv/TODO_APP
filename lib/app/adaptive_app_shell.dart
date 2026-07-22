@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/layout/adaptive_breakpoints.dart';
+import '../features/auth/presentation/reset_password_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/notes/data/notes_repository.dart';
 import '../features/notes/domain/note_item.dart';
@@ -83,6 +85,26 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
 
   void _closeSettingsPanel() {
     setState(() => _panelView = DesktopPanelView.summary);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openResetFromUrl());
+    }
+  }
+
+  void _openResetFromUrl() {
+    if (!mounted) return;
+    final token = Uri.base.queryParameters['wodo_reset']?.trim();
+    if (token == null || token.isEmpty) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ResetPasswordScreen(token: token),
+      ),
+    );
   }
 
   @override

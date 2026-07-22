@@ -17,6 +17,11 @@ Copy from `deploy/.env.example` and fill in production values:
 - `DATABASE_URL` — PostgreSQL reachable from the `wodo-api` container
 - `SECRET_AUTH_TOKEN_KEY` — at least 32 random characters
 - `CORS_ALLOWED_ORIGINS=https://app.wodo.app,https://wodo.app`
+- `RESEND_API_KEY` — API key de Resend (correo desde `@krealistudio.com`)
+- `MAIL_FROM=WODO <noreply@krealistudio.com>`
+- `WODO_APP_URL=https://app.wodo.app`
+
+Ver guía completa: [RESEND_SETUP.md](./RESEND_SETUP.md).
 
 PostgreSQL is **not** in production `docker-compose.yml`; provision it separately
 (managed DB or a Postgres container on the VPS with a private network).
@@ -81,7 +86,8 @@ flutter run -d chrome \
 
 Local data remains on-device; sync covers notes, tags, and day entries.
 
-## Unblock locked account (forgot password, phase 0)
+## Unblock locked account (forgot password)
 
-Until password reset email is live, delete the user in Postgres so they can
-register again. See [DELETE_WODO_USER.md](./DELETE_WODO_USER.md).
+Password reset email is available when `RESEND_API_KEY` is set on the VPS.
+Until then, delete the user in Postgres so they can register again. See
+[DELETE_WODO_USER.md](./DELETE_WODO_USER.md).

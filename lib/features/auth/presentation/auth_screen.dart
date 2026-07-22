@@ -81,9 +81,8 @@ class _AuthScreenState extends State<AuthScreen> {
           context,
           title: 'Cuenta creada',
           message:
-              'Guarda tu contraseña en un lugar seguro. Por ahora no hay '
-              'recuperación por correo; si la olvidas, tendrás que volver a '
-              'registrar la cuenta.',
+              'Revisa tu correo: te enviamos un mensaje de bienvenida si el '
+              'servidor de correo está activo.',
           type: AppAlertType.success,
         );
       } else {
@@ -106,7 +105,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
   void _openForgotPassword() {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const ForgotPasswordScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => ForgotPasswordScreen(initialEmail: _email.text),
+      ),
     );
   }
 

@@ -1,11 +1,58 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_surface.dart';
+import '../../../global/widgets/app_alerts.dart';
+import '../data/auth_service.dart';
+import '../data/auth_session_repository.dart';
+import '../domain/auth_errors.dart';
+import 'reset_password_screen.dart';
 import 'widgets/auth_page_shell.dart';
 
-/// Phase 1: guidance until password reset email (SMTP) ships in phase 2.
-class ForgotPasswordScreen extends StatelessWidget {
-  const ForgotPasswordScreen({super.key});
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key, this.initialEmail});
+
+  final String? initialEmail;
+
+  @override
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _email;
+  var _submitting = false;
+  var _sent = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _email = TextEditingController(text: widget.initialEmail ?? '');
+  }
+
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _submitting = true);
+    try {
+      await AuthService.instance.requestPasswordReset(_email.text);
+      if (!mounted) return;
+      setState(() => _sent = true);
+    } catch (error) {
+      if (!mounted) return;
+      await AppAlerts.show(
+        context,
+        message: AuthErrors.message(error, registering: false),
+        type: AppAlertType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,85 +67,92 @@ class ForgotPasswordScreen extends StatelessWidget {
       ),
       body: AuthPageShell(
         title: 'Recuperar acceso',
-        subtitle:
-            'La recuperación por correo llegará pronto. Mientras tanto, '
-            'prueba estas opciones:',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _TipRow(
-              icon: Icons.visibility_outlined,
-              text:
-                  'Usa el ojo en contraseña para comprobar que la escribiste bien.',
-            ),
-            const SizedBox(height: 14),
-            _TipRow(
-              icon: Icons.alternate_email_outlined,
-              text:
-                  'Revisa el correo: debe ser exactamente el de registro.',
-            ),
-            const SizedBox(height: 14),
-            _TipRow(
-              icon: Icons.swap_horiz_outlined,
-              text: 'En el login, pulsa «Usar otra cuenta» si el email no es el correcto.',
-            ),
-            const SizedBox(height: 14),
-            _TipRow(
-              icon: Icons.person_add_alt_1_outlined,
-              text:
-                  'Si olvidaste la contraseña, un administrador puede eliminar '
-                  'tu usuario en el servidor para que vuelvas a registrarte.',
-            ),
-            const SizedBox(height: 20),
-            AuthPrimaryButton(
-              label: 'Volver al inicio de sesión',
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
+        subtitle: _sent
+            ? 'Si existe una cuenta con ese correo, te enviaremos un enlace '
+                'para elegir una nueva contraseña.'
+            : 'Introduce el correo con el que te registraste. Te enviaremos '
+                'un enlace si la cuenta existe.',
+        child: _sent ? _buildSentState(context) : _buildForm(context),
       ),
     );
   }
-}
 
-class _TipRow extends StatelessWidget {
-  const _TipRow({
-    required this.icon,
-    required this.text,
-  });
+  Widget _buildForm(BuildContext context) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            autofillHints: const [AutofillHints.email],
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              labelText: 'Correo electrónico',
+              prefixIcon: Icon(Icons.mail_outline_rounded),
+            ),
+            validator: (value) {
+              final trimmed = value?.trim() ?? '';
+              if (trimmed.isEmpty) return 'Introduce tu correo';
+              if (!trimmed.contains('@')) return 'Correo no válido';
+              return null;
+            },
+            onFieldSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 20),
+          AuthPrimaryButton(
+            label: 'Enviar enlace',
+            loading: _submitting,
+            onPressed: _submitting ? null : _submit,
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Volver al inicio de sesión'),
+          ),
+        ],
+      ),
+    );
+  }
 
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSentState(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final accent = Theme.of(context).colorScheme.primary;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          width: 36,
-          height: 36,
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, size: 20, color: accent),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              text,
-              style: textTheme.bodyMedium?.copyWith(
-                color: AppSurface.title(context),
-                height: 1.4,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.mark_email_read_outlined,
+                color: Theme.of(context).colorScheme.primary,
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Revisa la bandeja de entrada y la carpeta de spam. '
+                  'Puedes solicitar hasta 2 correos cada 24 horas.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: AppSurface.secondary(context),
+                    height: 1.45,
+                  ),
+                ),
+              ),
+            ],
           ),
+        ),
+        const SizedBox(height: 20),
+        AuthPrimaryButton(
+          label: 'Volver al inicio de sesión',
+          onPressed: () => Navigator.of(context).pop(),
         ),
       ],
     );

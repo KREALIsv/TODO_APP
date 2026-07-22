@@ -42,6 +42,11 @@ services:
       REFRESH_TOKEN_EXPIRATION: ${REFRESH_TOKEN_EXPIRATION:-7d}
       THROTTLE_TTL: ${THROTTLE_TTL:-60}
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-100}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-WODO <noreply@krealistudio.com>}
+      WODO_APP_URL: ${WODO_APP_URL:-https://app.wodo.app}
+      MAIL_MAX_PER_USER_FLOW: ${MAIL_MAX_PER_USER_FLOW:-2}
+      MAIL_FLOW_WINDOW_HOURS: ${MAIL_FLOW_WINDOW_HOURS:-24}
     networks:
       - edge
     healthcheck:
