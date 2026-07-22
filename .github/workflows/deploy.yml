@@ -146,17 +146,17 @@ jobs:
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/sites/landing/"
 
       - name: Pull and bring up containers
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT || 22 }}" \
-            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            "cd '${{ secrets.DEPLOY_PATH }}' && docker compose pull && docker compose up -d"
-
-      - name: Run Prisma migrations
-        if: env.DEPLOY_API == 'true'
-        run: |
-          ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT || 22 }}" \
-            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
-            "cd '${{ secrets.DEPLOY_PATH }}' && docker compose exec -T api npx prisma migrate deploy"
+          REMOTE="cd '${{ secrets.DEPLOY_PATH }}'"
+          SSH=(ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT || 22 }}" -o StrictHostKeyChecking=yes "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}")
+          if [ "${{ env.DEPLOY_API }}" = "true" ]; then
+            # GHCR package is private by default; VPS must auth before pull.
+            printf '%s' "$GHCR_TOKEN" | "${SSH[@]}" 'docker login ghcr.io -u krealisv --password-stdin'
+            "${SSH[@]}" "${REMOTE} && docker compose pull api"
+          fi
+          "${SSH[@]}" "${REMOTE} && docker compose up -d"
 
       # NOTA: el registro en el edge compartido (scripts/setup-wodo-https.sh) es
       # de una sola vez y ya está aplicado; requiere privilegios para escribir el
