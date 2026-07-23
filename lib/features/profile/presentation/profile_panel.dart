@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import '../../../core/theme/app_surface.dart';
 import '../../../global/widgets/activity_stat_card.dart';
@@ -42,9 +41,11 @@ class ProfilePanel extends StatelessWidget {
   SettingsRepository get _settings => settings ?? SettingsRepository.instance;
 
   static const heatmapGap = 3.0;
-  static const minCellWithNumbers = 14.0;
+  static const heatmapGapWithNumbers = 4.0;
+  /// Room for two-digit day numbers to sit centered inside each cell.
+  static const minCellWithNumbers = 18.0;
   static const minCellCompact = 12.0;
-  static const maxCellWithNumbers = 14.0;
+  static const maxCellWithNumbers = 22.0;
   static const maxCellCompact = 12.0;
   static const sidebarWeeks = 26;
 
@@ -169,6 +170,10 @@ class ProfileActivityHero extends StatelessWidget {
           final maxCell = showDayNumbers
               ? ProfilePanel.maxCellWithNumbers
               : ProfilePanel.maxCellCompact;
+          final gap = showDayNumbers
+              ? ProfilePanel.heatmapGapWithNumbers
+              : ProfilePanel.heatmapGap;
+          final monthLabelHeight = showDayNumbers ? 14.0 : 12.0;
 
           late final int weeks;
           late final double? fixedCellSize;
@@ -180,11 +185,11 @@ class ProfileActivityHero extends StatelessWidget {
             fixedCellSize = null;
             weeks = HeatmapLayout.weeksForMinCell(
               width: constraints.maxWidth,
-              gap: ProfilePanel.heatmapGap,
+              gap: gap,
               minCell: minCell,
               maxCellSize: maxCell,
-              preferredMax: showDayNumbers ? 12 : 15,
-              preferredMid: showDayNumbers ? 10 : 12,
+              preferredMax: showDayNumbers ? 10 : 15,
+              preferredMid: showDayNumbers ? 8 : 12,
               dayLabelWidth: _dayLabelWidth,
             );
           }
@@ -197,21 +202,24 @@ class ProfileActivityHero extends StatelessWidget {
               ? HeatmapLayout.forFixedCell(
                   cellSize: fixedCellSize,
                   weeks: weeks,
-                  gap: ProfilePanel.heatmapGap,
+                  gap: gap,
+                  monthLabelHeight: monthLabelHeight,
                 )
               : HeatmapLayout.forConstraints(
                   width: constraints.maxWidth,
                   weeks: weeks,
-                  gap: ProfilePanel.heatmapGap,
+                  gap: gap,
                   dayLabelWidth: _dayLabelWidth,
                   maxCellSize: maxCell,
+                  monthLabelHeight: monthLabelHeight,
                 );
           final height = layout?.totalHeight ??
               ActivityHeatmap.heightForWidth(
                 width: constraints.maxWidth,
                 weeks: weeks,
-                gap: ProfilePanel.heatmapGap,
+                gap: gap,
                 dayLabelWidth: _dayLabelWidth,
+                monthLabelHeight: monthLabelHeight,
               );
 
           final gridNaturalWidth = fixedCellSize != null
@@ -226,8 +234,9 @@ class ProfileActivityHero extends StatelessWidget {
               cells: cells,
               weeks: weeks,
               rangeStart: rangeStart,
-              gap: ProfilePanel.heatmapGap,
+              gap: gap,
               dayLabelWidth: _dayLabelWidth,
+              monthLabelHeight: monthLabelHeight,
               showAllWeekdayLabels: true,
               showDayNumbers: showDayNumbers,
               fixedCellSize: fixedCellSize,
