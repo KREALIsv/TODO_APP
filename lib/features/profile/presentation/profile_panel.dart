@@ -41,12 +41,12 @@ class ProfilePanel extends StatelessWidget {
   SettingsRepository get _settings => settings ?? SettingsRepository.instance;
 
   static const heatmapGap = 3.0;
-  /// Mobile: slightly roomier when day numbers are on (not desktop-huge).
-  static const minCellWithNumbers = 14.0;
-  static const minCellCompact = 12.0;
-  static const maxCellWithNumbers = 15.0;
-  static const maxCellCompact = 12.0;
-  /// Desktop sidebar: GitHub-sized squares; fill width with more weeks.
+  /// Mobile fluid layout: floor cell size; width is filled by expanding cells.
+  static const minCellWithNumbers = 10.0;
+  static const minCellCompact = 10.0;
+  static const mobileWeeksMax = 26;
+  static const mobileWeeksMid = 20;
+  /// Desktop sidebar: GitHub-sized squares; fill width with more weeks + scroll.
   static const sidebarCellCompact = 11.0;
   static const sidebarCellWithNumbers = 12.0;
   static const sidebarWeeksMax = 52;
@@ -191,20 +191,19 @@ class ProfileActivityHero extends StatelessWidget {
               dayLabelWidth: _dayLabelWidth,
             );
           } else {
+            // Mobile / full-width Perfil: stretch cells to fill the card (no right gap).
             final minCell = showDayNumbers
                 ? ProfilePanel.minCellWithNumbers
                 : ProfilePanel.minCellCompact;
-            maxCell = showDayNumbers
-                ? ProfilePanel.maxCellWithNumbers
-                : ProfilePanel.maxCellCompact;
             fixedCellSize = null;
+            maxCell = double.infinity;
             weeks = HeatmapLayout.weeksForMinCell(
               width: constraints.maxWidth,
               gap: gap,
               minCell: minCell,
-              maxCellSize: maxCell,
-              preferredMax: showDayNumbers ? 13 : 15,
-              preferredMid: showDayNumbers ? 10 : 12,
+              maxCellSize: double.infinity,
+              preferredMax: ProfilePanel.mobileWeeksMax,
+              preferredMid: ProfilePanel.mobileWeeksMid,
               dayLabelWidth: _dayLabelWidth,
             );
           }
@@ -244,6 +243,7 @@ class ProfileActivityHero extends StatelessWidget {
               : constraints.maxWidth;
 
           Widget heatmap = SizedBox(
+            width: double.infinity,
             height: height,
             child: ActivityHeatmap(
               cells: cells,
