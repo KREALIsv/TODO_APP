@@ -41,13 +41,16 @@ class ProfilePanel extends StatelessWidget {
   SettingsRepository get _settings => settings ?? SettingsRepository.instance;
 
   static const heatmapGap = 3.0;
-  static const heatmapGapWithNumbers = 4.0;
-  /// Room for two-digit day numbers to sit centered inside each cell.
-  static const minCellWithNumbers = 18.0;
+  /// Mobile: slightly roomier when day numbers are on (not desktop-huge).
+  static const minCellWithNumbers = 14.0;
   static const minCellCompact = 12.0;
-  static const maxCellWithNumbers = 22.0;
+  static const maxCellWithNumbers = 15.0;
   static const maxCellCompact = 12.0;
-  static const sidebarWeeks = 26;
+  /// Desktop sidebar: GitHub-sized squares; fill width with more weeks.
+  static const sidebarCellCompact = 11.0;
+  static const sidebarCellWithNumbers = 12.0;
+  static const sidebarWeeksMax = 52;
+  static const sidebarWeeksMid = 39;
 
   @override
   Widget build(BuildContext context) {
@@ -164,32 +167,44 @@ class ProfileActivityHero extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isSidebar = density == ProfilePanelDensity.sidebar;
-          final minCell = showDayNumbers
-              ? ProfilePanel.minCellWithNumbers
-              : ProfilePanel.minCellCompact;
-          final maxCell = showDayNumbers
-              ? ProfilePanel.maxCellWithNumbers
-              : ProfilePanel.maxCellCompact;
-          final gap = showDayNumbers
-              ? ProfilePanel.heatmapGapWithNumbers
-              : ProfilePanel.heatmapGap;
+          final gap = ProfilePanel.heatmapGap;
           final monthLabelHeight = showDayNumbers ? 14.0 : 12.0;
 
           late final int weeks;
           late final double? fixedCellSize;
+          late final double maxCell;
 
           if (isSidebar) {
-            fixedCellSize = maxCell;
-            weeks = ProfilePanel.sidebarWeeks;
+            // Desktop: keep GitHub-scale cells; spend extra width on more weeks.
+            final cell = showDayNumbers
+                ? ProfilePanel.sidebarCellWithNumbers
+                : ProfilePanel.sidebarCellCompact;
+            fixedCellSize = cell;
+            maxCell = cell;
+            weeks = HeatmapLayout.weeksForMinCell(
+              width: constraints.maxWidth,
+              gap: gap,
+              minCell: cell,
+              maxCellSize: cell,
+              preferredMax: ProfilePanel.sidebarWeeksMax,
+              preferredMid: ProfilePanel.sidebarWeeksMid,
+              dayLabelWidth: _dayLabelWidth,
+            );
           } else {
+            final minCell = showDayNumbers
+                ? ProfilePanel.minCellWithNumbers
+                : ProfilePanel.minCellCompact;
+            maxCell = showDayNumbers
+                ? ProfilePanel.maxCellWithNumbers
+                : ProfilePanel.maxCellCompact;
             fixedCellSize = null;
             weeks = HeatmapLayout.weeksForMinCell(
               width: constraints.maxWidth,
               gap: gap,
               minCell: minCell,
               maxCellSize: maxCell,
-              preferredMax: showDayNumbers ? 10 : 15,
-              preferredMid: showDayNumbers ? 8 : 12,
+              preferredMax: showDayNumbers ? 13 : 15,
+              preferredMid: showDayNumbers ? 10 : 12,
               dayLabelWidth: _dayLabelWidth,
             );
           }
