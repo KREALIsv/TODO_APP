@@ -38,6 +38,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-wodo_user}:${POSTGRES_PASSWORD:-wodo_password}@db:5432/${POSTGRES_DB:-wodo}
       SECRET_AUTH_TOKEN_KEY: ${SECRET_AUTH_TOKEN_KEY:-dev-secret-must-be-at-least-32-chars-long}
       ACCESS_TOKEN_EXPIRATION: 15m
+      ACCESS_TOKEN_EXPIRATION_WEB: 24h
       REFRESH_TOKEN_EXPIRATION: 7d
       CORS_ALLOWED_ORIGINS: http://localhost:8080
       THROTTLE_TTL: 60

@@ -5,6 +5,8 @@ import '../../settings/presentation/data_backup.dart';
 import '../../sync/data/device_identity.dart';
 import '../../sync/data/sync_service.dart';
 import '../data/auth_service.dart';
+import '../domain/auth_errors.dart';
+import '../domain/auth_session_expired_exception.dart';
 import 'account_screen.dart';
 import 'auth_screen.dart';
 
@@ -84,13 +86,27 @@ abstract final class AuthFlow {
   }
 
   static Future<void> syncNow(BuildContext context) async {
-    await SyncService.instance.syncNow();
+    try {
+      await SyncService.instance.syncNow();
+    } on AuthSessionExpiredException catch (error) {
+      if (!context.mounted) return;
+      await AppAlerts.show(
+        context,
+        title: AuthErrors.sessionExpiredTitle,
+        message: error.userMessage,
+        type: AppAlertType.warning,
+      );
+      return;
+    }
+
     if (!context.mounted) return;
 
     final error = SyncService.instance.errorMessage;
     await AppAlerts.show(
       context,
-      message: error ?? 'Tus datos están actualizados.',
+      message: error == null
+          ? 'Tus datos están actualizados.'
+          : AuthErrors.message(StateError(error), registering: false),
       type: error == null ? AppAlertType.success : AppAlertType.error,
     );
   }
