@@ -36,6 +36,34 @@ class AuthService extends ChangeNotifier {
     return _authenticate('auth/login', email: email, password: password);
   }
 
+  Future<void> requestPasswordReset(String email) async {
+    if (!WodoApiConfig.isConfigured) {
+      throw StateError('La sincronización aún no está configurada.');
+    }
+    final response = await http.post(
+      WodoApiConfig.uri('auth/forgot-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email.trim()}),
+    );
+    _responseData(response);
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String password,
+  }) async {
+    if (!WodoApiConfig.isConfigured) {
+      throw StateError('La sincronización aún no está configurada.');
+    }
+    final response = await http.post(
+      WodoApiConfig.uri('auth/reset-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'token': token.trim(), 'password': password}),
+    );
+    if (response.statusCode == 204) return;
+    _responseData(response);
+  }
+
   Future<void> logout() async {
     final session = _sessions.session;
     if (session != null && WodoApiConfig.isConfigured) {

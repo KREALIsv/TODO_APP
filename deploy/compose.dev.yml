@@ -42,6 +42,9 @@ services:
       CORS_ALLOWED_ORIGINS: http://localhost:8080
       THROTTLE_TTL: 60
       THROTTLE_LIMIT: 1000
+      WODO_APP_URL: http://localhost:8080
+      MAIL_MAX_PER_USER_FLOW: 2
+      MAIL_FLOW_WINDOW_HOURS: 24
     env_file:
       - ../backend/.env
     volumes:

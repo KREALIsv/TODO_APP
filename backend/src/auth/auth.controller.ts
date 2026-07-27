@@ -7,10 +7,17 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthGuard, CurrentUser, CurrentUserPayload } from '../common';
 import { AuthService } from './auth.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
-import { LoginDto, RefreshTokenDto, RegisterDto } from './dto';
+import {
+  ForgotPasswordDto,
+  LoginDto,
+  RefreshTokenDto,
+  RegisterDto,
+  ResetPasswordDto,
+} from './dto';
 
 @Controller('auth')
 export class AuthController {
@@ -26,6 +33,23 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
     return this.authService.login(dto);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 900000 } })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ accepted: true }> {
+    await this.authService.requestPasswordReset(dto.email);
+    return { accepted: true };
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 900000 } })
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
+    await this.authService.resetPassword(dto.token, dto.password);
   }
 
   @Post('refresh')

@@ -8,6 +8,7 @@ import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
 import { PrismaService } from '../common/services';
+import { MailService } from '../mail';
 import { LoginDto, RegisterDto } from './dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 
@@ -21,6 +22,7 @@ export class AuthService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly mail: MailService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponseDto> {
@@ -41,6 +43,8 @@ export class AuthService {
       },
     });
 
+    void this.sendWelcomeEmail(user.id, user.email);
+
     return this.createSession(user.id);
   }
 
@@ -59,6 +63,83 @@ export class AuthService {
     }
 
     return this.createSession(user.id);
+  }
+
+  async requestPasswordReset(email: string): Promise<void> {
+    const normalized = email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalized },
+    });
+
+    if (!user || !user.passwordHash) {
+      return;
+    }
+
+    if (!this.mail.isConfigured()) {
+      return;
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    const appUrl = this.config.get<string>(
+      'WODO_APP_URL',
+      'https://app.wodo.app',
+    );
+    const resetUrl = `${appUrl.replace(/\/$/, '')}/?wodo_reset=${rawToken}`;
+
+    await this.mail.send({
+      to: user.email,
+      flow: 'password_reset',
+      userId: user.id,
+      subject: 'Restablece tu contraseña de WODO',
+      html: this.mail.buildPasswordResetHtml(resetUrl),
+    });
+  }
+
+  async resetPassword(token: string, password: string): Promise<void> {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const record = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (
+      !record ||
+      record.usedAt ||
+      record.expiresAt <= new Date() ||
+      !record.user.passwordHash
+    ) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: { passwordHash },
+      }),
+      this.prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.session.deleteMany({ where: { userId: record.userId } }),
+    ]);
   }
 
   async refresh(refreshToken: string): Promise<AuthResponseDto> {
@@ -87,13 +168,33 @@ export class AuthService {
     });
   }
 
+  private async sendWelcomeEmail(userId: string, email: string): Promise<void> {
+    if (!this.mail.isConfigured()) return;
+
+    try {
+      const appUrl = this.config.get<string>(
+        'WODO_APP_URL',
+        'https://app.wodo.app',
+      );
+      await this.mail.send({
+        to: email,
+        flow: 'welcome',
+        userId,
+        subject: 'Bienvenida/o a WODO',
+        html: this.mail.buildWelcomeHtml(appUrl.replace(/\/$/, '')),
+      });
+    } catch (error) {
+      // Registration should succeed even if welcome mail fails.
+      console.error('Welcome email failed:', error);
+    }
+  }
+
   private async createSession(userId: string): Promise<AuthResponseDto> {
     const secret = this.config.getOrThrow<string>('SECRET_AUTH_TOKEN_KEY');
     const accessExpiration = this.config.getOrThrow<string>('ACCESS_TOKEN_EXPIRATION');
     const refreshExpiration = this.config.getOrThrow<string>('REFRESH_TOKEN_EXPIRATION');
 
     const sessionUuid = crypto.randomUUID();
-    const now = Math.floor(Date.now() / 1000);
     const accessExpiresIn = this.parseDuration(accessExpiration);
     const refreshExpiresIn = this.parseDuration(refreshExpiration);
 
