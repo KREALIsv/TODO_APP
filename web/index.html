@@ -188,6 +188,12 @@
       var boot = document.getElementById('wodo-boot');
       var msg = document.getElementById('wodo-boot-msg');
       var BOOT_CLEAN_KEY = 'wodo-boot-clean-v2';
+      var SESSION_READY_KEY = 'wodo-session-ready-v1';
+
+      // Same-tab return (e.g. accidental reload): skip blocking splash.
+      if (sessionStorage.getItem(SESSION_READY_KEY) === '1' && boot) {
+        boot.remove();
+      }
 
       // One-time migration for users stuck on the old Flutter service worker.
       // Repeat visits skip this entirely so cold starts stay fast.

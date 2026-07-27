@@ -284,8 +284,9 @@ class ActivityHeatmap extends StatelessWidget {
         : AppColors.neutral60;
     final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
           color: labelColor,
-          fontSize: 9,
+          fontSize: showDayNumbers ? 10 : 9,
           height: 1,
+          fontWeight: FontWeight.w500,
         );
     final monthLabels = _monthLabelsForWeeks();
     final weekdayLabels =
@@ -327,6 +328,22 @@ class ActivityHeatmap extends StatelessWidget {
             ? dayLabelWidth + HeatmapLayout.dayLabelGap + layout.gridWidth
             : width;
 
+        // Width of each month label: from its week until the next month (or end).
+        final monthLabelWidths = List<double>.filled(weeks, 0);
+        for (var week = 0; week < weeks; week++) {
+          if (monthLabels[week] == null) continue;
+          var endWeek = weeks;
+          for (var w = week + 1; w < weeks; w++) {
+            if (monthLabels[w] != null) {
+              endWeek = w;
+              break;
+            }
+          }
+          final span = endWeek - week;
+          monthLabelWidths[week] =
+              span * cell + (span > 1 ? (span - 1) * gap : 0);
+        }
+
         Widget grid = SizedBox(
           width: contentWidth,
           height: layout.totalHeight,
@@ -340,13 +357,13 @@ class ActivityHeatmap extends StatelessWidget {
                         HeatmapLayout.dayLabelGap +
                         week * (cell + gap),
                     top: 0,
-                    width: cell * 3 + gap * 2,
+                    width: monthLabelWidths[week],
                     height: monthLabelHeight,
                     child: Text(
                       monthLabels[week]!,
                       style: labelStyle,
                       maxLines: 1,
-                      overflow: TextOverflow.clip,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
               Positioned(
@@ -466,8 +483,9 @@ class _HeatmapPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (cell <= 0) return;
     // Soft corner on each cell; scales with size, stays subtle.
-    final radius = Radius.circular((cell * 0.25).clamp(2.0, 5.0));
-    final fontSize = (cell * 0.42).clamp(6.0, 12.0);
+    final radius = Radius.circular((cell * 0.22).clamp(2.0, 5.0));
+    // ~half the cell so two-digit days (e.g. "22") stay readable and centered.
+    final fontSize = (cell * 0.48).clamp(7.0, 11.0);
     for (var week = 0; week < weeks; week++) {
       for (var day = 0; day < 7; day++) {
         final index = week * 7 + day;
@@ -490,19 +508,17 @@ class _HeatmapPainter extends CustomPainter {
             style: TextStyle(
               color: _labelColorFor(count, scheme),
               fontSize: fontSize,
-              fontWeight: FontWeight.w500,
-              height: 1,
+              fontWeight: FontWeight.w600,
+              height: 1.0,
+              letterSpacing: -0.2,
             ),
           ),
+          textAlign: TextAlign.center,
           textDirection: TextDirection.ltr,
-        )..layout(maxWidth: cell);
-        tp.paint(
-          canvas,
-          Offset(
-            left + (cell - tp.width) / 2,
-            top + (cell - tp.height) / 2,
-          ),
-        );
+        )..layout(minWidth: cell, maxWidth: cell);
+        // Optical vertical nudge: glyph metrics sit slightly high in the box.
+        final dy = top + (cell - tp.height) / 2 + cell * 0.02;
+        tp.paint(canvas, Offset(left, dy));
       }
     }
   }

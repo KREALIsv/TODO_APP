@@ -17,6 +17,7 @@
 
 ### Notes / gotchas
 - First web page load is slow (Flutter compiles to JS on first request); wait ~15-20s or refresh once before assuming a failure.
+- Mobile Safari back/swipe is wired through `WebHistoryNavigatorObserver` (`lib/core/web/web_history_navigation.dart`); without it, popping a pushed route can reload the HTML boot splash instead of returning to the list.
 - Local notifications (`flutter_local_notifications`) bootstrap is best-effort and is skipped gracefully on web/hot-reload; the app works without it.
 
 ### Deploy (production) — wodo.app + app.wodo.app

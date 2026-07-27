@@ -331,6 +331,23 @@ void main() {
       );
       expect(layout!.cellSize, greaterThanOrEqualTo(10));
     });
+
+    test('fluid layout fills horizontal width on phone-sized cards', () {
+      const cardWidth = 390.0;
+      const dayLabelWidth = 14.0;
+      const gap = 3.0;
+      const weeks = 26;
+      final layout = HeatmapLayout.forConstraints(
+        width: cardWidth,
+        weeks: weeks,
+        gap: gap,
+        dayLabelWidth: dayLabelWidth,
+      );
+      expect(layout, isNotNull);
+      final gridArea =
+          cardWidth - dayLabelWidth - HeatmapLayout.dayLabelGap;
+      expect(layout!.gridWidth, closeTo(gridArea, 0.01));
+    });
   });
 
   group('ActivityStrip', () {

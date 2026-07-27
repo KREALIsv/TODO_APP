@@ -4,7 +4,6 @@ import '../../../core/theme/app_surface.dart';
 import '../../../global/themes/app_colors.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/auth_flow.dart';
-import '../../notes/domain/tag_colors.dart';
 import '../../sync/data/device_identity.dart';
 import '../../sync/data/sync_service.dart';
 import 'profile_panel.dart';
@@ -324,23 +323,25 @@ class _AccountAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = compact ? 44.0 : 52.0;
     final loggedIn = initials != null && initials!.isNotEmpty;
+    final scheme = Theme.of(context).colorScheme;
 
     return CircleAvatar(
       radius: size / 2,
+      // Match home avatar: brand green when signed in, soft green when not.
       backgroundColor:
-          loggedIn ? TagColors.brandPink : AppColors.neutral20,
+          loggedIn ? scheme.primary : scheme.primaryContainer,
       child: loggedIn
           ? Text(
               initials!,
               style: TextStyle(
-                color: Colors.white,
+                color: scheme.onPrimary,
                 fontWeight: FontWeight.w700,
                 fontSize: compact ? 15 : 17,
               ),
             )
           : Icon(
               Icons.person_outline_rounded,
-              color: AppColors.neutral60,
+              color: scheme.primary,
               size: compact ? 22 : 26,
             ),
     );

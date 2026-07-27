@@ -56,8 +56,6 @@ class _BootstrapAppState extends State<_BootstrapApp> {
         AuthSessionRepository.instance.init(),
         DeviceIdentity.instance.init(),
       ]);
-      await SyncService.instance.init();
-      await LocalTabSyncService.instance.init();
       if (!mounted) return;
       setState(() => _ready = true);
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -74,6 +72,8 @@ class _BootstrapAppState extends State<_BootstrapApp> {
 
   Future<void> _postBootstrap() async {
     try {
+      await SyncService.instance.init();
+      await LocalTabSyncService.instance.init();
       await TagsRepository.instance.ensureTags(
         NotesRepository.instance.getAllTags(),
       );
