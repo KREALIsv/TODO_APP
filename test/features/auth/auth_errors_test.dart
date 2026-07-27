@@ -33,7 +33,7 @@ void main() {
         AuthSessionExpiredException(AuthErrors.sessionExpiredMessage()),
         registering: false,
       ),
-      contains('Inicia sesión'),
+      contains('iniciar sesión'),
     );
   });
 }
