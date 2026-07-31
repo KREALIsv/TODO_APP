@@ -66,14 +66,18 @@ abstract final class AuthFlow {
     required bool syncEnabled,
     required SyncState syncState,
   }) {
-    if (!isConfigured) return 'Sincronización no disponible en esta versión';
+    if (!isConfigured) {
+      return 'Sincronización no configurada (solo builds de desarrollo)';
+    }
     if (!isAuthenticated) return 'Modo local · solo en este dispositivo';
     if (!syncEnabled) return 'Sincronización pausada en este dispositivo';
     return switch (syncState) {
       SyncState.syncing => 'Sincronizando…',
       SyncState.error => 'Error al sincronizar',
       SyncState.idle => 'Datos al día en la nube',
-      SyncState.unavailable => 'Inicia sesión para sincronizar',
+      SyncState.unavailable => isAuthenticated
+          ? 'Listo para sincronizar'
+          : 'Inicia sesión para sincronizar',
     };
   }
 

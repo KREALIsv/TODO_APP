@@ -128,19 +128,11 @@ class _LoggedOutCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: compact ? 12 : 14),
-          if (canSignIn)
-            FilledButton.icon(
-              onPressed: onSignIn,
-              icon: const Icon(Icons.login_rounded, size: 18),
-              label: const Text('Iniciar sesión'),
-            )
-          else
-            Text(
-              'La sincronización entre dispositivos estará disponible pronto.',
-              style: textTheme.bodySmall?.copyWith(
-                color: AppSurface.secondary(context),
-              ),
-            ),
+          FilledButton.icon(
+            onPressed: canSignIn ? onSignIn : null,
+            icon: const Icon(Icons.login_rounded, size: 18),
+            label: const Text('Iniciar sesión'),
+          ),
         ],
       ),
     );
@@ -239,11 +231,15 @@ class _LoggedInCard extends StatelessWidget {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            Text(
-                              'Ver datos de cuenta',
-                              style: textTheme.labelLarge?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.w600,
+                            Flexible(
+                              child: Text(
+                                'Ver datos de cuenta',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.labelLarge?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                             Icon(
