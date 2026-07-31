@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -14,6 +15,7 @@ import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthGuard, CurrentUser, CurrentUserPayload } from '../common';
 import { ApprovePairingDto, StartPairingDto } from './dto';
 import {
+  PairingPendingResult,
   PairingPollResult,
   PairingService,
   PairingStartResult,
@@ -29,6 +31,17 @@ export class PairingController {
   @Throttle({ default: { limit: 20, ttl: 900000 } })
   start(@Body() dto: StartPairingDto): Promise<PairingStartResult> {
     return this.pairingService.start(dto);
+  }
+
+  @Get('pending')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 60, ttl: 900000 } })
+  pending(@Query('code') code?: string): Promise<PairingPendingResult> {
+    if (!code?.trim()) {
+      throw new BadRequestException('Código de vinculación requerido.');
+    }
+    return this.pairingService.getPendingByCode(code);
   }
 
   @Post('approve')

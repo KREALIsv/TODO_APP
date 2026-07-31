@@ -7,6 +7,8 @@ import '../../../global/themes/app_colors.dart';
 import '../../../global/widgets/app_alerts.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/auth_flow.dart';
+import '../../encryption/data/vault_service.dart';
+import '../../encryption/domain/cloud_vault_state.dart';
 import '../../notes/data/attachments_repository.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
@@ -240,6 +242,7 @@ class SettingsScreen extends StatelessWidget {
         AuthService.instance,
         SyncService.instance,
         DeviceIdentity.instance,
+        VaultService.instance,
       ]),
       builder: (context, _) {
         final bg = _settings.listBackground;
@@ -333,6 +336,32 @@ class SettingsScreen extends StatelessWidget {
               accent: accent,
               onTap: () => AuthFlow.openLinkedDevices(context),
             ),
+            const SettingsDivider(),
+            if (!VaultService.instance.accountEncryptionEnabled)
+              SettingsRow(
+                icon: Icons.lock_outline_rounded,
+                title: 'Proteger mis datos en la nube',
+                subtitle: 'Opcional · encriptación de extremo a extremo',
+                accent: accent,
+                onTap: () => AuthFlow.enableCloudProtection(context),
+              )
+            else if (VaultService.instance.state == CloudVaultState.authOnly ||
+                VaultService.instance.state == CloudVaultState.revoked)
+              SettingsRow(
+                icon: Icons.link_rounded,
+                title: 'Vincula este dispositivo',
+                subtitle: 'QR o código de recuperación',
+                accent: accent,
+                onTap: () => AuthFlow.openLinkDeviceGate(context),
+              )
+            else
+              SettingsRow(
+                icon: Icons.verified_user_outlined,
+                title: 'Datos protegidos en la nube',
+                trailing: 'Activo',
+                accent: accent,
+                showChevron: false,
+              ),
             const SettingsDivider(),
             SettingsRow(
               icon: Icons.cloud_sync_outlined,

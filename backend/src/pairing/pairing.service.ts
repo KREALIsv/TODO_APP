@@ -10,6 +10,7 @@ import { PairingStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../common/services';
+import { DevicesService } from '../devices/devices.service';
 import { ApprovePairingDto, StartPairingDto } from './dto';
 
 const PAIRING_TTL_MS = 3 * 60 * 1000;
@@ -26,7 +27,16 @@ export interface PairingStartResult {
     code: string;
     apiBase: string;
     expiresAt: string;
+    ephemeralPub?: string;
   };
+}
+
+export interface PairingPendingResult {
+  pairingId: string;
+  displayCode: string;
+  ephemeralPub: string | null;
+  expiresAt: string;
+  encryptionRequired: boolean;
 }
 
 export interface PairingPollResult {
@@ -35,6 +45,9 @@ export interface PairingPollResult {
   refreshToken?: string;
   expiresIn?: number;
   email?: string;
+  wrappedDek?: string | null;
+  approverEphemeralPub?: string | null;
+  encryptionEnabled?: boolean;
 }
 
 @Injectable()
@@ -43,6 +56,7 @@ export class PairingService {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
+    private readonly devices: DevicesService,
   ) {}
 
   async start(dto: StartPairingDto): Promise<PairingStartResult> {
@@ -51,6 +65,7 @@ export class PairingService {
     const displayCode = await this.allocateDisplayCode();
     const expiresAt = new Date(Date.now() + PAIRING_TTL_MS);
     const apiBase = this.resolveApiBase();
+    const ephemeralPub = dto.ephemeralPub?.trim() || null;
 
     const session = await this.prisma.pairingSession.create({
       data: {
@@ -58,6 +73,7 @@ export class PairingService {
         pollTokenHash,
         clientPlatform: dto.clientPlatform ?? null,
         newAppUserId: dto.appUserId?.trim() || null,
+        ephemeralPub,
         expiresAt,
       },
     });
@@ -74,7 +90,35 @@ export class PairingService {
         code: displayCode,
         apiBase,
         expiresAt: expiresAtIso,
+        ...(ephemeralPub ? { ephemeralPub } : {}),
       },
+    };
+  }
+
+  async getPendingByCode(code: string): Promise<PairingPendingResult> {
+    const normalized = code.trim().toUpperCase();
+    const session = await this.prisma.pairingSession.findFirst({
+      where: {
+        displayCode: normalized,
+        status: PairingStatus.pending,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!session) {
+      throw new NotFoundException('No encontramos esa solicitud de vinculación.');
+    }
+    if (session.expiresAt <= new Date()) {
+      await this.markExpired(session.id);
+      throw new GoneException('El código de vinculación expiró. Genera uno nuevo.');
+    }
+
+    return {
+      pairingId: session.id,
+      displayCode: session.displayCode,
+      ephemeralPub: session.ephemeralPub,
+      expiresAt: session.expiresAt.toISOString(),
+      encryptionRequired: false,
     };
   }
 
@@ -120,6 +164,14 @@ export class PairingService {
       throw new UnauthorizedException('Usuario no válido.');
     }
 
+    if (user.encryptionEnabled) {
+      if (!dto.wrappedDek?.trim() || !dto.approverEphemeralPub?.trim()) {
+        throw new BadRequestException(
+          'Esta cuenta tiene datos protegidos: se requiere la clave envuelta (DEK) para vincular.',
+        );
+      }
+    }
+
     const platform =
       session.clientPlatform === 'web' || session.clientPlatform === 'mobile'
         ? session.clientPlatform
@@ -136,8 +188,14 @@ export class PairingService {
         grantRefreshToken: tokens.refreshToken,
         grantExpiresIn: tokens.expiresIn,
         grantEmail: user.email,
+        grantWrappedDek: dto.wrappedDek?.trim() || null,
+        grantApproverPub: dto.approverEphemeralPub?.trim() || null,
       },
     });
+
+    if (session.newAppUserId) {
+      await this.devices.markTrusted(approverUserId, session.newAppUserId);
+    }
 
     return { accepted: true };
   }
@@ -184,12 +242,24 @@ export class PairingService {
       throw new GoneException('La sesión de vinculación ya no está disponible.');
     }
 
+    let encryptionEnabled = false;
+    if (session.approverUserId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: session.approverUserId },
+        select: { encryptionEnabled: true },
+      });
+      encryptionEnabled = user?.encryptionEnabled ?? false;
+    }
+
     const result: PairingPollResult = {
       status: 'approved',
       accessToken: session.grantAccessToken,
       refreshToken: session.grantRefreshToken,
       expiresIn: session.grantExpiresIn,
       email: session.grantEmail ?? undefined,
+      wrappedDek: session.grantWrappedDek,
+      approverEphemeralPub: session.grantApproverPub,
+      encryptionEnabled,
     };
 
     await this.prisma.pairingSession.update({
@@ -201,6 +271,8 @@ export class PairingService {
         grantRefreshToken: null,
         grantExpiresIn: null,
         grantEmail: null,
+        grantWrappedDek: null,
+        grantApproverPub: null,
       },
     });
 

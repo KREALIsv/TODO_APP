@@ -8,6 +8,7 @@ import 'app/app.dart';
 import 'core/theme/theme.dart';
 import 'core/web/boot_ready.dart';
 import 'features/auth/data/auth_session_repository.dart';
+import 'features/encryption/data/vault_service.dart';
 import 'features/notes/data/attachments_repository.dart';
 import 'features/notes/data/day_entries_repository.dart';
 import 'features/notes/data/notes_repository.dart';
@@ -72,6 +73,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
 
   Future<void> _postBootstrap() async {
     try {
+      await VaultService.instance.init();
       await SyncService.instance.init();
       await LocalTabSyncService.instance.init();
       await TagsRepository.instance.ensureTags(

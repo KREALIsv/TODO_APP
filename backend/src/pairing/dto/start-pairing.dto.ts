@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class StartPairingDto {
   @IsOptional()
@@ -9,4 +9,11 @@ export class StartPairingDto {
   @IsOptional()
   @IsIn(['web', 'mobile'])
   clientPlatform?: 'web' | 'mobile';
+
+  /** X25519 public key (base64) from the new device for DEK relay. */
+  @IsOptional()
+  @IsString()
+  @MinLength(32)
+  @MaxLength(256)
+  ephemeralPub?: string;
 }

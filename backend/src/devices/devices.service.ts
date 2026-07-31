@@ -60,6 +60,34 @@ export class DevicesService {
       throw new NotFoundException('Dispositivo no encontrado.');
     }
 
-    await this.prisma.device.delete({ where: { id: device.id } });
+    await this.prisma.device.update({
+      where: { id: device.id },
+      data: {
+        trusted: false,
+        vaultState: 'revoked',
+      },
+    });
+  }
+
+  async markTrusted(userId: string, appUserId: string): Promise<void> {
+    const now = new Date();
+    await this.prisma.device.upsert({
+      where: { appUserId },
+      create: {
+        userId,
+        appUserId,
+        trusted: true,
+        vaultState: 'trusted',
+        pairedAt: now,
+        lastSyncedAt: now,
+      },
+      update: {
+        userId,
+        trusted: true,
+        vaultState: 'trusted',
+        pairedAt: now,
+        lastSyncedAt: now,
+      },
+    });
   }
 }

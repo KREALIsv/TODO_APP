@@ -8,6 +8,8 @@ import '../../../core/theme/app_surface.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/domain/auth_errors.dart';
 import '../../auth/presentation/widgets/auth_page_shell.dart';
+import '../../encryption/data/crypto_service.dart';
+import '../../encryption/data/vault_service.dart';
 import '../../sync/data/device_identity.dart';
 import '../../sync/data/device_registry.dart';
 import '../../sync/data/sync_service.dart';
@@ -23,6 +25,7 @@ class QrLoginScreen extends StatefulWidget {
 
 class _QrLoginScreenState extends State<QrLoginScreen> {
   PairingStart? _pairing;
+  PairingKeySession? _keySession;
   var _loading = true;
   Object? _error;
   Timer? _expiryTicker;
@@ -51,11 +54,15 @@ class _QrLoginScreenState extends State<QrLoginScreen> {
     _expiryTicker?.cancel();
 
     try {
+      final keySession = await PairingKeySession.create();
+      final pub = await keySession.publicKeyBase64;
       final started = await PairingService.instance.start(
         appUserId: DeviceIdentity.instance.appUserId,
+        ephemeralPub: pub,
       );
       if (!mounted || generation != _pollGeneration) return;
 
+      _keySession = keySession;
       setState(() {
         _pairing = started;
         _loading = false;
@@ -100,8 +107,30 @@ class _QrLoginScreenState extends State<QrLoginScreen> {
           expiresInSeconds: result.expiresIn!,
           email: result.email,
         );
+
+        if (result.encryptionEnabled) {
+          final wrapped = result.wrappedDek;
+          final approverPub = result.approverEphemeralPub;
+          final session = _keySession;
+          if (wrapped == null ||
+              approverPub == null ||
+              session == null) {
+            throw StateError(
+              'La cuenta tiene datos protegidos, pero no llegó la clave. '
+              'Vuelve a intentar o usa el código de recuperación.',
+            );
+          }
+          final dek = await CryptoService.instance.unwrapDekFromPairing(
+            wrappedDek: wrapped,
+            approverEphemeralPubBase64: approverPub,
+            newDeviceKeyPair: session.keyPair,
+          );
+          await VaultService.instance.storeDekFromPairing(dek);
+        }
+
         await DeviceRegistry.instance.register();
         await DeviceIdentity.instance.setSyncEnabled(true);
+        await VaultService.instance.refreshSecurity();
         await SyncService.instance.syncNow();
         if (!mounted || generation != _pollGeneration) return;
         Navigator.of(context).pop(true);

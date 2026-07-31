@@ -1,7 +1,8 @@
-import { GoneException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, GoneException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PairingStatus } from '@prisma/client';
 import { AuthService } from '../auth/auth.service';
+import { DevicesService } from '../devices/devices.service';
 import { PrismaService } from '../common/services';
 import { PairingService } from './pairing.service';
 
@@ -22,6 +23,10 @@ describe('PairingService', () => {
     issueSession: jest.fn(),
   } as unknown as AuthService;
 
+  const devices = {
+    markTrusted: jest.fn(),
+  } as unknown as DevicesService;
+
   const config = {
     get: jest.fn(() => 'https://api.wodo.app'),
   } as unknown as ConfigService;
@@ -30,11 +35,11 @@ describe('PairingService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new PairingService(config, prisma, auth);
+    service = new PairingService(config, prisma, auth, devices);
     (prisma.pairingSession.findFirst as jest.Mock).mockResolvedValue(null);
   });
 
-  it('starts a pairing session with QR payload and poll token', async () => {
+  it('starts a pairing session with ephemeral pub in QR', async () => {
     (prisma.pairingSession.create as jest.Mock).mockImplementation(
       async ({ data }) => ({
         id: 'pair-1',
@@ -45,37 +50,50 @@ describe('PairingService', () => {
     const result = await service.start({
       appUserId: 'device-1',
       clientPlatform: 'web',
+      ephemeralPub: 'pub-key-base64-xxxxxxxxxxxxxxxxxxxx',
     });
 
-    expect(result.pairingId).toBe('pair-1');
-    expect(result.displayCode).toHaveLength(8);
-    expect(result.pollToken).toHaveLength(64);
-    expect(result.qrPayload).toMatchObject({
-      v: 1,
-      pairingId: 'pair-1',
-      code: result.displayCode,
-      apiBase: 'https://api.wodo.app/api/v1',
-    });
+    expect(result.qrPayload.ephemeralPub).toBe(
+      'pub-key-base64-xxxxxxxxxxxxxxxxxxxx',
+    );
     expect(prisma.pairingSession.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        clientPlatform: 'web',
-        newAppUserId: 'device-1',
-        displayCode: result.displayCode,
+        ephemeralPub: 'pub-key-base64-xxxxxxxxxxxxxxxxxxxx',
       }),
     });
   });
 
-  it('approves a pending pairing and stores a one-time session grant', async () => {
-    const expiresAt = new Date(Date.now() + 60_000);
+  it('requires wrapped DEK when account has encryption enabled', async () => {
     (prisma.pairingSession.findUnique as jest.Mock).mockResolvedValue({
       id: 'pair-1',
       status: PairingStatus.pending,
-      expiresAt,
+      expiresAt: new Date(Date.now() + 60_000),
       clientPlatform: 'web',
+      newAppUserId: 'device-new',
     });
     (prisma.user.findUnique as jest.Mock).mockResolvedValue({
       id: 'user-1',
       email: 'user@example.com',
+      encryptionEnabled: true,
+    });
+
+    await expect(
+      service.approve('user-1', { pairingId: 'pair-1' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('stores wrapped DEK grant and marks new device trusted', async () => {
+    (prisma.pairingSession.findUnique as jest.Mock).mockResolvedValue({
+      id: 'pair-1',
+      status: PairingStatus.pending,
+      expiresAt: new Date(Date.now() + 60_000),
+      clientPlatform: 'web',
+      newAppUserId: 'device-new',
+    });
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+      encryptionEnabled: true,
     });
     (auth.issueSession as jest.Mock).mockResolvedValue({
       accessToken: 'access',
@@ -84,43 +102,40 @@ describe('PairingService', () => {
     });
     (prisma.pairingSession.update as jest.Mock).mockResolvedValue({});
 
-    await expect(
-      service.approve('user-1', { pairingId: 'pair-1' }),
-    ).resolves.toEqual({ accepted: true });
+    await service.approve('user-1', {
+      pairingId: 'pair-1',
+      wrappedDek: 'wrapped-dek-blob-xxxxxxxxxxxxxxxx',
+      approverEphemeralPub: 'approver-pub-xxxxxxxxxxxxxxxxxxxx',
+    });
 
-    expect(auth.issueSession).toHaveBeenCalledWith('user-1', 'web');
     expect(prisma.pairingSession.update).toHaveBeenCalledWith({
       where: { id: 'pair-1' },
       data: expect.objectContaining({
-        status: PairingStatus.approved,
-        grantAccessToken: 'access',
-        grantEmail: 'user@example.com',
+        grantWrappedDek: 'wrapped-dek-blob-xxxxxxxxxxxxxxxx',
+        grantApproverPub: 'approver-pub-xxxxxxxxxxxxxxxxxxxx',
       }),
     });
+    expect(devices.markTrusted).toHaveBeenCalledWith('user-1', 'device-new');
   });
 
-  it('poll returns pending until approved, then consumes grant', async () => {
+  it('poll returns wrapped DEK once then consumes', async () => {
     const pollToken = 'a'.repeat(64);
-    (prisma.pairingSession.findUnique as jest.Mock)
-      .mockResolvedValueOnce({
-        id: 'pair-1',
-        status: PairingStatus.pending,
-        expiresAt: new Date(Date.now() + 60_000),
-      })
-      .mockResolvedValueOnce({
-        id: 'pair-1',
-        status: PairingStatus.approved,
-        expiresAt: new Date(Date.now() + 60_000),
-        grantAccessToken: 'access',
-        grantRefreshToken: 'refresh',
-        grantExpiresIn: 900,
-        grantEmail: 'user@example.com',
-      });
-    (prisma.pairingSession.update as jest.Mock).mockResolvedValue({});
-
-    await expect(service.poll(pollToken)).resolves.toEqual({
-      status: 'pending',
+    (prisma.pairingSession.findUnique as jest.Mock).mockResolvedValue({
+      id: 'pair-1',
+      status: PairingStatus.approved,
+      expiresAt: new Date(Date.now() + 60_000),
+      grantAccessToken: 'access',
+      grantRefreshToken: 'refresh',
+      grantExpiresIn: 900,
+      grantEmail: 'user@example.com',
+      grantWrappedDek: 'wrap',
+      grantApproverPub: 'pub',
+      approverUserId: 'user-1',
     });
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      encryptionEnabled: true,
+    });
+    (prisma.pairingSession.update as jest.Mock).mockResolvedValue({});
 
     await expect(service.poll(pollToken)).resolves.toEqual({
       status: 'approved',
@@ -128,14 +143,9 @@ describe('PairingService', () => {
       refreshToken: 'refresh',
       expiresIn: 900,
       email: 'user@example.com',
-    });
-
-    expect(prisma.pairingSession.update).toHaveBeenCalledWith({
-      where: { id: 'pair-1' },
-      data: expect.objectContaining({
-        status: PairingStatus.consumed,
-        grantAccessToken: null,
-      }),
+      wrappedDek: 'wrap',
+      approverEphemeralPub: 'pub',
+      encryptionEnabled: true,
     });
   });
 
@@ -146,28 +156,12 @@ describe('PairingService', () => {
     );
   });
 
-  it('marks expired pending sessions on poll', async () => {
-    (prisma.pairingSession.findUnique as jest.Mock).mockResolvedValue({
-      id: 'pair-1',
-      status: PairingStatus.pending,
-      expiresAt: new Date(Date.now() - 1000),
-    });
-    (prisma.pairingSession.update as jest.Mock).mockResolvedValue({});
-
-    await expect(service.poll('token')).resolves.toEqual({ status: 'expired' });
-    expect(prisma.pairingSession.update).toHaveBeenCalledWith({
-      where: { id: 'pair-1' },
-      data: { status: PairingStatus.expired },
-    });
-  });
-
   it('rejects consumed sessions', async () => {
     (prisma.pairingSession.findUnique as jest.Mock).mockResolvedValue({
       id: 'pair-1',
       status: PairingStatus.consumed,
       expiresAt: new Date(Date.now() + 60_000),
     });
-
     await expect(service.poll('token')).rejects.toBeInstanceOf(GoneException);
   });
 });

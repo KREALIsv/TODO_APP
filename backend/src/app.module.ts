@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { DevicesModule } from './devices/devices.module';
+import { EncryptionModule } from './encryption/encryption.module';
 import { NotesModule } from './notes/notes.module';
 import { PairingModule } from './pairing/pairing.module';
 import { SyncModule } from './sync/sync.module';
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module';
     NotesModule,
     SyncModule,
     PairingModule,
+    EncryptionModule,
   ],
   controllers: [AppController],
 })

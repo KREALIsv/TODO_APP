@@ -378,8 +378,8 @@ No sustituye E2EE pero complementa:
 |------|------------|
 | **P0 — Diseño** | Este TRD + `SECURITY.md` resumen |
 | **P1 — Pairing sin E2EE** | QR vinculación + estados UI + revocar; sync plaintext (validar flujo) |
-| **P2 — E2EE enable** | Activar protección + **recovery obligatorio** (pantalla + copiar + `.txt`) + encrypt push/pull |
-| **P3 — Hardening** | Purga plaintext legacy, refresh token hash, adjuntos |
+| **P2 — E2EE enable** | ✅ Activar protección + recovery (pantalla/copiar) + encrypt push/pull + DEK vía ECDH en pairing + unlock por recovery wrap |
+| **P3 — Hardening** | Purga plaintext legacy, refresh token hash, adjuntos, descarga `.txt` recovery |
 | **P4 — Correo transaccional** | Resend unificado: `welcome`, `password_reset`, opcional `vault_recovery` (reenvío de código sin persistir en servidor) |
 
 ---

@@ -1,10 +1,13 @@
 import 'dart:convert';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../auth/data/auth_service.dart';
 import '../../auth/domain/auth_errors.dart';
+import '../../encryption/data/crypto_service.dart';
+import '../../encryption/data/vault_service.dart';
 import '../../sync/data/device_identity.dart';
 import '../../sync/data/wodo_api_config.dart';
 
@@ -45,6 +48,29 @@ class PairingStart {
   }
 }
 
+class PairingPending {
+  const PairingPending({
+    required this.pairingId,
+    required this.displayCode,
+    required this.ephemeralPub,
+    required this.expiresAt,
+  });
+
+  final String pairingId;
+  final String displayCode;
+  final String? ephemeralPub;
+  final DateTime expiresAt;
+
+  factory PairingPending.fromJson(Map<String, dynamic> json) {
+    return PairingPending(
+      pairingId: json['pairingId']?.toString() ?? '',
+      displayCode: json['displayCode']?.toString() ?? '',
+      ephemeralPub: json['ephemeralPub']?.toString(),
+      expiresAt: DateTime.parse(json['expiresAt'] as String),
+    );
+  }
+}
+
 class PairingPollResult {
   const PairingPollResult._({
     required this.status,
@@ -52,6 +78,9 @@ class PairingPollResult {
     this.refreshToken,
     this.expiresIn,
     this.email,
+    this.wrappedDek,
+    this.approverEphemeralPub,
+    this.encryptionEnabled = false,
   });
 
   final String status;
@@ -59,6 +88,9 @@ class PairingPollResult {
   final String? refreshToken;
   final int? expiresIn;
   final String? email;
+  final String? wrappedDek;
+  final String? approverEphemeralPub;
+  final bool encryptionEnabled;
 
   bool get isPending => status == 'pending';
   bool get isApproved => status == 'approved';
@@ -72,6 +104,9 @@ class PairingPollResult {
       refreshToken: json['refreshToken'] as String?,
       expiresIn: (json['expiresIn'] as num?)?.toInt(),
       email: json['email'] as String?,
+      wrappedDek: json['wrappedDek'] as String?,
+      approverEphemeralPub: json['approverEphemeralPub'] as String?,
+      encryptionEnabled: json['encryptionEnabled'] == true,
     );
   }
 }
@@ -84,6 +119,8 @@ class LinkedDevice {
     this.appVersion,
     this.lastSyncedAt,
     this.createdAt,
+    this.vaultState = 'none',
+    this.trusted = false,
   });
 
   final String id;
@@ -92,6 +129,8 @@ class LinkedDevice {
   final String? appVersion;
   final DateTime? lastSyncedAt;
   final DateTime? createdAt;
+  final String vaultState;
+  final bool trusted;
 
   bool get isThisDevice =>
       appUserId == DeviceIdentity.instance.appUserId;
@@ -99,6 +138,7 @@ class LinkedDevice {
   String get label {
     final platformLabel = (platform ?? 'Dispositivo').trim();
     if (isThisDevice) return '$platformLabel · este dispositivo';
+    if (vaultState == 'revoked') return '$platformLabel · revocado';
     return platformLabel;
   }
 
@@ -115,6 +155,8 @@ class LinkedDevice {
       appVersion: json['appVersion']?.toString(),
       lastSyncedAt: parseDate(json['lastSyncedAt']),
       createdAt: parseDate(json['createdAt']),
+      vaultState: json['vaultState']?.toString() ?? 'none',
+      trusted: json['trusted'] == true,
     );
   }
 }
@@ -124,7 +166,10 @@ class PairingService {
 
   static final instance = PairingService._();
 
-  Future<PairingStart> start({String? appUserId}) async {
+  Future<PairingStart> start({
+    String? appUserId,
+    String? ephemeralPub,
+  }) async {
     if (!WodoApiConfig.isConfigured) {
       throw StateError('La sincronización aún no está configurada.');
     }
@@ -135,9 +180,21 @@ class PairingService {
       body: jsonEncode({
         if (appUserId != null && appUserId.isNotEmpty) 'appUserId': appUserId,
         if (kIsWeb) 'clientPlatform': 'web',
+        if (ephemeralPub != null && ephemeralPub.isNotEmpty)
+          'ephemeralPub': ephemeralPub,
       }),
     );
     return PairingStart.fromJson(_responseData(response));
+  }
+
+  Future<PairingPending> fetchPending(String code) async {
+    final response = await AuthService.instance.authorizedRequest(
+      (token) => http.get(
+        WodoApiConfig.uri('pairing/pending', {'code': code.trim().toUpperCase()}),
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
+    return PairingPending.fromJson(_responseData(response));
   }
 
   Future<PairingPollResult> poll(String pollToken) async {
@@ -150,7 +207,12 @@ class PairingService {
     return PairingPollResult.fromJson(_responseData(response));
   }
 
-  Future<void> approve({String? pairingId, String? code}) async {
+  Future<void> approve({
+    String? pairingId,
+    String? code,
+    String? wrappedDek,
+    String? approverEphemeralPub,
+  }) async {
     final response = await AuthService.instance.authorizedRequest(
       (token) => http.post(
         WodoApiConfig.uri('pairing/approve'),
@@ -161,36 +223,65 @@ class PairingService {
         body: jsonEncode({
           if (pairingId != null && pairingId.isNotEmpty) 'pairingId': pairingId,
           if (code != null && code.isNotEmpty) 'code': code.trim().toUpperCase(),
+          if (wrappedDek != null) 'wrappedDek': wrappedDek,
+          if (approverEphemeralPub != null)
+            'approverEphemeralPub': approverEphemeralPub,
         }),
       ),
     );
     _responseData(response);
   }
 
-  /// Parses QR JSON payload or a bare display code / pairing UUID.
+  /// Parses QR JSON / code and approves, wrapping DEK when vault is ready.
   Future<void> approveFromScanOrCode(String raw) async {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) {
       throw StateError('Introduce el código que aparece en el otro dispositivo.');
     }
 
+    String? pairingId;
+    String? code;
+    String? ephemeralPub;
+
     if (trimmed.startsWith('{')) {
       final decoded = jsonDecode(trimmed) as Map<String, dynamic>;
-      final pairingId = decoded['pairingId']?.toString();
-      final code = decoded['code']?.toString();
-      await approve(pairingId: pairingId, code: code);
-      return;
+      pairingId = decoded['pairingId']?.toString();
+      code = decoded['code']?.toString();
+      ephemeralPub = decoded['ephemeralPub']?.toString();
+    } else {
+      final uuidLike = RegExp(
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+      );
+      if (uuidLike.hasMatch(trimmed)) {
+        pairingId = trimmed;
+      } else {
+        code = trimmed;
+      }
     }
 
-    final uuidLike = RegExp(
-      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    if (ephemeralPub == null && code != null) {
+      final pending = await fetchPending(code);
+      pairingId ??= pending.pairingId;
+      ephemeralPub = pending.ephemeralPub;
+    }
+
+    String? wrappedDek;
+    String? approverPub;
+    final vault = VaultService.instance;
+    if (vault.canSyncEncrypted && ephemeralPub != null && ephemeralPub.isNotEmpty) {
+      final wrap = await vault.wrapDekForPairing(ephemeralPub);
+      if (wrap != null) {
+        wrappedDek = wrap.wrappedDek;
+        approverPub = wrap.approverEphemeralPub;
+      }
+    }
+
+    await approve(
+      pairingId: pairingId,
+      code: code,
+      wrappedDek: wrappedDek,
+      approverEphemeralPub: approverPub,
     );
-    if (uuidLike.hasMatch(trimmed)) {
-      await approve(pairingId: trimmed);
-      return;
-    }
-
-    await approve(code: trimmed);
   }
 
   Future<List<LinkedDevice>> listDevices() async {
@@ -243,4 +334,19 @@ class PairingService {
     }
     return decoded['data'];
   }
+}
+
+/// Holds the new-device X25519 keypair for the duration of a QR login attempt.
+class PairingKeySession {
+  PairingKeySession(this.keyPair);
+
+  final SimpleKeyPair keyPair;
+
+  static Future<PairingKeySession> create() async {
+    final pair = await CryptoService.instance.generateX25519KeyPair();
+    return PairingKeySession(pair);
+  }
+
+  Future<String> get publicKeyBase64 =>
+      CryptoService.instance.publicKeyBase64(keyPair);
 }

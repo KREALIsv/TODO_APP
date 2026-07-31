@@ -7,6 +7,10 @@ import '../../sync/data/sync_service.dart';
 import '../data/auth_service.dart';
 import '../domain/auth_errors.dart';
 import '../domain/auth_session_expired_exception.dart';
+import '../../encryption/data/vault_service.dart';
+import '../../encryption/domain/cloud_vault_state.dart';
+import '../../encryption/presentation/link_device_gate.dart';
+import '../../encryption/presentation/recovery_code_screen.dart';
 import '../../pairing/presentation/approve_pairing_screen.dart';
 import '../../pairing/presentation/linked_devices_screen.dart';
 import '../../pairing/presentation/qr_login_screen.dart';
@@ -29,7 +33,10 @@ abstract final class AuthFlow {
       ),
     );
     if (signedIn != true || !context.mounted) return;
+    await VaultService.instance.refreshSecurity();
+    if (!context.mounted) return;
     _showSignedInSnack(context);
+    await _maybeOpenVaultGate(context);
   }
 
   static Future<void> openQrLogin(BuildContext context) async {
@@ -39,7 +46,18 @@ abstract final class AuthFlow {
       ),
     );
     if (signedIn != true || !context.mounted) return;
+    await VaultService.instance.refreshSecurity();
+    if (!context.mounted) return;
     _showSignedInSnack(context);
+    await _maybeOpenVaultGate(context);
+  }
+
+  static Future<void> _maybeOpenVaultGate(BuildContext context) async {
+    final state = VaultService.instance.state;
+    if (state == CloudVaultState.authOnly ||
+        state == CloudVaultState.revoked) {
+      await openLinkDeviceGate(context);
+    }
   }
 
   static Future<void> openApprovePairing(BuildContext context) {
@@ -102,7 +120,22 @@ abstract final class AuthFlow {
       return 'Sincronización no configurada (solo builds de desarrollo)';
     }
     if (!isAuthenticated) return 'Modo local · solo en este dispositivo';
+    final vault = VaultService.instance.state;
+    if (vault == CloudVaultState.authOnly) {
+      return 'Sesión iniciada · vincula este dispositivo para ver tus datos';
+    }
+    if (vault == CloudVaultState.revoked) {
+      return 'Este dispositivo fue desvinculado';
+    }
     if (!syncEnabled) return 'Sincronización pausada en este dispositivo';
+    if (vault == CloudVaultState.vaultReady) {
+      return switch (syncState) {
+        SyncState.syncing => 'Datos protegidos · sincronizando…',
+        SyncState.error => 'Datos protegidos · error al sincronizar',
+        SyncState.idle => 'Datos protegidos · al día',
+        SyncState.unavailable => 'Datos protegidos · listo para sincronizar',
+      };
+    }
     return switch (syncState) {
       SyncState.syncing => 'Sincronizando…',
       SyncState.error => 'Error al sincronizar',
@@ -111,6 +144,53 @@ abstract final class AuthFlow {
           ? 'Listo para sincronizar'
           : 'Inicia sesión para sincronizar',
     };
+  }
+
+  static Future<void> openLinkDeviceGate(BuildContext context) {
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const LinkDeviceGate(),
+      ),
+    );
+  }
+
+  static Future<void> enableCloudProtection(BuildContext context) async {
+    final confirmed = await AppAlerts.confirm(
+      context,
+      title: 'Proteger mis datos en la nube',
+      message:
+          'Tus notas y tareas se encriptarán antes de subirlas. '
+          'Otros dispositivos tendrán que vincularse (QR) o usar un código '
+          'de recuperación. Deberás guardar ese código; sin él no hay '
+          'recuperación si pierdes todos los dispositivos.',
+      confirmLabel: 'Activar protección',
+    );
+    if (!confirmed || !context.mounted) return;
+
+    try {
+      final code = await VaultService.instance.enableProtection();
+      if (!context.mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => RecoveryCodeScreen(recoveryCode: code),
+        ),
+      );
+      await SyncService.instance.resetAndSync();
+      if (!context.mounted) return;
+      await AppAlerts.show(
+        context,
+        title: 'Protección activada',
+        message: 'Tus datos en la nube quedan encriptados de extremo a extremo.',
+        type: AppAlertType.success,
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      await AppAlerts.show(
+        context,
+        message: AuthErrors.message(error, registering: false),
+        type: AppAlertType.error,
+      );
+    }
   }
 
   static Future<void> openAccount(BuildContext context) {
