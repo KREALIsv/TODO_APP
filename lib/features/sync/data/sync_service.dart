@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
 import '../../auth/data/auth_service.dart';
+import '../../auth/domain/auth_session_expired_exception.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
@@ -66,12 +67,15 @@ class SyncService extends ChangeNotifier {
     try {
       final token = await _auth.accessToken();
       if (token == null) return;
-      await DeviceRegistry.instance.register(token);
+      await DeviceRegistry.instance.register();
       final beforePull = _snapshot();
       await _push(token, beforePull);
       await _pull(token, beforePull);
       await _box.put(_snapshotKey, _snapshot());
       _state = SyncState.idle;
+    } on AuthSessionExpiredException {
+      _state = SyncState.unavailable;
+      _errorMessage = null;
     } catch (error) {
       _state = SyncState.error;
       _errorMessage = error.toString().replaceFirst('Bad state: ', '');
@@ -280,24 +284,21 @@ class SyncService extends ChangeNotifier {
     Map<String, String>? query,
   }) async {
     final uri = WodoApiConfig.uri(path, query);
-    final response = body == null
-        ? await http.get(uri, headers: {'Authorization': 'Bearer $token'})
-        : await http.post(
-            uri,
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode(body),
-          );
+    final response = await _auth.authorizedRequest(
+      (resolvedToken) => body == null
+          ? http.get(uri, headers: {'Authorization': 'Bearer $resolvedToken'})
+          : http.post(
+              uri,
+              headers: {
+                'Authorization': 'Bearer $resolvedToken',
+                'Content-Type': 'application/json',
+              },
+              body: jsonEncode(body),
+            ),
+    );
     final decoded = response.body.isEmpty
         ? <String, dynamic>{}
         : jsonDecode(response.body) as Map<String, dynamic>;
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(
-        (decoded['message'] ?? 'Error de sincronización.').toString(),
-      );
-    }
     final data = decoded['data'];
     if (data is! Map<String, dynamic>) {
       throw const FormatException(

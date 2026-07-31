@@ -45,7 +45,7 @@ export class AuthService {
 
     void this.sendWelcomeEmail(user.id, user.email);
 
-    return this.createSession(user.id);
+    return this.createSession(user.id, dto.clientPlatform);
   }
 
   async login(dto: LoginDto): Promise<AuthResponseDto> {
@@ -62,7 +62,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.createSession(user.id);
+    return this.createSession(user.id, dto.clientPlatform);
   }
 
   async requestPasswordReset(email: string): Promise<void> {
@@ -142,7 +142,10 @@ export class AuthService {
     ]);
   }
 
-  async refresh(refreshToken: string): Promise<AuthResponseDto> {
+  async refresh(
+    refreshToken: string,
+    clientPlatform?: 'web' | 'mobile',
+  ): Promise<AuthResponseDto> {
     const session = await this.prisma.session.findUnique({
       where: { refreshToken },
     });
@@ -153,7 +156,7 @@ export class AuthService {
 
     await this.prisma.session.delete({ where: { id: session.id } });
 
-    return this.createSession(session.userId);
+    return this.createSession(session.userId, clientPlatform);
   }
 
   async logout(userId: string, sessionUuid: string): Promise<void> {
@@ -189,10 +192,19 @@ export class AuthService {
     }
   }
 
-  private async createSession(userId: string): Promise<AuthResponseDto> {
+  private async createSession(
+    userId: string,
+    clientPlatform?: 'web' | 'mobile',
+  ): Promise<AuthResponseDto> {
     const secret = this.config.getOrThrow<string>('SECRET_AUTH_TOKEN_KEY');
-    const accessExpiration = this.config.getOrThrow<string>('ACCESS_TOKEN_EXPIRATION');
-    const refreshExpiration = this.config.getOrThrow<string>('REFRESH_TOKEN_EXPIRATION');
+    const accessExpiration =
+      clientPlatform === 'web'
+        ? (this.config.get<string>('ACCESS_TOKEN_EXPIRATION_WEB') ??
+          this.config.getOrThrow<string>('ACCESS_TOKEN_EXPIRATION'))
+        : this.config.getOrThrow<string>('ACCESS_TOKEN_EXPIRATION');
+    const refreshExpiration = this.config.getOrThrow<string>(
+      'REFRESH_TOKEN_EXPIRATION',
+    );
 
     const sessionUuid = crypto.randomUUID();
     const accessExpiresIn = this.parseDuration(accessExpiration);

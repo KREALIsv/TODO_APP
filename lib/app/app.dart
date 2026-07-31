@@ -6,6 +6,7 @@ import '../core/web/web_history_navigation.dart';
 import '../features/settings/data/settings_repository.dart';
 import '../features/settings/presentation/background_palette.dart';
 import '../global/constants/constants.dart';
+import '../global/widgets/session_expiry_listener.dart';
 import '../global/widgets/sync_status_banner.dart';
 
 class TodosApp extends StatefulWidget {
@@ -55,8 +56,11 @@ class _TodosAppState extends State<TodosApp> {
               .tint(AppTheme.dark()),
           themeMode: _settings.themeMode,
           builder: (context, child) {
-            return SyncStatusBanner(
-              child: child ?? const SizedBox.shrink(),
+            return SessionExpiryListener(
+              navigatorKey: _navigatorKey,
+              child: SyncStatusBanner(
+                child: child ?? const SizedBox.shrink(),
+              ),
             );
           },
           home: const AdaptiveAppShell(),

@@ -55,7 +55,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   refresh(@Body() dto: RefreshTokenDto): Promise<AuthResponseDto> {
-    return this.authService.refresh(dto.refreshToken);
+    return this.authService.refresh(dto.refreshToken, dto.clientPlatform);
   }
 
   @Post('logout')

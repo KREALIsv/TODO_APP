@@ -128,19 +128,11 @@ class _LoggedOutCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: compact ? 12 : 14),
-          if (canSignIn)
-            FilledButton.icon(
-              onPressed: onSignIn,
-              icon: const Icon(Icons.login_rounded, size: 18),
-              label: const Text('Iniciar sesión'),
-            )
-          else
-            Text(
-              'La sincronización entre dispositivos estará disponible pronto.',
-              style: textTheme.bodySmall?.copyWith(
-                color: AppSurface.secondary(context),
-              ),
-            ),
+          FilledButton.icon(
+            onPressed: canSignIn ? onSignIn : null,
+            icon: const Icon(Icons.login_rounded, size: 18),
+            label: const Text('Iniciar sesión'),
+          ),
         ],
       ),
     );
@@ -239,11 +231,15 @@ class _LoggedInCard extends StatelessWidget {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            Text(
-                              'Ver datos de cuenta',
-                              style: textTheme.labelLarge?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.w600,
+                            Flexible(
+                              child: Text(
+                                'Ver datos de cuenta',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.labelLarge?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                             Icon(
@@ -262,36 +258,11 @@ class _LoggedInCard extends StatelessWidget {
           ),
           Padding(
             padding: EdgeInsets.all(compact ? 14 : 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: syncing ? null : onSyncNow,
-                    icon: syncing
-                        ? SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          )
-                        : const Icon(Icons.sync_rounded, size: 18),
-                    label: Text(syncing ? 'Sincronizando…' : 'Sincronizar'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: onLogout,
-                    icon: const Icon(Icons.logout_rounded, size: 18),
-                    label: const Text('Salir'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.error,
-                    ),
-                  ),
-                ),
-              ],
+            child: _AccountActionButtons(
+              compact: compact,
+              syncing: syncing,
+              onSyncNow: onSyncNow,
+              onLogout: onLogout,
             ),
           ),
           if (!syncEnabled)
@@ -306,6 +277,92 @@ class _LoggedInCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _AccountActionButtons extends StatelessWidget {
+  const _AccountActionButtons({
+    required this.compact,
+    required this.syncing,
+    required this.onSyncNow,
+    required this.onLogout,
+  });
+
+  final bool compact;
+  final bool syncing;
+  final VoidCallback? onSyncNow;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    final syncButton = OutlinedButton.icon(
+      onPressed: syncing ? null : onSyncNow,
+      style: OutlinedButton.styleFrom(
+        visualDensity:
+            compact ? VisualDensity.compact : VisualDensity.standard,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 16,
+          vertical: compact ? 10 : 12,
+        ),
+      ),
+      icon: syncing
+          ? SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: scheme.primary,
+              ),
+            )
+          : const Icon(Icons.sync_rounded, size: 18),
+      label: Text(
+        syncing ? 'Sincronizando…' : 'Sincronizar',
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.fade,
+      ),
+    );
+
+    final logoutButton = TextButton.icon(
+      onPressed: onLogout,
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.error,
+        visualDensity:
+            compact ? VisualDensity.compact : VisualDensity.standard,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 16,
+          vertical: compact ? 10 : 12,
+        ),
+      ),
+      icon: const Icon(Icons.logout_rounded, size: 18),
+      label: const Text(
+        'Salir',
+        maxLines: 1,
+        softWrap: false,
+      ),
+    );
+
+    // Sidebar (~300px): stack actions so labels stay on one line.
+    if (compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          syncButton,
+          const SizedBox(height: 8),
+          logoutButton,
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: syncButton),
+        const SizedBox(width: 10),
+        Expanded(child: logoutButton),
+      ],
     );
   }
 }

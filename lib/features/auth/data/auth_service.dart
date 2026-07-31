@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 
 import '../../sync/data/device_registry.dart';
 import '../../sync/data/wodo_api_config.dart';
+import '../domain/auth_errors.dart';
+import '../domain/auth_session_expired_exception.dart';
 import '../domain/user_profile.dart';
 import 'auth_session_repository.dart';
 
@@ -15,9 +17,18 @@ class AuthService extends ChangeNotifier {
 
   AuthSessionRepository get _sessions => AuthSessionRepository.instance;
 
+  String? _sessionEndedMessage;
+
   bool get isConfigured => WodoApiConfig.isConfigured;
   bool get isAuthenticated => _sessions.isAuthenticated;
   String? get userEmail => _sessions.userEmail;
+
+  /// User-facing copy for a dialog after [endSessionDueToExpiry]; consumed once.
+  String? consumeSessionEndedMessage() {
+    final message = _sessionEndedMessage;
+    _sessionEndedMessage = null;
+    return message;
+  }
 
   String get userInitials {
     final email = userEmail;
@@ -74,6 +85,7 @@ class AuthService extends ChangeNotifier {
         );
       } catch (_) {}
     }
+    _sessionEndedMessage = null;
     await _sessions.clear();
     notifyListeners();
   }
@@ -82,7 +94,12 @@ class AuthService extends ChangeNotifier {
     if (!WodoApiConfig.isConfigured) {
       throw StateError('La sincronización aún no está configurada.');
     }
-    final response = await _authorizedGet('users/me');
+    final response = await authorizedRequest(
+      (token) => http.get(
+        WodoApiConfig.uri('users/me'),
+        headers: {'Authorization': 'Bearer $token'},
+      ),
+    );
     return UserProfile.fromJson(_responseData(response));
   }
 
@@ -91,51 +108,70 @@ class AuthService extends ChangeNotifier {
     if (!WodoApiConfig.isConfigured) {
       throw StateError('La sincronización aún no está configurada.');
     }
-    await _authorizedDelete('users/me');
-  }
-
-  Future<http.Response> _authorizedGet(String path) async {
-    final token = await accessToken();
-    if (token == null) {
-      throw StateError('No hay sesión activa.');
-    }
-    return http.get(
-      WodoApiConfig.uri(path),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-  }
-
-  Future<void> _authorizedDelete(String path) async {
-    final token = await accessToken();
-    if (token == null) {
-      throw StateError('No hay sesión activa.');
-    }
-    final response = await http.delete(
-      WodoApiConfig.uri(path),
-      headers: {'Authorization': 'Bearer $token'},
+    final response = await authorizedRequest(
+      (token) => http.delete(
+        WodoApiConfig.uri('users/me'),
+        headers: {'Authorization': 'Bearer $token'},
+      ),
     );
     if (response.statusCode == 204) return;
-
-    final decoded = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body) as Map<String, dynamic>;
-    final error = decoded['message'] ?? 'No se pudo completar la solicitud.';
-    throw StateError(error.toString());
+    throw StateError(
+      AuthErrors.fromHttpFailure(
+        statusCode: response.statusCode,
+        apiMessage: _decodeMessage(response),
+      ),
+    );
   }
 
-  Future<String?> accessToken() async {
+  Future<String?> accessToken({bool forceRefresh = false}) async {
     final session = _sessions.session;
     if (session == null) return null;
-    if (!session.isExpired) return session.accessToken;
 
-    final response = await http.post(
-      WodoApiConfig.uri('auth/refresh'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'refreshToken': session.refreshToken}),
-    );
-    final payload = _responseData(response);
-    await _saveSession(payload);
-    return _sessions.session?.accessToken;
+    final needsRefresh = forceRefresh ||
+        session.isExpired ||
+        (kIsWeb && _shouldRefreshEarly(session));
+    if (!needsRefresh) return session.accessToken;
+
+    return _refreshAccessToken(session);
+  }
+
+  /// Runs [send] with a bearer token; refreshes once on 401/410 before ending session.
+  Future<http.Response> authorizedRequest(
+    Future<http.Response> Function(String token) send,
+  ) async {
+    var token = await accessToken();
+    if (token == null) {
+      throw AuthSessionExpiredException(AuthErrors.sessionExpiredMessage());
+    }
+
+    var response = await send(token);
+    if (AuthErrors.isAuthFailureStatus(response.statusCode)) {
+      token = await accessToken(forceRefresh: true);
+      if (token == null) {
+        throw AuthSessionExpiredException(
+          _sessionEndedMessage ?? AuthErrors.sessionExpiredMessage(),
+        );
+      }
+      response = await send(token);
+    }
+
+    if (AuthErrors.isAuthFailureStatus(response.statusCode)) {
+      final message = AuthErrors.fromHttpFailure(
+        statusCode: response.statusCode,
+        apiMessage: _decodeMessage(response),
+      );
+      await endSessionDueToExpiry(message);
+      throw AuthSessionExpiredException(message);
+    }
+
+    return response;
+  }
+
+  Future<void> endSessionDueToExpiry(String userMessage) async {
+    if (!_sessions.isAuthenticated) return;
+    await _sessions.clear();
+    _sessionEndedMessage = userMessage;
+    notifyListeners();
   }
 
   Future<void> _authenticate(
@@ -149,7 +185,11 @@ class AuthService extends ChangeNotifier {
     final response = await http.post(
       WodoApiConfig.uri(path),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email.trim(), 'password': password}),
+      body: jsonEncode({
+        'email': email.trim(),
+        'password': password,
+        ..._clientPlatformField(),
+      }),
     );
     final payload = _responseData(response);
     await _saveSession(
@@ -158,10 +198,53 @@ class AuthService extends ChangeNotifier {
     );
     final token = _sessions.session?.accessToken;
     if (token != null) {
-      await DeviceRegistry.instance.register(token);
+      await DeviceRegistry.instance.register();
     }
     await _sessions.rememberLoginEmail(email.trim().toLowerCase());
     notifyListeners();
+  }
+
+  Future<String?> _refreshAccessToken(AuthSession session) async {
+    try {
+      final response = await http.post(
+        WodoApiConfig.uri('auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'refreshToken': session.refreshToken,
+          ..._clientPlatformField(),
+        }),
+      );
+
+      if (AuthErrors.isAuthFailureStatus(response.statusCode)) {
+        final message = AuthErrors.fromHttpFailure(
+          statusCode: response.statusCode,
+          apiMessage: _decodeMessage(response),
+        );
+        await endSessionDueToExpiry(message);
+        return null;
+      }
+
+      final payload = _responseData(response);
+      await _saveSession(payload);
+      notifyListeners();
+      return _sessions.session?.accessToken;
+    } catch (error) {
+      if (error is AuthSessionExpiredException) rethrow;
+      final message = AuthErrors.sessionExpiredMessage();
+      await endSessionDueToExpiry(message);
+      return null;
+    }
+  }
+
+  bool _shouldRefreshEarly(AuthSession session) {
+    // Web tabs stay open for hours — renew well before the access token expires.
+    const buffer = Duration(minutes: 30);
+    return !session.expiresAt.isAfter(DateTime.now().add(buffer));
+  }
+
+  Map<String, String> _clientPlatformField() {
+    if (!kIsWeb) return const {};
+    return const {'clientPlatform': 'web'};
   }
 
   Future<void> _saveSession(
@@ -191,13 +274,27 @@ class AuthService extends ChangeNotifier {
         ? <String, dynamic>{}
         : jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final error = decoded['message'] ?? 'No se pudo completar la solicitud.';
-      throw StateError(error.toString());
+      throw StateError(
+        AuthErrors.fromHttpFailure(
+          statusCode: response.statusCode,
+          apiMessage: decoded['message']?.toString(),
+        ),
+      );
     }
     final data = decoded['data'];
     if (data is! Map<String, dynamic>) {
       throw const FormatException('La respuesta del servidor no es válida.');
     }
     return data;
+  }
+
+  String? _decodeMessage(http.Response response) {
+    if (response.body.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      return decoded['message']?.toString();
+    } catch (_) {
+      return null;
+    }
   }
 }

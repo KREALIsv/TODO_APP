@@ -1,7 +1,16 @@
 class WodoApiConfig {
   const WodoApiConfig._();
 
-  static const baseUrl = String.fromEnvironment('WODO_API_URL');
+  /// Compile-time override; when empty, production API is used so sync works
+  /// in local dev without extra flags (same as release deploy).
+  static const _compileTimeUrl = String.fromEnvironment('WODO_API_URL');
+
+  static const productionBaseUrl = 'https://api.wodo.app/api/v1';
+
+  static String get baseUrl {
+    final configured = _compileTimeUrl.trim();
+    return configured.isEmpty ? productionBaseUrl : configured;
+  }
 
   static bool get isConfigured => baseUrl.trim().isNotEmpty;
 

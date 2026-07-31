@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:todos_app/features/auth/domain/auth_errors.dart';
+import 'package:todos_app/features/auth/domain/auth_session_expired_exception.dart';
 
 void main() {
   test('maps invalid credentials to Spanish', () {
@@ -19,25 +20,20 @@ void main() {
     );
   });
 
-  test('maps email quota exceeded', () {
+  test('maps unauthorized API errors to friendly session copy', () {
     expect(
-      AuthErrors.message(
-        StateError(
-          'Has alcanzado el límite de correos para este proceso. Inténtalo más tarde.',
-        ),
-        registering: false,
+      AuthErrors.fromHttpFailure(
+        statusCode: 401,
+        apiMessage: 'Unauthorized',
       ),
-      'Has alcanzado el límite de correos para este proceso. Inténtalo más tarde.',
+      contains('sesión en la nube expiró'),
     );
-  });
-
-  test('maps invalid reset token', () {
     expect(
       AuthErrors.message(
-        StateError('Invalid or expired reset token'),
+        AuthSessionExpiredException(AuthErrors.sessionExpiredMessage()),
         registering: false,
       ),
-      contains('caducado'),
+      contains('iniciar sesión'),
     );
   });
 }
