@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/io/share_bytes_file.dart';
 import '../../../core/theme/app_surface.dart';
 import '../../../global/widgets/app_alerts.dart';
 import '../../auth/presentation/widgets/auth_page_shell.dart';
@@ -17,6 +20,7 @@ class RecoveryCodeScreen extends StatefulWidget {
 
 class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
   var _confirmed = false;
+  var _sharing = false;
 
   Future<void> _copy() async {
     await Clipboard.setData(ClipboardData(text: widget.recoveryCode));
@@ -27,6 +31,38 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  Future<void> _downloadTxt() async {
+    setState(() => _sharing = true);
+    try {
+      final body = [
+        'WODO — código de recuperación',
+        '',
+        'Guarda este archivo en un lugar seguro (gestor de contraseñas o impreso).',
+        'Si pierdes todos tus dispositivos y este código, no podremos recuperar',
+        'tus notas y tareas protegidas en la nube.',
+        '',
+        widget.recoveryCode,
+        '',
+        'https://app.wodo.app',
+      ].join('\n');
+      await shareBytesAsFile(
+        bytes: Uint8List.fromList(utf8.encode(body)),
+        fileName: 'wodo-codigo-recuperacion.txt',
+        mimeType: 'text/plain',
+        subject: 'Código de recuperación WODO',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      await AppAlerts.show(
+        context,
+        message: 'No se pudo guardar el archivo. Prueba a copiar el código.',
+        type: AppAlertType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
   }
 
   Future<void> _finish() async {
@@ -91,6 +127,20 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
                 icon: const Icon(Icons.copy_rounded),
                 label: const Text('Copiar código'),
               ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _sharing ? null : _downloadTxt,
+                icon: _sharing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download_rounded),
+                label: Text(
+                  _sharing ? 'Preparando archivo…' : 'Descargar .txt',
+                ),
+              ),
               const SizedBox(height: 16),
               Text(
                 'Guárdalo en un gestor de contraseñas o imprímelo. '
@@ -101,15 +151,18 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _confirmed,
-                onChanged: (value) =>
-                    setState(() => _confirmed = value ?? false),
-                controlAffinity: ListTileControlAffinity.leading,
-                title: Text(
-                  'Lo guardé en un lugar seguro',
-                  style: textTheme.bodyMedium,
+              Material(
+                type: MaterialType.transparency,
+                child: CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _confirmed,
+                  onChanged: (value) =>
+                      setState(() => _confirmed = value ?? false),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text(
+                    'Lo guardé en un lugar seguro',
+                    style: textTheme.bodyMedium,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),

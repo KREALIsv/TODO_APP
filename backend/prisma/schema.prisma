@@ -133,20 +133,20 @@ model UserIdentity {
 }
 
 model Session {
-  id           String    @id @default(uuid()) @db.Uuid
-  userId       String    @map("user_id") @db.Uuid
-  refreshToken String    @unique @map("refresh_token") @db.VarChar(512)
-  sessionUuid  String    @unique @map("session_uuid") @db.VarChar(64)
-  ipAddress    String?   @map("ip_address") @db.VarChar(45)
-  userAgent    String?   @map("user_agent") @db.Text
-  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash") @db.VarChar(128)
+  sessionUuid      String    @unique @map("session_uuid") @db.VarChar(64)
+  ipAddress        String?   @map("ip_address") @db.VarChar(45)
+  userAgent        String?   @map("user_agent") @db.Text
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([refreshToken])
+  @@index([refreshTokenHash])
   @@index([expiresAt])
   @@map("sessions")
 }

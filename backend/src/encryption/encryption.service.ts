@@ -2,18 +2,29 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/services';
 import { EnableEncryptionDto } from './dto';
 
 @Injectable()
 export class EncryptionService {
+  private readonly logger = new Logger(EncryptionService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getSecurity(userId: string, appUserId?: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Usuario no encontrado.');
+
+    if (user.encryptionEnabled) {
+      // Idempotent cleanup for accounts that enabled E2EE before purge shipped.
+      void this.purgeLegacyPlaintext(userId).catch((error) => {
+        this.logger.warn(`Legacy purge skipped for ${userId}: ${error}`);
+      });
+    }
 
     const devices = await this.prisma.device.findMany({
       where: { userId },
@@ -84,10 +95,58 @@ export class EncryptionService {
       });
     });
 
+    const purge = await this.purgeLegacyPlaintext(userId);
+
     return {
       encryptionEnabled: true,
       encryptionVersion: version,
+      purgedMutations: purge.purgedMutations,
     };
+  }
+
+  /**
+   * Deletes non-opaque sync mutations and blanks projected plaintext mirrors.
+   * Safe to call repeatedly for E2EE accounts.
+   */
+  async purgeLegacyPlaintext(userId: string): Promise<{ purgedMutations: number }> {
+    const rows = await this.prisma.syncMutation.findMany({
+      where: { userId },
+      select: { id: true, payload: true },
+    });
+
+    const legacyIds = rows
+      .filter((row) => !this.isOpaquePayload(row.payload))
+      .map((row) => row.id);
+
+    if (legacyIds.length > 0) {
+      await this.prisma.syncMutation.deleteMany({
+        where: { id: { in: legacyIds } },
+      });
+    }
+
+    await this.prisma.note.updateMany({
+      where: { userId },
+      data: {
+        content: '',
+        tagIds: [],
+      },
+    });
+
+    await this.prisma.tag.updateMany({
+      where: { userId },
+      data: {
+        name: '·',
+      },
+    });
+
+    await this.prisma.dayEntry.updateMany({
+      where: { userId },
+      data: {
+        outcome: null,
+      },
+    });
+
+    return { purgedMutations: legacyIds.length };
   }
 
   /**
@@ -132,5 +191,18 @@ export class EncryptionService {
         lastSyncedAt: now,
       },
     });
+  }
+
+  private isOpaquePayload(payload: Prisma.JsonValue | null): boolean {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return false;
+    }
+    const map = payload as Record<string, unknown>;
+    return (
+      map.v === 1 &&
+      typeof map.alg === 'string' &&
+      typeof map.nonce === 'string' &&
+      typeof map.ciphertext === 'string'
+    );
   }
 }

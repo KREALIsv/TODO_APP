@@ -379,7 +379,7 @@ No sustituye E2EE pero complementa:
 | **P0 — Diseño** | Este TRD + `SECURITY.md` resumen |
 | **P1 — Pairing sin E2EE** | QR vinculación + estados UI + revocar; sync plaintext (validar flujo) |
 | **P2 — E2EE enable** | ✅ Activar protección + recovery (pantalla/copiar) + encrypt push/pull + DEK vía ECDH en pairing + unlock por recovery wrap |
-| **P3 — Hardening** | Purga plaintext legacy, refresh token hash, adjuntos, descarga `.txt` recovery |
+| **P3 — Hardening** | ✅ Purga plaintext legacy, refresh token hash, descarga `.txt` recovery, `SECURITY.md` (adjuntos sync → v2) |
 | **P4 — Correo transaccional** | Resend unificado: `welcome`, `password_reset`, opcional `vault_recovery` (reenvío de código sin persistir en servidor) |
 
 ---
@@ -467,7 +467,7 @@ flowchart TD
 
 1. Pantalla **“Guarda tu código de recuperación”** — confirmación explícita (“Lo guardé” / copiar).
 2. Texto: *“Si pierdes todos tus dispositivos y este código, no podremos recuperar tus notas en la nube.”*
-3. Descarga opcional `.txt` del código (mismo momento).
+3. Descarga opcional `.txt` del código (mismo momento) — botón *Descargar .txt*.
 4. Ajustes: **“Ver / regenerar código”** solo desde dispositivo **trusted** (regenerar invalida el anterior).
 5. Pantalla **“Vincula este dispositivo”**: **“Usar código de recuperación”** siempre visible si `encryptionEnabled`.
 

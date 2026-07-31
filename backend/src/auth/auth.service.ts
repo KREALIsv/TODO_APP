@@ -147,7 +147,7 @@ export class AuthService {
     clientPlatform?: 'web' | 'mobile',
   ): Promise<AuthResponseDto> {
     const session = await this.prisma.session.findUnique({
-      where: { refreshToken },
+      where: { refreshTokenHash: this.hashToken(refreshToken) },
     });
 
     if (!session || session.expiresAt <= new Date()) {
@@ -222,7 +222,7 @@ export class AuthService {
     await this.prisma.session.create({
       data: {
         userId,
-        refreshToken,
+        refreshTokenHash: this.hashToken(refreshToken),
         sessionUuid,
         expiresAt: new Date(Date.now() + refreshExpiresIn * 1000),
       },
@@ -233,6 +233,10 @@ export class AuthService {
       refreshToken,
       expiresIn: accessExpiresIn,
     };
+  }
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   private parseDuration(exp: string): number {
