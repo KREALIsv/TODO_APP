@@ -256,7 +256,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               if (!_registering) ...[
                 const SizedBox(height: 20),
-                const _AuthDivider(label: 'o entra sin escribir tu contraseña'),
+                const _AuthDivider(label: 'o'),
                 const SizedBox(height: 16),
                 _PairingLoginOption(enabled: !_submitting, onTap: _openQrLogin),
               ],
