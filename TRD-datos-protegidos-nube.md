@@ -301,7 +301,6 @@ Base: `/api/v1` (auth JWT salvo `pairing/start` que puede ser anónimo con rate 
 |--------|------|------|-------------|
 | GET | `/users/me/security` | JWT | `encryptionEnabled`, `deviceVaultState`, lista dispositivos |
 | POST | `/encryption/enable` | JWT | Genera DEK server-side storage of wrapped blobs; marca cuenta |
-| POST | `/encryption/recovery-code/email` | JWT | Envía copia del código al email de la cuenta (Resend); body `{ recoveryCode }` — no persistir en servidor |
 | POST | `/encryption/recovery/regenerate` | JWT + trusted | Nuevo recovery wrap (fase posterior) |
 | POST | `/encryption/recovery/unlock` | JWT | Body: recovery code → devuelve wrapped DEK (rate limited) |
 | POST | `/pairing/start` | opcional | Crea `pairingId`, TTL, devuelve datos para QR |
@@ -377,8 +376,9 @@ No sustituye E2EE pero complementa:
 |------|------------|
 | **P0 — Diseño** | Este TRD + `SECURITY.md` resumen |
 | **P1 — Pairing sin E2EE** | QR vinculación + estados UI + revocar; sync plaintext (validar flujo) |
-| **P2 — E2EE enable** | Activar protección + **recovery obligatorio** + encrypt push/pull |
+| **P2 — E2EE enable** | Activar protección + **recovery obligatorio** (pantalla + copiar + `.txt`) + encrypt push/pull |
 | **P3 — Hardening** | Purga plaintext legacy, refresh token hash, adjuntos |
+| **P4 — Correo transaccional** | Resend unificado: `welcome`, `password_reset`, opcional `vault_recovery` (reenvío de código sin persistir en servidor) |
 
 ---
 
@@ -436,7 +436,7 @@ Escenarios: cerraste todas las pestañas, borraste caché del navegador, solo us
 
 | Caso | Camino |
 |------|--------|
-| **Peor caso** (sin otro dispositivo, caché borrada, solo PC) | **Opción B** — código de recuperación (+ copia por **correo Resend** al activar protección) |
+| **Peor caso** (sin otro dispositivo, caché borrada, solo PC) | **Opción B** — código de recuperación (pantalla + copiar + descarga `.txt`) |
 | **Caso habitual** (otro dispositivo aún vinculado) | **Opción A** — QR desde teléfono / otro equipo |
 | **Sin código ni dispositivo** | **Opción C** — límite E2EE; datos en nube irrecuperables |
 
@@ -465,10 +465,11 @@ flowchart TD
 
 1. Pantalla **“Guarda tu código de recuperación”** — confirmación explícita (“Lo guardé” / copiar).
 2. Texto: *“Si pierdes todos tus dispositivos y este código, no podremos recuperar tus notas en la nube.”*
-3. **Enviar copia al correo** (Resend, flujo `vault_recovery`): botón *“Enviar también a mi correo”* tras mostrar el código (rate limit por usuario). El servidor **no almacena** el código; solo lo reenvía al email de la cuenta. **Aviso:** quien acceda al correo podría recuperar datos — el usuario debe entender el tradeoff.
-4. Descarga opcional `.txt` del código (mismo momento).
-5. Ajustes: **“Ver / regenerar código”** solo desde dispositivo **trusted** (regenerar invalida el anterior y puede re-enviar email).
-6. Pantalla **“Vincula este dispositivo”**: **“Usar código de recuperación”** siempre visible si `encryptionEnabled`.
+3. Descarga opcional `.txt` del código (mismo momento).
+4. Ajustes: **“Ver / regenerar código”** solo desde dispositivo **trusted** (regenerar invalida el anterior).
+5. Pantalla **“Vincula este dispositivo”**: **“Usar código de recuperación”** siempre visible si `encryptionEnabled`.
+
+**Correo (fase posterior, P4):** botón opcional *“Enviar también a mi correo”* vía Resend (`vault_recovery`), junto con otros flujos transaccionales (`welcome`, `password_reset`). El servidor no almacenaría el código; solo reenviaría al email de la cuenta. No bloquea P2: la recuperación funciona sin correo.
 
 ### 15.4 Respuesta directa: “¿No se puede?”
 

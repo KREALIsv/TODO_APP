@@ -93,26 +93,4 @@ export class MailService {
       </div>
     `.trim();
   }
-
-  buildVaultRecoveryCodeHtml(recoveryCode: string, appUrl: string): string {
-    const safeCode = recoveryCode.trim();
-    return `
-      <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; color: #1a1a1a;">
-        <p style="font-size: 18px; font-weight: 600;">Tu código de recuperación de WODO</p>
-        <p>Activaste la protección de tus datos en la nube. Guarda este código en un lugar seguro (gestor de contraseñas o impreso).</p>
-        <p style="margin: 24px 0; padding: 16px; background: #f5f5f5; border-radius: 10px; font-family: ui-monospace, monospace; font-size: 16px; letter-spacing: 0.05em; word-break: break-all;">
-          ${safeCode}
-        </p>
-        <p style="font-size: 14px; color: #555;">
-          Si pierdes todos tus dispositivos, necesitarás este código para recuperar tus notas y tareas en
-          <a href="${appUrl}" style="color: #F2327D;">app.wodo.app</a>.
-          WODO no puede recuperarlo por ti.
-        </p>
-        <p style="font-size: 14px; color: #555;">
-          Si no activaste la protección o no reconoces este correo, ignóralo y revisa la seguridad de tu cuenta.
-        </p>
-        <p style="font-size: 12px; color: #888;">WODO · Kreali Studio</p>
-      </div>
-    `.trim();
-  }
 }

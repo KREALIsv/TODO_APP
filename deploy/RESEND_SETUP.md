@@ -77,7 +77,6 @@ Flujos contabilizados por separado:
 
 - `welcome` — bienvenida al registrarse
 - `password_reset` — enlace para nueva contraseña
-- `vault_recovery` — copia del código de recuperación E2EE (al activar protección en la nube; el servidor no almacena el código)
 
 Si un usuario agota la cuota, la API responde **429** con un mensaje en español;
 no se envía el correo (protege la cuota de Resend).
