@@ -151,6 +151,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     final title = _registering ? 'Crear cuenta' : 'Iniciar sesión';
 
     return Scaffold(
