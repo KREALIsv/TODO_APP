@@ -325,7 +325,7 @@ class SettingsScreen extends StatelessWidget {
             SettingsRow(
               icon: Icons.qr_code_scanner_rounded,
               title: 'Vincular dispositivo',
-              subtitle: 'Confirma el código de web u otro equipo',
+              subtitle: 'Escanea el QR o introduce el código',
               accent: accent,
               onTap: () => AuthFlow.openApprovePairing(context),
             ),
