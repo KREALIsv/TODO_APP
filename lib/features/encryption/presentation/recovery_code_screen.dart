@@ -6,7 +6,9 @@ import 'package:flutter/services.dart';
 import '../../../core/io/share_bytes_file.dart';
 import '../../../core/theme/app_surface.dart';
 import '../../../global/widgets/app_alerts.dart';
+import '../../auth/domain/auth_errors.dart';
 import '../../auth/presentation/widgets/auth_page_shell.dart';
+import '../data/encryption_api.dart';
 
 /// Mandatory acknowledgment of the recovery code after enabling protection.
 class RecoveryCodeScreen extends StatefulWidget {
@@ -21,6 +23,7 @@ class RecoveryCodeScreen extends StatefulWidget {
 class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
   var _confirmed = false;
   var _sharing = false;
+  var _emailing = false;
 
   Future<void> _copy() async {
     await Clipboard.setData(ClipboardData(text: widget.recoveryCode));
@@ -62,6 +65,43 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
       );
     } finally {
       if (mounted) setState(() => _sharing = false);
+    }
+  }
+
+  Future<void> _emailCopy() async {
+    setState(() => _emailing = true);
+    try {
+      final result = await EncryptionApi.instance.emailRecoveryCode(
+        widget.recoveryCode,
+      );
+      if (!mounted) return;
+      if (result.skipped) {
+        await AppAlerts.show(
+          context,
+          message:
+              'El correo no está configurado en el servidor. '
+              'Copia o descarga el código por ahora.',
+          type: AppAlertType.warning,
+        );
+        return;
+      }
+      await AppAlerts.show(
+        context,
+        title: 'Correo enviado',
+        message:
+            'Revisa la bandeja de tu cuenta WODO (y spam). '
+            'Quien acceda a ese correo podría usar el código.',
+        type: AppAlertType.success,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      await AppAlerts.show(
+        context,
+        message: AuthErrors.message(error, registering: false),
+        type: AppAlertType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _emailing = false);
     }
   }
 
@@ -141,10 +181,27 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
                   _sharing ? 'Preparando archivo…' : 'Descargar .txt',
                 ),
               ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _emailing ? null : _emailCopy,
+                icon: _emailing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.mail_outline_rounded),
+                label: Text(
+                  _emailing
+                      ? 'Enviando…'
+                      : 'Enviar también a mi correo',
+                ),
+              ),
               const SizedBox(height: 16),
               Text(
                 'Guárdalo en un gestor de contraseñas o imprímelo. '
-                'WODO no puede volver a mostrártelo completo más adelante.',
+                'WODO no puede volver a mostrártelo completo más adelante. '
+                'El envío por correo es opcional: quien lea tu bandeja podría usar el código.',
                 style: textTheme.bodySmall?.copyWith(
                   color: AppSurface.secondary(context),
                   height: 1.4,

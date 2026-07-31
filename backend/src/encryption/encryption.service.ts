@@ -5,15 +5,21 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/services';
+import { MailService } from '../mail';
 import { EnableEncryptionDto } from './dto';
 
 @Injectable()
 export class EncryptionService {
   private readonly logger = new Logger(EncryptionService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+    private readonly config: ConfigService,
+  ) {}
 
   async getSecurity(userId: string, appUserId?: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -191,6 +197,40 @@ export class EncryptionService {
         lastSyncedAt: now,
       },
     });
+  }
+
+  /**
+   * Relays the recovery code to the account email via Resend.
+   * The code is NOT stored on the server — only logged as a send in mail_send_logs.
+   */
+  async sendRecoveryCodeEmail(
+    userId: string,
+    recoveryCode: string,
+  ): Promise<{ accepted: true; skipped?: boolean }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return { accepted: true };
+    }
+
+    if (!this.mail.isConfigured()) {
+      return { accepted: true, skipped: true };
+    }
+
+    const appUrl = this.config.get<string>(
+      'WODO_APP_URL',
+      'https://app.wodo.app',
+    );
+    const code = recoveryCode.trim();
+
+    await this.mail.send({
+      to: user.email,
+      flow: 'vault_recovery',
+      userId: user.id,
+      subject: 'Tu código de recuperación de WODO',
+      html: this.mail.buildVaultRecoveryCodeHtml(code, appUrl),
+    });
+
+    return { accepted: true };
   }
 
   private isOpaquePayload(payload: Prisma.JsonValue | null): boolean {

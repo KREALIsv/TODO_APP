@@ -16,6 +16,7 @@ void main() {
     expect(find.textContaining('ABCD-EFGH'), findsOneWidget);
     expect(find.text('Copiar código'), findsOneWidget);
     expect(find.text('Descargar .txt'), findsOneWidget);
+    expect(find.text('Enviar también a mi correo'), findsOneWidget);
     expect(find.text('Lo guardé en un lugar seguro'), findsOneWidget);
   });
 }

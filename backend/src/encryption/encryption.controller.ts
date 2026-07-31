@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthGuard, CurrentUser, CurrentUserPayload } from '../common';
-import { EnableEncryptionDto } from './dto';
+import { EnableEncryptionDto, SendRecoveryCodeEmailDto } from './dto';
 import { EncryptionService } from './encryption.service';
 
 @Controller()
@@ -40,5 +40,19 @@ export class EncryptionController {
   @Throttle({ default: { limit: 20, ttl: 900000 } })
   getRecoveryWrap(@CurrentUser() user: CurrentUserPayload) {
     return this.encryptionService.getRecoveryWrap(user.userId);
+  }
+
+  @Post('encryption/recovery-code/email')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 900000 } })
+  sendRecoveryCodeEmail(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: SendRecoveryCodeEmailDto,
+  ) {
+    return this.encryptionService.sendRecoveryCodeEmail(
+      user.userId,
+      dto.recoveryCode,
+    );
   }
 }

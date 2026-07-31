@@ -105,6 +105,22 @@ class EncryptionApi {
     return RecoveryWrap.fromJson(_data(response));
   }
 
+  /// Relays the recovery code to the account email. Server does not store it.
+  Future<({bool skipped})> emailRecoveryCode(String recoveryCode) async {
+    final response = await AuthService.instance.authorizedRequest(
+      (token) => http.post(
+        WodoApiConfig.uri('encryption/recovery-code/email'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'recoveryCode': recoveryCode}),
+      ),
+    );
+    final data = _data(response);
+    return (skipped: data['skipped'] == true);
+  }
+
   Map<String, dynamic> _data(http.Response response) {
     final decoded = response.body.isEmpty
         ? <String, dynamic>{}

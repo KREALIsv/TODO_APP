@@ -1,6 +1,8 @@
 import { ConflictException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EncryptionService } from './encryption.service';
 import { PrismaService } from '../common/services';
+import { MailService } from '../mail';
 
 describe('EncryptionService', () => {
   const prisma = {
@@ -28,11 +30,24 @@ describe('EncryptionService', () => {
     $transaction: jest.fn(),
   } as unknown as PrismaService;
 
+  const mail = {
+    isConfigured: jest.fn(),
+    send: jest.fn(),
+    buildVaultRecoveryCodeHtml: jest.fn(),
+  } as unknown as MailService;
+
+  const config = {
+    get: jest.fn((key: string, fallback?: unknown) => {
+      if (key === 'WODO_APP_URL') return 'https://app.wodo.app';
+      return fallback;
+    }),
+  } as unknown as ConfigService;
+
   let service: EncryptionService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new EncryptionService(prisma);
+    service = new EncryptionService(prisma, mail, config);
     (prisma.$transaction as jest.Mock).mockImplementation(
       async (fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma),
     );
@@ -132,5 +147,44 @@ describe('EncryptionService', () => {
     expect(prisma.syncMutation.deleteMany).toHaveBeenCalledWith({
       where: { id: { in: ['plain'] } },
     });
+  });
+
+  it('relays recovery code by email without persisting it', async () => {
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+    });
+    (mail.isConfigured as jest.Mock).mockReturnValue(true);
+    (mail.buildVaultRecoveryCodeHtml as jest.Mock).mockReturnValue('<html>');
+    (mail.send as jest.Mock).mockResolvedValue({ id: 'email-1' });
+
+    await expect(
+      service.sendRecoveryCodeEmail('user-1', '  ABCD-CODE  '),
+    ).resolves.toEqual({ accepted: true });
+
+    expect(mail.send).toHaveBeenCalledWith({
+      to: 'user@example.com',
+      flow: 'vault_recovery',
+      userId: 'user-1',
+      subject: 'Tu código de recuperación de WODO',
+      html: '<html>',
+    });
+    expect(mail.buildVaultRecoveryCodeHtml).toHaveBeenCalledWith(
+      'ABCD-CODE',
+      'https://app.wodo.app',
+    );
+  });
+
+  it('skips recovery email when Resend is not configured', async () => {
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'user-1',
+      email: 'user@example.com',
+    });
+    (mail.isConfigured as jest.Mock).mockReturnValue(false);
+
+    await expect(
+      service.sendRecoveryCodeEmail('user-1', 'ABCD-CODE'),
+    ).resolves.toEqual({ accepted: true, skipped: true });
+    expect(mail.send).not.toHaveBeenCalled();
   });
 });

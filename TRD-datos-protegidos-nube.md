@@ -380,7 +380,7 @@ No sustituye E2EE pero complementa:
 | **P1 — Pairing sin E2EE** | QR vinculación + estados UI + revocar; sync plaintext (validar flujo) |
 | **P2 — E2EE enable** | ✅ Activar protección + recovery (pantalla/copiar) + encrypt push/pull + DEK vía ECDH en pairing + unlock por recovery wrap |
 | **P3 — Hardening** | ✅ Purga plaintext legacy, refresh token hash, descarga `.txt` recovery, `SECURITY.md` (adjuntos sync → v2) |
-| **P4 — Correo transaccional** | Resend unificado: `welcome`, `password_reset`, opcional `vault_recovery` (reenvío de código sin persistir en servidor) |
+| **P4 — Correo transaccional** | ✅ Resend unificado: `welcome`, `password_reset`, opcional `vault_recovery` (relay sin persistir código; key en `/opt/wodo/.env`) |
 
 ---
 
@@ -471,7 +471,7 @@ flowchart TD
 4. Ajustes: **“Ver / regenerar código”** solo desde dispositivo **trusted** (regenerar invalida el anterior).
 5. Pantalla **“Vincula este dispositivo”**: **“Usar código de recuperación”** siempre visible si `encryptionEnabled`.
 
-**Correo (fase posterior, P4):** botón opcional *“Enviar también a mi correo”* vía Resend (`vault_recovery`), junto con otros flujos transaccionales (`welcome`, `password_reset`). El servidor no almacenaría el código; solo reenviaría al email de la cuenta. No bloquea P2: la recuperación funciona sin correo.
+**Correo (P4):** botón opcional *“Enviar también a mi correo”* → `POST /encryption/recovery-code/email` vía Resend (`vault_recovery`). El servidor no almacena el código; solo lo reenvía al email de la cuenta. La recuperación sigue funcionando sin correo.
 
 ### 15.4 Respuesta directa: “¿No se puede?”
 

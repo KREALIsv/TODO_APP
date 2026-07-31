@@ -1,4 +1,4 @@
-export type MailFlowName = 'welcome' | 'password_reset';
+export type MailFlowName = 'welcome' | 'password_reset' | 'vault_recovery';
 
 export interface SendMailParams {
   to: string;
