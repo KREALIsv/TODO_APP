@@ -11,10 +11,16 @@ import 'forgot_password_screen.dart';
 import 'widgets/auth_page_shell.dart';
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key, this.contextTitle, this.contextMessage});
+  const AuthScreen({
+    super.key,
+    this.contextTitle,
+    this.contextMessage,
+    this.initialRegistering = false,
+  });
 
   final String? contextTitle;
   final String? contextMessage;
+  final bool initialRegistering;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -36,6 +42,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   void initState() {
     super.initState();
+    _registering = widget.initialRegistering;
     _password.addListener(_onPasswordChanged);
     _email.addListener(_onEmailChanged);
     final remembered = _sessions.lastLoginEmail;
