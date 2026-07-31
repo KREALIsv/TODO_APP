@@ -17,7 +17,11 @@ import '../data/pairing_service.dart';
 
 /// New device (typically web): show QR + code and wait for phone approval.
 class QrLoginScreen extends StatefulWidget {
-  const QrLoginScreen({super.key});
+  const QrLoginScreen({super.key, @visibleForTesting this.previewPairing});
+
+  /// Renders the QR state without calling the pairing API (tests/previews only).
+  @visibleForTesting
+  final PairingStart? previewPairing;
 
   @override
   State<QrLoginScreen> createState() => _QrLoginScreenState();
@@ -34,6 +38,16 @@ class _QrLoginScreenState extends State<QrLoginScreen> {
   @override
   void initState() {
     super.initState();
+    final preview = widget.previewPairing;
+    if (preview != null) {
+      _pairing = preview;
+      _loading = false;
+      _expiryTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        setState(() {});
+      });
+      return;
+    }
     _begin();
   }
 

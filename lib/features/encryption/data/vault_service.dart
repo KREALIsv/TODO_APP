@@ -196,4 +196,30 @@ class VaultService extends ChangeNotifier {
     }
     await refreshSecurity();
   }
+
+  /// Overrides cloud vault flags for widget/golden tests only.
+  @visibleForTesting
+  void debugOverrideCloudState({
+    bool? accountEncryptionEnabled,
+    String? deviceVaultState,
+    bool clearDek = false,
+    bool markVaultReady = false,
+  }) {
+    if (accountEncryptionEnabled != null) {
+      _accountEncryptionEnabled = accountEncryptionEnabled;
+    }
+    if (deviceVaultState != null) {
+      _deviceVaultState = deviceVaultState;
+    }
+    if (clearDek) {
+      _dek = null;
+    }
+    if (markVaultReady) {
+      _dek = SecretKey(List<int>.filled(32, 1));
+      _accountEncryptionEnabled = true;
+      _deviceVaultState = 'trusted';
+    }
+    _loaded = true;
+    notifyListeners();
+  }
 }
