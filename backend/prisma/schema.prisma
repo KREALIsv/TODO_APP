@@ -34,6 +34,7 @@ model User {
   identities  UserIdentity[]
   sessions    Session[]
   devices     Device[]
+  pairingSessionsApproved PairingSession[] @relation("PairingApprover")
   notes       Note[]
   tags        Tag[]
   dayEntries  DayEntry[]
@@ -43,6 +44,38 @@ model User {
 
   @@index([email])
   @@map("users")
+}
+
+enum PairingStatus {
+  pending
+  approved
+  consumed
+  expired
+}
+
+model PairingSession {
+  id                String        @id @default(uuid()) @db.Uuid
+  displayCode       String        @map("display_code") @db.VarChar(16)
+  pollTokenHash     String        @unique @map("poll_token_hash") @db.VarChar(128)
+  status            PairingStatus @default(pending)
+  clientPlatform    String?       @map("client_platform") @db.VarChar(16)
+  newAppUserId      String?       @map("new_app_user_id") @db.VarChar(64)
+  approverUserId    String?       @map("approver_user_id") @db.Uuid
+  grantAccessToken  String?       @map("grant_access_token") @db.Text
+  grantRefreshToken String?       @map("grant_refresh_token") @db.Text
+  grantExpiresIn    Int?          @map("grant_expires_in")
+  grantEmail        String?       @map("grant_email") @db.VarChar(255)
+  expiresAt         DateTime      @map("expires_at") @db.Timestamptz(6)
+  approvedAt        DateTime?     @map("approved_at") @db.Timestamptz(6)
+  consumedAt        DateTime?     @map("consumed_at") @db.Timestamptz(6)
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  approver User? @relation("PairingApprover", fields: [approverUserId], references: [id], onDelete: SetNull)
+
+  @@index([displayCode])
+  @@index([status, expiresAt])
+  @@map("pairing_sessions")
 }
 
 model PasswordResetToken {

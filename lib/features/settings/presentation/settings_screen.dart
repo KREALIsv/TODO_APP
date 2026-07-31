@@ -320,6 +320,21 @@ class SettingsScreen extends StatelessWidget {
             ),
             const SettingsDivider(),
             SettingsRow(
+              icon: Icons.qr_code_scanner_rounded,
+              title: 'Vincular dispositivo',
+              subtitle: 'Confirma el código de web u otro equipo',
+              accent: accent,
+              onTap: () => AuthFlow.openApprovePairing(context),
+            ),
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.devices_other_outlined,
+              title: 'Dispositivos vinculados',
+              accent: accent,
+              onTap: () => AuthFlow.openLinkedDevices(context),
+            ),
+            const SettingsDivider(),
+            SettingsRow(
               icon: Icons.cloud_sync_outlined,
               title: 'Sincronizar aquí',
               trailing: DeviceIdentity.instance.syncEnabled ? 'Activa' : 'Pausada',

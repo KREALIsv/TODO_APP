@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_surface.dart';
 import '../../../global/widgets/app_alerts.dart';
+import '../../pairing/presentation/qr_login_screen.dart';
 import '../../sync/data/sync_service.dart';
 import '../data/auth_service.dart';
 import '../data/auth_session_repository.dart';
@@ -109,6 +111,17 @@ class _AuthScreenState extends State<AuthScreen> {
         builder: (_) => ForgotPasswordScreen(initialEmail: _email.text),
       ),
     );
+  }
+
+  Future<void> _openQrLogin() async {
+    final signedIn = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => const QrLoginScreen(),
+      ),
+    );
+    if (signedIn == true && mounted) {
+      Navigator.of(context).pop(true);
+    }
   }
 
   void _toggleMode() {
@@ -245,6 +258,37 @@ class _AuthScreenState extends State<AuthScreen> {
                 loading: _submitting,
                 onPressed: _submit,
               ),
+              if (!_registering) ...[
+                const SizedBox(height: 18),
+                Text(
+                  '¿Ya usas WODO en otro dispositivo?',
+                  textAlign: TextAlign.center,
+                  style: textTheme.labelSmall?.copyWith(
+                    color: AppSurface.secondary(context),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _submitting ? null : _openQrLogin,
+                  icon: const Icon(Icons.qr_code_2_rounded),
+                  label: Text(
+                    kIsWeb
+                        ? 'Entrar con tu teléfono'
+                        : 'Entrar con otro dispositivo',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  kIsWeb
+                      ? 'Escanea o introduce el código desde la app en tu teléfono.'
+                      : 'Muestra un código en este dispositivo y confírmalo en el otro.',
+                  textAlign: TextAlign.center,
+                  style: textTheme.labelSmall?.copyWith(
+                    color: AppSurface.secondary(context),
+                    height: 1.35,
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               if (_canUseAnotherAccount && !_showRememberedEmailHint)
                 Center(

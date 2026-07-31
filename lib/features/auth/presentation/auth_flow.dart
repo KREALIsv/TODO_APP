@@ -7,6 +7,9 @@ import '../../sync/data/sync_service.dart';
 import '../data/auth_service.dart';
 import '../domain/auth_errors.dart';
 import '../domain/auth_session_expired_exception.dart';
+import '../../pairing/presentation/approve_pairing_screen.dart';
+import '../../pairing/presentation/linked_devices_screen.dart';
+import '../../pairing/presentation/qr_login_screen.dart';
 import 'account_screen.dart';
 import 'auth_screen.dart';
 
@@ -26,7 +29,36 @@ abstract final class AuthFlow {
       ),
     );
     if (signedIn != true || !context.mounted) return;
+    _showSignedInSnack(context);
+  }
 
+  static Future<void> openQrLogin(BuildContext context) async {
+    final signedIn = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => const QrLoginScreen(),
+      ),
+    );
+    if (signedIn != true || !context.mounted) return;
+    _showSignedInSnack(context);
+  }
+
+  static Future<void> openApprovePairing(BuildContext context) {
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const ApprovePairingScreen(),
+      ),
+    );
+  }
+
+  static Future<void> openLinkedDevices(BuildContext context) {
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const LinkedDevicesScreen(),
+      ),
+    );
+  }
+
+  static void _showSignedInSnack(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(

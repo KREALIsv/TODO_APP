@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { DevicesModule } from './devices/devices.module';
 import { NotesModule } from './notes/notes.module';
+import { PairingModule } from './pairing/pairing.module';
 import { SyncModule } from './sync/sync.module';
 import { UsersModule } from './users/users.module';
 
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module';
     DevicesModule,
     NotesModule,
     SyncModule,
+    PairingModule,
   ],
   controllers: [AppController],
 })

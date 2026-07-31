@@ -212,7 +212,9 @@ Si el usuario **nunca** activa protección, sync sigue como hoy (plaintext en se
 
 ### 7.3 Flujo A — Vincular dispositivo nuevo (QR)
 
-**Precondición:** cuenta con `encryptionEnabled`; **al menos un** dispositivo `trusted` (o recovery key para caso sin trusted).
+**P1 (sin E2EE):** basta con una cuenta con sesión en el dispositivo que aprueba; el QR entrega sesión JWT + sync plaintext.
+
+**P2+ (con E2EE):** cuenta con `encryptionEnabled`; **al menos un** dispositivo `trusted` (o recovery key para caso sin trusted); el relay incluye DEK.
 
 ```mermaid
 sequenceDiagram
@@ -303,11 +305,11 @@ Base: `/api/v1` (auth JWT salvo `pairing/start` que puede ser anónimo con rate 
 | POST | `/encryption/enable` | JWT | Genera DEK server-side storage of wrapped blobs; marca cuenta |
 | POST | `/encryption/recovery/regenerate` | JWT + trusted | Nuevo recovery wrap (fase posterior) |
 | POST | `/encryption/recovery/unlock` | JWT | Body: recovery code → devuelve wrapped DEK (rate limited) |
-| POST | `/pairing/start` | opcional | Crea `pairingId`, TTL, devuelve datos para QR |
-| POST | `/pairing/approve` | JWT trusted | Usuario confirma pairing en teléfono |
-| POST | `/pairing/relay` | JWT trusted | Envía ciphertext al pairing channel |
-| GET | `/pairing/poll` | pairing token | Dispositivo nuevo recibe mensajes relay |
-| DELETE | `/devices/:appUserId` | JWT trusted | Revoca dispositivo |
+| POST | `/pairing/start` | público + throttle | Crea `pairingId` + `displayCode` + `pollToken` (TTL 3 min); QR payload |
+| POST | `/pairing/approve` | JWT | Confirma pairing (por `pairingId` o `code`); emite grant de sesión |
+| GET | `/pairing/poll` | `X-Pairing-Token` | Nuevo dispositivo: `pending` / `approved`(+tokens) / `expired` |
+| POST | `/pairing/relay` | JWT trusted | **P2:** ciphertext ECDH (sessionGrant + wrappedDek) |
+| DELETE | `/devices/:appUserId` | JWT | Revoca dispositivo de la lista |
 
 **Sync existente** (`/sync/push`, `/sync/pull`): sin cambio de rutas; payloads opacos cuando `encryptionEnabled`. Validar que servidor no exige campos plaintext en `applyMutation` para cuentas E2EE (o desactivar projection a `notes.content` legible).
 

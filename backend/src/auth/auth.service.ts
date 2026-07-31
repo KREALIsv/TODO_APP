@@ -45,7 +45,7 @@ export class AuthService {
 
     void this.sendWelcomeEmail(user.id, user.email);
 
-    return this.createSession(user.id, dto.clientPlatform);
+    return this.issueSession(user.id, dto.clientPlatform);
   }
 
   async login(dto: LoginDto): Promise<AuthResponseDto> {
@@ -62,7 +62,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.createSession(user.id, dto.clientPlatform);
+    return this.issueSession(user.id, dto.clientPlatform);
   }
 
   async requestPasswordReset(email: string): Promise<void> {
@@ -156,7 +156,7 @@ export class AuthService {
 
     await this.prisma.session.delete({ where: { id: session.id } });
 
-    return this.createSession(session.userId, clientPlatform);
+    return this.issueSession(session.userId, clientPlatform);
   }
 
   async logout(userId: string, sessionUuid: string): Promise<void> {
@@ -192,7 +192,8 @@ export class AuthService {
     }
   }
 
-  private async createSession(
+  /** Creates a new JWT session for [userId] (login, refresh, or pairing grant). */
+  async issueSession(
     userId: string,
     clientPlatform?: 'web' | 'mobile',
   ): Promise<AuthResponseDto> {
