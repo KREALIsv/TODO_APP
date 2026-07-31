@@ -112,9 +112,7 @@ class _QrLoginScreenState extends State<QrLoginScreen> {
           final wrapped = result.wrappedDek;
           final approverPub = result.approverEphemeralPub;
           final session = _keySession;
-          if (wrapped == null ||
-              approverPub == null ||
-              session == null) {
+          if (wrapped == null || approverPub == null || session == null) {
             throw StateError(
               'La cuenta tiene datos protegidos, pero no llegó la clave. '
               'Vuelve a intentar o usa el código de recuperación.',
@@ -148,8 +146,10 @@ class _QrLoginScreenState extends State<QrLoginScreen> {
   String get _remainingLabel {
     final pairing = _pairing;
     if (pairing == null) return '';
-    final seconds =
-        pairing.expiresAt.difference(DateTime.now()).inSeconds.clamp(0, 9999);
+    final seconds = pairing.expiresAt
+        .difference(DateTime.now())
+        .inSeconds
+        .clamp(0, 9999);
     final m = seconds ~/ 60;
     final s = (seconds % 60).toString().padLeft(2, '0');
     return '$m:$s';
@@ -178,17 +178,15 @@ class _QrLoginScreenState extends State<QrLoginScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Entrar con tu teléfono'),
-        centerTitle: true,
+        leading: const BackButton(),
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
       ),
       body: AuthPageShell(
-        title: 'Entrar con tu teléfono',
+        title: 'Vincular este dispositivo',
         subtitle:
-            'En un dispositivo donde ya tengas sesión (p. ej. tu teléfono), '
-            'abre Ajustes → Vincular dispositivo e introduce este código.',
+            'Usa un equipo donde ya tengas sesión para aprobar el acceso.',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -206,68 +204,66 @@ class _QrLoginScreenState extends State<QrLoginScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              AuthPrimaryButton(
-                label: 'Reintentar',
-                onPressed: _begin,
-              ),
+              AuthPrimaryButton(label: 'Reintentar', onPressed: _begin),
             ] else if (pairing != null) ...[
+              const _PairingSteps(),
+              const SizedBox(height: 20),
               Center(
-                child: DecoratedBox(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: AppSurface.border(context),
-                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppSurface.border(context)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: QrImageView(
-                      data: pairing.qrData,
-                      version: QrVersions.auto,
-                      size: 220,
-                      backgroundColor: Colors.white,
-                    ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      QrImageView(
+                        data: pairing.qrData,
+                        version: QrVersions.auto,
+                        size: 200,
+                        backgroundColor: Colors.white,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'O introduce este código',
+                        style: textTheme.labelMedium?.copyWith(
+                          color: AppSurface.secondary(context),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SelectableText(
+                        pairing.displayCode,
+                        textAlign: TextAlign.center,
+                        style: textTheme.headlineSmall?.copyWith(
+                          letterSpacing: 4,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'monospace',
+                          color: AppSurface.title(context),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextButton.icon(
+                        onPressed: _copyCode,
+                        icon: const Icon(Icons.copy_rounded, size: 17),
+                        label: const Text('Copiar'),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-              Text(
-                'Código',
-                textAlign: TextAlign.center,
-                style: textTheme.labelLarge?.copyWith(
-                  color: AppSurface.secondary(context),
-                ),
-              ),
-              const SizedBox(height: 6),
-              SelectableText(
-                pairing.displayCode,
-                textAlign: TextAlign.center,
-                style: textTheme.headlineSmall?.copyWith(
-                  letterSpacing: 3,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'monospace',
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: TextButton.icon(
-                  onPressed: _copyCode,
-                  icon: const Icon(Icons.copy_rounded, size: 18),
-                  label: const Text('Copiar código'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                expired ? 'Código expirado' : 'Caduca en $_remainingLabel',
-                textAlign: TextAlign.center,
-                style: textTheme.bodySmall?.copyWith(
-                  color: expired
-                      ? Theme.of(context).colorScheme.error
-                      : AppSurface.secondary(context),
-                ),
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               if (_error != null) ...[
                 Text(
                   AuthErrors.message(_error!, registering: false),
@@ -283,25 +279,135 @@ class _QrLoginScreenState extends State<QrLoginScreen> {
                   label: 'Generar código nuevo',
                   onPressed: _begin,
                 )
-              else ...[
-                const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                const SizedBox(height: 12),
+              else
+                _WaitingStatus(remainingLabel: _remainingLabel),
+            ],
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Volver al inicio de sesión'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PairingSteps extends StatelessWidget {
+  const _PairingSteps();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        _PairingStep(
+          number: '1',
+          text: 'Abre WODO en el dispositivo donde ya tienes sesión.',
+        ),
+        SizedBox(height: 10),
+        _PairingStep(
+          number: '2',
+          text: 'Ve a Ajustes → Vincular dispositivo y escanea el QR.',
+        ),
+      ],
+    );
+  }
+}
+
+class _PairingStep extends StatelessWidget {
+  const _PairingStep({required this.number, required this.text});
+
+  final String number;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            number,
+            style: textTheme.labelMedium?.copyWith(
+              color: colorScheme.primary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 3),
+            child: Text(
+              text,
+              style: textTheme.bodyMedium?.copyWith(height: 1.35),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WaitingStatus extends StatelessWidget {
+  const _WaitingStatus({required this.remainingLabel});
+
+  final String remainingLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  'Esperando confirmación en tu teléfono…',
-                  textAlign: TextAlign.center,
+                  'Esperando aprobación…',
                   style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'El código vence en $remainingLabel',
+                  style: textTheme.bodySmall?.copyWith(
                     color: AppSurface.secondary(context),
                   ),
                 ),
               ],
-            ],
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Usar correo y contraseña'),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

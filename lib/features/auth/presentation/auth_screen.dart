@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_surface.dart';
@@ -115,9 +114,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _openQrLogin() async {
     final signedIn = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => const QrLoginScreen(),
-      ),
+      MaterialPageRoute<bool>(builder: (_) => const QrLoginScreen()),
     );
     if (signedIn == true && mounted) {
       Navigator.of(context).pop(true);
@@ -138,9 +135,9 @@ class _AuthScreenState extends State<AuthScreen> {
     if (widget.contextMessage != null) return widget.contextMessage!;
     return _registering
         ? 'Crea tu cuenta para sincronizar notas y tareas entre dispositivos. '
-            'Tus datos locales se mantienen sin conexión.'
+              'Tus datos locales se mantienen sin conexión.'
         : 'Entra con tu cuenta WODO para sincronizar entre dispositivos. '
-            'Sin sesión, todo sigue guardándose aquí en local.';
+              'Sin sesión, todo sigue guardándose aquí en local.';
   }
 
   @override
@@ -154,14 +151,12 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final title = _registering ? 'Crear cuenta' : 'Iniciar sesión';
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(title),
-        centerTitle: true,
+        leading: const BackButton(),
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -259,37 +254,12 @@ class _AuthScreenState extends State<AuthScreen> {
                 onPressed: _submit,
               ),
               if (!_registering) ...[
-                const SizedBox(height: 18),
-                Text(
-                  '¿Ya usas WODO en otro dispositivo?',
-                  textAlign: TextAlign.center,
-                  style: textTheme.labelSmall?.copyWith(
-                    color: AppSurface.secondary(context),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _submitting ? null : _openQrLogin,
-                  icon: const Icon(Icons.qr_code_2_rounded),
-                  label: Text(
-                    kIsWeb
-                        ? 'Entrar con tu teléfono'
-                        : 'Entrar con otro dispositivo',
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  kIsWeb
-                      ? 'Escanea o introduce el código desde la app en tu teléfono.'
-                      : 'Muestra un código en este dispositivo y confírmalo en el otro.',
-                  textAlign: TextAlign.center,
-                  style: textTheme.labelSmall?.copyWith(
-                    color: AppSurface.secondary(context),
-                    height: 1.35,
-                  ),
-                ),
+                const SizedBox(height: 20),
+                const _AuthDivider(label: 'o entra sin escribir tu contraseña'),
+                const SizedBox(height: 16),
+                _PairingLoginOption(enabled: !_submitting, onTap: _openQrLogin),
               ],
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               if (_canUseAnotherAccount && !_showRememberedEmailHint)
                 Center(
                   child: TextButton(
@@ -319,6 +289,108 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                 ),
               ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthDivider extends StatelessWidget {
+  const _AuthDivider({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = AppSurface.border(context);
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
+      color: AppSurface.secondary(context),
+      fontWeight: FontWeight.w500,
+    );
+
+    return Row(
+      children: [
+        Expanded(child: Divider(color: color)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(label, style: style),
+        ),
+        Expanded(child: Divider(color: color)),
+      ],
+    );
+  }
+}
+
+class _PairingLoginOption extends StatelessWidget {
+  const _PairingLoginOption({required this.enabled, required this.onTap});
+
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Material(
+      color: colorScheme.primary.withValues(alpha: 0.06),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: colorScheme.primary.withValues(alpha: 0.25),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.qr_code_2_rounded,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Entrar con otro dispositivo',
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Muestra un QR y apruébalo desde un equipo donde ya '
+                      'tengas sesión.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppSurface.secondary(context),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward_rounded,
+                size: 20,
+                color: colorScheme.primary,
+              ),
             ],
           ),
         ),
