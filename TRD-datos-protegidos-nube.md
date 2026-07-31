@@ -301,7 +301,8 @@ Base: `/api/v1` (auth JWT salvo `pairing/start` que puede ser anónimo con rate 
 |--------|------|------|-------------|
 | GET | `/users/me/security` | JWT | `encryptionEnabled`, `deviceVaultState`, lista dispositivos |
 | POST | `/encryption/enable` | JWT | Genera DEK server-side storage of wrapped blobs; marca cuenta |
-| POST | `/encryption/recovery/regenerate` | JWT + trusted | Nuevo recovery wrap |
+| POST | `/encryption/recovery-code/email` | JWT | Envía copia del código al email de la cuenta (Resend); body `{ recoveryCode }` — no persistir en servidor |
+| POST | `/encryption/recovery/regenerate` | JWT + trusted | Nuevo recovery wrap (fase posterior) |
 | POST | `/encryption/recovery/unlock` | JWT | Body: recovery code → devuelve wrapped DEK (rate limited) |
 | POST | `/pairing/start` | opcional | Crea `pairingId`, TTL, devuelve datos para QR |
 | POST | `/pairing/approve` | JWT trusted | Usuario confirma pairing en teléfono |
@@ -431,6 +432,16 @@ Escenarios: cerraste todas las pestañas, borraste caché del navegador, solo us
 
 ### 15.2 Caminos para recuperar datos
 
+**Prioridad de producto:**
+
+| Caso | Camino |
+|------|--------|
+| **Peor caso** (sin otro dispositivo, caché borrada, solo PC) | **Opción B** — código de recuperación (+ copia por **correo Resend** al activar protección) |
+| **Caso habitual** (otro dispositivo aún vinculado) | **Opción A** — QR desde teléfono / otro equipo |
+| **Sin código ni dispositivo** | **Opción C** — límite E2EE; datos en nube irrecuperables |
+
+La Opción A **no sustituye** a B en el peor caso; es atajo cuando ya tienes un trusted device.
+
 ```mermaid
 flowchart TD
   A[Protección activada en la nube] --> B{¿Algún dispositivo trusted con DEK?}
@@ -452,10 +463,12 @@ flowchart TD
 
 ### 15.3 UX obligatoria al activar protección
 
-1. Pantalla **“Guarda tu código de recuperación”** — no se puede omitir con un solo “OK” sin confirmación (checkbox “Lo guardé” o copiar/descargar).
-2. Texto explícito: *“Si pierdes todos tus dispositivos y este código, no podremos recuperar tus notas en la nube.”*
-3. En Ajustes: **“Ver / regenerar código de recuperación”** solo desde dispositivo **trusted** (regenerar invalida el anterior).
-4. En pantalla **“Vincula este dispositivo”**: botón secundario **“Usar código de recuperación”** (siempre visible si `encryptionEnabled`).
+1. Pantalla **“Guarda tu código de recuperación”** — confirmación explícita (“Lo guardé” / copiar).
+2. Texto: *“Si pierdes todos tus dispositivos y este código, no podremos recuperar tus notas en la nube.”*
+3. **Enviar copia al correo** (Resend, flujo `vault_recovery`): botón *“Enviar también a mi correo”* tras mostrar el código (rate limit por usuario). El servidor **no almacena** el código; solo lo reenvía al email de la cuenta. **Aviso:** quien acceda al correo podría recuperar datos — el usuario debe entender el tradeoff.
+4. Descarga opcional `.txt` del código (mismo momento).
+5. Ajustes: **“Ver / regenerar código”** solo desde dispositivo **trusted** (regenerar invalida el anterior y puede re-enviar email).
+6. Pantalla **“Vincula este dispositivo”**: **“Usar código de recuperación”** siempre visible si `encryptionEnabled`.
 
 ### 15.4 Respuesta directa: “¿No se puede?”
 

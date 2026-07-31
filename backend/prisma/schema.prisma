@@ -19,6 +19,7 @@ enum AuthProvider {
 enum MailFlow {
   welcome
   password_reset
+  vault_recovery
 }
 
 model User {
