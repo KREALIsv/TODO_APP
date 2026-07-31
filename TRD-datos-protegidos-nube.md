@@ -376,7 +376,7 @@ No sustituye E2EE pero complementa:
 |------|------------|
 | **P0 — Diseño** | Este TRD + `SECURITY.md` resumen |
 | **P1 — Pairing sin E2EE** | QR vinculación + estados UI + revocar; sync plaintext (validar flujo) |
-| **P2 — E2EE enable** | Activar protección + recovery + encrypt push/pull |
+| **P2 — E2EE enable** | Activar protección + **recovery obligatorio** + encrypt push/pull |
 | **P3 — Hardening** | Purga plaintext legacy, refresh token hash, adjuntos |
 
 ---
@@ -390,23 +390,82 @@ No sustituye E2EE pero complementa:
 5. Contenido en `sync_mutations` para cuentas protegidas no contiene `title`/`body` legibles (verificación manual / test).
 6. Cambio de contraseña no rompe lectura de notas en dispositivos vinculados.
 7. Revocar dispositivo obliga a vincular de nuevo.
-8. Recovery code restaura acceso sin trusted device.
+8. Recovery code restaura acceso sin trusted device (incl. web tras borrar caché).
 9. Cuenta sin protección: sync y UI como antes.
+10. Activar protección no permite continuar sin acknowledgment del código de recuperación.
 
 ---
 
-## 14. Preguntas abiertas
+## 14. Decisiones de producto (cerradas)
 
-| # | Pregunta | Propuesta default |
-|---|----------|-------------------|
-| 1 | ¿`dayEntry.outcome` y fechas en claro en servidor? | v1: dentro del blob encriptado; fechas locales derivadas tras decrypt |
-| 2 | ¿Web guarda DEK entre sesiones? | Solo tras pairing hasta “Cerrar sesión” o revocación; no persistir DEK en localStorage plano |
-| 3 | ¿Límite de dispositivos trusted? | 5 activos; revocar el más antiguo si se excede |
-| 4 | ¿Nombre dispositivo en lista? | “Web · Chrome”, “Android · Pixel” desde `DeviceRegistry` |
+| # | Tema | Decisión |
+|---|------|----------|
+| 1 | **Contenido en blob encriptado** | **Título, descripción, etiquetas** y resto del contenido de la nota/tarea van **dentro del blob** (Opción B). El servidor no lee “de qué trata” la tarea. Solo metadata de **sync**: `entityId`, `operation`, revisiones, timestamps de mutación. |
+| 2 | **DEK en web** | **Opción B:** persistir DEK mientras la sesión web está activa. **Cerrar sesión** o revocar dispositivo → borrar DEK local; volver a vincular (QR) o recovery. |
+| 3 | **Límite de dispositivos** | **Sin límite** fijo. Lista gestionable en Ajustes; el usuario puede **revocar** cualquier dispositivo que no reconozca. |
+| 4 | **Nombres en lista** | **Automático** (plataforma / navegador) + **última sincronización** + **nombre editable** por el usuario (ej. “Mi laptop trabajo”). |
+
+### 14.1 Privacidad vs contenido “malo” en tareas (decisión §1)
+
+Con E2EE el servidor **no puede leer** títulos ni descripciones. Eso protege vida privada cotidiana (“ir al baño”, medicación, citas, salud) — alineado con la promesa del producto.
+
+**Implicación:** no hay moderación automática del *texto* de notas en la nube (igual que Signal / Proton). El control es por **cuenta** (ToS, reporte de usuario, bloqueo de cuenta, rate limits), no por escaneo de contenido.
+
+**Qué va en el blob (v1):** todo lo que el usuario escribe o etiqueta que identifique la tarea/nota. **Qué no va en claro:** nada de contenido semántico; solo lo necesario para mover blobs y ordenar sync.
 
 ---
 
-## 15. Referencias
+## 15. Recuperación sin dispositivo con DEK
+
+Escenarios: cerraste todas las pestañas, borraste caché del navegador, solo usas web (app aún no en tiendas), revocaste dispositivos, perdiste el teléfono.
+
+### 15.1 Dos llaves distintas (recordatorio)
+
+| Llave | Qué abre | Si solo tienes esto… |
+|-------|----------|----------------------|
+| **Email + contraseña** | Cuenta (JWT) | Ves que la cuenta existe, **pero no** tus notas encriptadas |
+| **DEK** | Contenido en la nube | Necesitas vinculación QR **o** **código de recuperación** |
+| **Código de recuperación** | Copia de la DEK en el servidor (envuelta) | Puedes recuperar datos **sin** otro dispositivo |
+
+**Iniciar sesión ≠ tener la data** cuando `encryptionEnabled` es true.
+
+### 15.2 Caminos para recuperar datos
+
+```mermaid
+flowchart TD
+  A[Protección activada en la nube] --> B{¿Algún dispositivo trusted con DEK?}
+  B -->|Sí| C[Vincular con QR desde ese dispositivo]
+  B -->|No| D{¿Guardaste el código de recuperación?}
+  D -->|Sí| E[Iniciar sesión + ingresar código]
+  E --> F[Descifrar DEK del servidor → pull → notas visibles]
+  D -->|No| G[Datos en la nube irrecuperables]
+  G --> H[Opcional: datos solo en Hive local si un dispositivo no se limpió]
+```
+
+| Situación | Qué hacer |
+|-----------|-----------|
+| Web: cerraste pestañas, **sesión expiró** | **Iniciar sesión** → si no hay DEK: **QR** (si tienes otro dispositivo) o **código de recuperación** |
+| Web: **borraste caché / datos del sitio** | Igual: login + recovery o QR. La DEK local se perdió con la caché |
+| **Solo PC**, app móvil aún no existe | Al **activar protección**, obligatorio guardar **código de recuperación** (no depender del teléfono). Luego: login + recovery si limpias el navegador |
+| **Todos** los dispositivos revocados | Login + **código de recuperación** (único camino sin otro equipo) |
+| Perdiste recovery y todos los dispositivos | **No se puede** recuperar la nube. Mensaje explícito en producto y en este TRD |
+
+### 15.3 UX obligatoria al activar protección
+
+1. Pantalla **“Guarda tu código de recuperación”** — no se puede omitir con un solo “OK” sin confirmación (checkbox “Lo guardé” o copiar/descargar).
+2. Texto explícito: *“Si pierdes todos tus dispositivos y este código, no podremos recuperar tus notas en la nube.”*
+3. En Ajustes: **“Ver / regenerar código de recuperación”** solo desde dispositivo **trusted** (regenerar invalida el anterior).
+4. En pantalla **“Vincula este dispositivo”**: botón secundario **“Usar código de recuperación”** (siempre visible si `encryptionEnabled`).
+
+### 15.4 Respuesta directa: “¿No se puede?”
+
+- **Sí se puede**, si al activar protección guardaste el **código de recuperación**: entras con email/contraseña en web e ingresas el código → recuperas DEK y datos.
+- **No se puede** recuperar la nube si no hay dispositivo trusted **ni** código de recuperación (límite real del E2EE; no es bug).
+- Datos **solo en ese PC** en Hive pueden sobrevivir si no borraste datos del sitio; la nube sigue necesitando DEK o recovery para descargar/desencriptar de nuevo.
+
+---
+
+## 16. Referencias
 
 - WhatsApp Linked Devices (QR, ephemeral keys, server relay).
 - Standard Notes / Bitwarden (DEK + recovery code).
