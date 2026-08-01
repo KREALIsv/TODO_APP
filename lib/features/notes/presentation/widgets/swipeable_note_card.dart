@@ -8,6 +8,7 @@ import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/note_item.dart';
 import '../../domain/task_dates.dart';
+import '../../../sync/presentation/sync_conflict_list_card.dart';
 import 'note_card.dart';
 import 'note_card_context_sheet.dart';
 
@@ -151,6 +152,14 @@ class SwipeableNoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final conflictPair = syncConflictPairFor(item, _repo);
+    if (conflictPair != null) {
+      return SyncConflictListCard(
+        pair: conflictPair,
+        repository: _repo,
+      );
+    }
+
     final card = NoteCard(
       item: item,
       repository: _repo,

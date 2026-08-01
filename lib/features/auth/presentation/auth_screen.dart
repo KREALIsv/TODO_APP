@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_surface.dart';
 import '../../../global/widgets/app_alerts.dart';
-import '../../sync/data/sync_service.dart';
 import '../data/auth_service.dart';
 import '../data/auth_session_repository.dart';
 import '../domain/auth_errors.dart';
@@ -75,7 +74,6 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       if (_registering) {
         await _auth.register(email: _email.text, password: _password.text);
-        await SyncService.instance.syncNow();
         if (!mounted) return;
         await AppAlerts.show(
           context,
@@ -87,7 +85,6 @@ class _AuthScreenState extends State<AuthScreen> {
         );
       } else {
         await _auth.login(email: _email.text, password: _password.text);
-        await SyncService.instance.syncNow();
       }
       if (!mounted) return;
       Navigator.of(context).pop(true);

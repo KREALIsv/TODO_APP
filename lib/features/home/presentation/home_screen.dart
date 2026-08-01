@@ -22,6 +22,8 @@ import '../../notes/presentation/widgets/quick_capture_field.dart';
 import '../../notes/presentation/widgets/swipeable_note_card.dart';
 import '../../notes/presentation/widgets/task_section_header.dart';
 import '../../profile/presentation/profile_screen.dart';
+import '../../sync/domain/sync_conflict.dart';
+import '../../sync/presentation/sync_conflict_list_card.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../settings/presentation/widgets/list_background_layer.dart';
 import '../../shell/presentation/desktop_panel_state.dart';
@@ -64,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
   GroupedTasksExpansion _groupedExpansion = const GroupedTasksExpansion();
   bool _pinnedSectionExpanded = true;
   bool _ofDaySectionExpanded = true;
+  bool _conflictsSectionExpanded = true;
   late final ClockRefreshController _clock;
   DateTime _now = DateTime.now();
   late DateTime _selectedDay;
@@ -272,6 +275,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildConflictList(List<SyncConflictPair> conflicts) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      sliver: SliverList.builder(
+        itemCount: conflicts.length,
+        itemBuilder: (context, index) {
+          return SyncConflictListCard(
+            pair: conflicts[index],
+            repository: _repo,
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildNoteList(
     List<NoteItem> items,
     void Function(NoteItem item) onTap, {
@@ -313,6 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _groupedExpansion = const GroupedTasksExpansion();
     _pinnedSectionExpanded = true;
     _ofDaySectionExpanded = true;
+    _conflictsSectionExpanded = true;
   }
 
   PreferredSizeWidget _buildAppBarBottom(String searchQuery) {
@@ -481,6 +500,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     final groups =
         useGrouped ? TaskGroupsQuery.from(filtered, now: _now) : null;
+    final conflicts = searchQuery.trim().isEmpty &&
+            _effectiveFilter == NotesFilter.all
+        ? _repo.getPendingSyncConflicts()
+        : const <SyncConflictPair>[];
 
     return [
       SliverToBoxAdapter(
@@ -498,6 +521,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      if (conflicts.isNotEmpty) ...[
+        _buildSectionHeader(
+          'Conflictos de sincronización',
+          collapsible: true,
+          expanded: _conflictsSectionExpanded,
+          onToggle: () => setState(
+            () => _conflictsSectionExpanded = !_conflictsSectionExpanded,
+          ),
+        ),
+        if (_conflictsSectionExpanded) _buildConflictList(conflicts),
+      ],
       if (useGrouped && groups != null && !groups.isEmpty)
         ...buildGroupedTasksSlivers(
           groups: groups,

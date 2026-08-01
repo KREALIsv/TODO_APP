@@ -21,6 +21,7 @@ class NoteItem {
     this.archivedAt,
     this.reminderMinutesBefore,
     this.coverAttachmentId,
+    this.syncConflictOfNoteId,
   });
 
   final String id;
@@ -44,6 +45,12 @@ class NoteItem {
 
   /// Optional cover image from [AttachmentsRepository].
   final String? coverAttachmentId;
+
+  /// When set, this note is a local snapshot created during sync conflict
+  /// resolution and points at the canonical note id.
+  final String? syncConflictOfNoteId;
+
+  bool get isSyncConflictCopy => syncConflictOfNoteId != null;
 
   String get preview {
     final source = title.trim().isNotEmpty ? title : body;
@@ -80,6 +87,8 @@ class NoteItem {
       'archivedAt': archivedAt?.toIso8601String(),
       'reminderMinutesBefore': reminderMinutesBefore,
       'coverAttachmentId': coverAttachmentId,
+      if (syncConflictOfNoteId != null)
+        'syncConflictOfNoteId': syncConflictOfNoteId,
     };
   }
 
@@ -124,6 +133,7 @@ class NoteItem {
       archivedAt: _parseOptionalDate(map['archivedAt']),
       reminderMinutesBefore: reminder,
       coverAttachmentId: map['coverAttachmentId'] as String?,
+      syncConflictOfNoteId: map['syncConflictOfNoteId'] as String?,
     );
   }
 
@@ -144,6 +154,7 @@ class NoteItem {
     Object? archivedAt = _unset,
     Object? reminderMinutesBefore = _unset,
     Object? coverAttachmentId = _unset,
+    Object? syncConflictOfNoteId = _unset,
   }) {
     return NoteItem(
       id: id ?? this.id,
@@ -170,6 +181,9 @@ class NoteItem {
       coverAttachmentId: identical(coverAttachmentId, _unset)
           ? this.coverAttachmentId
           : coverAttachmentId as String?,
+      syncConflictOfNoteId: identical(syncConflictOfNoteId, _unset)
+          ? this.syncConflictOfNoteId
+          : syncConflictOfNoteId as String?,
     );
   }
 }

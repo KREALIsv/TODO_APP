@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/services';
 import { SyncMutationDto, SyncPullResponseDto, SyncResponseItem } from './dto';
+import { normalizeNotePayload } from './note-payload.mapper';
 
 const PAGE_SIZE = 100;
 
@@ -142,40 +143,34 @@ export class SyncService {
             data: { deletedAt: now },
           });
         } else {
+          const normalized = normalizeNotePayload(payload);
           await prisma.note.upsert({
             where: { userId_id: { userId, id: mutation.entityId } },
             create: {
               id: mutation.entityId,
               userId,
-              content: (payload.content as string) ?? '',
-              archivedAt: payload.archivedAt
-                ? new Date(payload.archivedAt as string)
-                : null,
-              dueAt: payload.dueAt
-                ? new Date(payload.dueAt as string)
-                : null,
-              reminderOffset: (payload.reminderOffset as string) ?? null,
-              tagIds: ((payload.tagIds as string[]) ?? []).map(String),
+              content: normalized.content,
+              archivedAt: normalized.archivedAt,
+              dueAt: normalized.dueAt,
+              reminderOffset: normalized.reminderOffset,
+              tagIds: normalized.tagIds,
               serverUpdatedAt: now,
               serverRevision: await this.nextRevisionFor(prisma, userId),
             },
             update: {
-              content: (payload.content as string) ?? undefined,
+              content: normalized.content,
               archivedAt: payload.archivedAt !== undefined
-                ? payload.archivedAt
-                  ? new Date(payload.archivedAt as string)
-                  : null
+                ? normalized.archivedAt
                 : undefined,
               dueAt: payload.dueAt !== undefined
-                ? payload.dueAt
-                  ? new Date(payload.dueAt as string)
-                  : null
+                ? normalized.dueAt
                 : undefined,
-              reminderOffset: payload.reminderOffset !== undefined
-                ? (payload.reminderOffset as string) ?? null
+              reminderOffset: payload.reminderMinutesBefore !== undefined ||
+                payload.reminderOffset !== undefined
+                ? normalized.reminderOffset
                 : undefined,
-              tagIds: payload.tagIds !== undefined
-                ? ((payload.tagIds as string[]) ?? []).map(String)
+              tagIds: payload.tags !== undefined || payload.tagIds !== undefined
+                ? normalized.tagIds
                 : undefined,
               serverUpdatedAt: now,
               serverRevision: await this.nextRevisionFor(prisma, userId),
