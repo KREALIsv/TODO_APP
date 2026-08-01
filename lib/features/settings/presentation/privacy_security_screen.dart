@@ -148,6 +148,14 @@ class PrivacySecurityScreen extends StatelessWidget {
         showChevron: false,
         onTap: null,
       ),
+      const SettingsDivider(),
+      SettingsRow(
+        icon: Icons.key_rounded,
+        title: 'Regenerar código de recuperación',
+        subtitle: 'Genera uno nuevo; el anterior dejará de funcionar',
+        accent: accent,
+        onTap: () => AuthFlow.regenerateRecoveryCode(context),
+      ),
     ];
   }
 }

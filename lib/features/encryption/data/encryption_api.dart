@@ -105,6 +105,30 @@ class EncryptionApi {
     return RecoveryWrap.fromJson(_data(response));
   }
 
+  Future<void> regenerateRecoveryWrap({
+    required String appUserId,
+    required String dekSalt,
+    required String encryptedDekRecovery,
+    String? recoveryHint,
+  }) async {
+    final response = await AuthService.instance.authorizedRequest(
+      (token) => http.post(
+        WodoApiConfig.uri('encryption/recovery/regenerate'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'appUserId': appUserId,
+          'dekSalt': dekSalt,
+          'encryptedDekRecovery': encryptedDekRecovery,
+          if (recoveryHint != null) 'recoveryHint': recoveryHint,
+        }),
+      ),
+    );
+    _data(response);
+  }
+
   /// Relays the recovery code to the account email. Server does not store it.
   Future<({bool skipped})> emailRecoveryCode(String recoveryCode) async {
     final response = await AuthService.instance.authorizedRequest(

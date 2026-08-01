@@ -198,6 +198,50 @@ abstract final class AuthFlow {
     }
   }
 
+  static Future<void> regenerateRecoveryCode(BuildContext context) async {
+    final confirmed = await AppAlerts.confirm(
+      context,
+      title: 'Regenerar código de recuperación',
+      message:
+          'Se creará un código nuevo. El anterior dejará de funcionar de '
+          'inmediato.\n\n'
+          'Guarda el nuevo código en un lugar seguro; sin él no podrás '
+          'recuperar tus datos si pierdes todos los dispositivos.',
+      confirmLabel: 'Regenerar código',
+      isDestructive: true,
+    );
+    if (!confirmed || !context.mounted) return;
+
+    try {
+      final code = await VaultService.instance.regenerateRecoveryCode();
+      if (!context.mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => RecoveryCodeScreen(
+            recoveryCode: code,
+            isRegeneration: true,
+          ),
+        ),
+      );
+      if (!context.mounted) return;
+      await AppAlerts.show(
+        context,
+        title: 'Código actualizado',
+        message:
+            'El código anterior ya no sirve. Usa el nuevo si necesitas '
+            'recuperar tus datos sin otro dispositivo.',
+        type: AppAlertType.success,
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      await AppAlerts.show(
+        context,
+        message: AuthErrors.message(error, registering: false),
+        type: AppAlertType.error,
+      );
+    }
+  }
+
   static Future<void> openAccount(BuildContext context) {
     return Navigator.of(context).push<void>(
       MaterialPageRoute<void>(

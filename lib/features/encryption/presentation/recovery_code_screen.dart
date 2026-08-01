@@ -12,9 +12,14 @@ import '../data/encryption_api.dart';
 
 /// Mandatory acknowledgment of the recovery code after enabling protection.
 class RecoveryCodeScreen extends StatefulWidget {
-  const RecoveryCodeScreen({super.key, required this.recoveryCode});
+  const RecoveryCodeScreen({
+    super.key,
+    required this.recoveryCode,
+    this.isRegeneration = false,
+  });
 
   final String recoveryCode;
+  final bool isRegeneration;
 
   @override
   State<RecoveryCodeScreen> createState() => _RecoveryCodeScreenState();
@@ -126,7 +131,11 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
       child: Scaffold(
         extendBodyBehindAppBar: true,
         appBar: AppBar(
-          title: const Text('Código de recuperación'),
+          title: Text(
+            widget.isRegeneration
+                ? 'Nuevo código de recuperación'
+                : 'Código de recuperación',
+          ),
           centerTitle: true,
           automaticallyImplyLeading: false,
           backgroundColor: Colors.transparent,
@@ -134,10 +143,15 @@ class _RecoveryCodeScreenState extends State<RecoveryCodeScreen> {
           elevation: 0,
         ),
         body: AuthPageShell(
-          title: 'Guarda tu código de recuperación',
-          subtitle:
-              'Si pierdes todos tus dispositivos y este código, no podremos '
-              'recuperar tus notas en la nube.',
+          title: widget.isRegeneration
+              ? 'Guarda tu nuevo código'
+              : 'Guarda tu código de recuperación',
+          subtitle: widget.isRegeneration
+              ? 'El código anterior ya no funciona. Si pierdes todos tus '
+                  'dispositivos y este código, no podremos recuperar tus '
+                  'notas en la nube.'
+              : 'Si pierdes todos tus dispositivos y este código, no podremos '
+                  'recuperar tus notas en la nube.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

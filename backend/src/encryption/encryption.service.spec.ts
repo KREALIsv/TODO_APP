@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EncryptionService } from './encryption.service';
 import { PrismaService } from '../common/services';
@@ -12,6 +12,7 @@ describe('EncryptionService', () => {
     },
     device: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
       upsert: jest.fn(),
     },
     syncMutation: {
@@ -130,6 +131,60 @@ describe('EncryptionService', () => {
       encryptionVersion: 1,
       recoveryHint: null,
     });
+  });
+
+  it('regenerates recovery wrap for trusted device', async () => {
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'user-1',
+      encryptionEnabled: true,
+      recoveryHint: 'old-hint',
+    });
+    (prisma.device.findUnique as jest.Mock).mockResolvedValue({
+      userId: 'user-1',
+      appUserId: 'device-1',
+      trusted: true,
+      vaultState: 'trusted',
+    });
+    (prisma.user.update as jest.Mock).mockResolvedValue({});
+
+    await expect(
+      service.regenerateRecoveryWrap('user-1', {
+        appUserId: 'device-1',
+        dekSalt: 'new-salt-base64-value-xx',
+        encryptedDekRecovery: 'new-wrap-blob-base64-value-xxxxxxxxxx',
+      }),
+    ).resolves.toEqual({ regenerated: true });
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: {
+        dekSalt: 'new-salt-base64-value-xx',
+        encryptedDekRecovery: 'new-wrap-blob-base64-value-xxxxxxxxxx',
+        recoveryHint: 'old-hint',
+      },
+    });
+  });
+
+  it('rejects recovery regeneration from untrusted device', async () => {
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      id: 'user-1',
+      encryptionEnabled: true,
+      recoveryHint: null,
+    });
+    (prisma.device.findUnique as jest.Mock).mockResolvedValue({
+      userId: 'user-1',
+      appUserId: 'device-1',
+      trusted: false,
+      vaultState: 'none',
+    });
+
+    await expect(
+      service.regenerateRecoveryWrap('user-1', {
+        appUserId: 'device-1',
+        dekSalt: 'new-salt-base64-value-xx',
+        encryptedDekRecovery: 'new-wrap-blob-base64-value-xxxxxxxxxx',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('purgeLegacyPlaintext only deletes non-opaque mutations', async () => {

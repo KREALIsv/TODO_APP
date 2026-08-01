@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -9,7 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/services';
 import { MailService } from '../mail';
-import { EnableEncryptionDto } from './dto';
+import { EnableEncryptionDto, RegenerateRecoveryDto } from './dto';
 
 @Injectable()
 export class EncryptionService {
@@ -175,6 +176,46 @@ export class EncryptionService {
       encryptionVersion: user.encryptionVersion,
       recoveryHint: user.recoveryHint,
     };
+  }
+
+  /**
+   * Replaces the recovery wrap with a new salt + ciphertext. Requires a trusted
+   * device; the previous recovery code stops working immediately.
+   */
+  async regenerateRecoveryWrap(
+    userId: string,
+    dto: RegenerateRecoveryDto,
+  ): Promise<{ regenerated: true }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuario no encontrado.');
+    if (!user.encryptionEnabled) {
+      throw new BadRequestException('La protección no está activada.');
+    }
+
+    const device = await this.prisma.device.findUnique({
+      where: { appUserId: dto.appUserId.trim() },
+    });
+    if (!device || device.userId !== userId) {
+      throw new ForbiddenException(
+        'Este dispositivo no puede regenerar el código de recuperación.',
+      );
+    }
+    if (!device.trusted || device.vaultState === 'revoked') {
+      throw new ForbiddenException(
+        'Solo un dispositivo vinculado puede regenerar el código.',
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        dekSalt: dto.dekSalt.trim(),
+        encryptedDekRecovery: dto.encryptedDekRecovery.trim(),
+        recoveryHint: dto.recoveryHint?.trim() || user.recoveryHint,
+      },
+    });
+
+    return { regenerated: true };
   }
 
   async markDeviceTrusted(userId: string, appUserId: string): Promise<void> {

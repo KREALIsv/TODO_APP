@@ -97,6 +97,32 @@ class VaultService extends ChangeNotifier {
     return recoveryCode;
   }
 
+  /// Re-wraps the local DEK with a new recovery code and uploads it.
+  /// Only callable when this device already has the DEK (vaultReady).
+  Future<String> regenerateRecoveryCode() async {
+    final dek = _dek;
+    if (dek == null) {
+      throw StateError(
+        'Este dispositivo no tiene acceso a tus datos protegidos.',
+      );
+    }
+    if (!_accountEncryptionEnabled) {
+      throw StateError('La protección no está activada.');
+    }
+
+    final recoveryCode = _crypto.generateRecoveryCode();
+    final wrap = await _crypto.wrapDekForRecovery(
+      dek: dek,
+      recoveryCode: recoveryCode,
+    );
+    await _api.regenerateRecoveryWrap(
+      appUserId: DeviceIdentity.instance.appUserId,
+      dekSalt: wrap.salt,
+      encryptedDekRecovery: wrap.encryptedDekRecovery,
+    );
+    return recoveryCode;
+  }
+
   Future<void> unlockWithRecoveryCode(String recoveryCode) async {
     final wrap = await _api.fetchRecoveryWrap();
     final dek = await _crypto.unwrapDekFromRecovery(
