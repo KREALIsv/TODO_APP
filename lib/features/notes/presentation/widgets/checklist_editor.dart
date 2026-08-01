@@ -2,13 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../global/themes/app_colors.dart';
-import '../../../../global/widgets/outlined_add_chip.dart';
 import '../../domain/checklist_item.dart';
 
 typedef ChecklistChanged = void Function({
   required String? title,
   required List<ChecklistItem> items,
 });
+
+const _borderlessFieldDecoration = InputDecoration(
+  isDense: true,
+  filled: false,
+  border: InputBorder.none,
+  enabledBorder: InputBorder.none,
+  focusedBorder: InputBorder.none,
+  disabledBorder: InputBorder.none,
+  errorBorder: InputBorder.none,
+  focusedErrorBorder: InputBorder.none,
+  contentPadding: EdgeInsets.symmetric(vertical: 2),
+  hintText: 'Nuevo elemento',
+);
 
 /// Checklist section for tasks: action button to create, then subtask rows.
 class ChecklistEditor extends StatefulWidget {
@@ -229,19 +241,22 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
             ],
           ),
         ],
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         ...widget.items.map((item) => _ChecklistItemRow(
               item: item,
               onToggle: () => _toggleItem(item.id),
               onTitleChanged: (title) => _updateItemTitle(item.id, title),
               onDelete: () => _removeItem(item.id),
             )),
-        const SizedBox(height: 4),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedAddChip(
-            label: 'Añadir elemento',
-            onPressed: _addItem,
+        TextButton.icon(
+          onPressed: _addItem,
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Añadir elemento'),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.neutral60,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            alignment: Alignment.centerLeft,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ),
       ],
@@ -431,16 +446,28 @@ class _ChecklistItemRow extends StatefulWidget {
 class _ChecklistItemRowState extends State<_ChecklistItemRow> {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
+  bool _hovering = false;
+  bool _focused = false;
+
+  bool get _showActions => _hovering || _focused;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.item.title);
     _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChanged);
     if (widget.item.title.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _focusNode.requestFocus();
       });
+    }
+  }
+
+  void _onFocusChanged() {
+    final focused = _focusNode.hasFocus;
+    if (_focused != focused) {
+      setState(() => _focused = focused);
     }
   }
 
@@ -455,6 +482,7 @@ class _ChecklistItemRowState extends State<_ChecklistItemRow> {
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChanged);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -465,50 +493,68 @@ class _ChecklistItemRowState extends State<_ChecklistItemRow> {
     final textTheme = Theme.of(context).textTheme;
     final completed = widget.item.completed;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 24,
-            height: 24,
-            child: Checkbox(
-              value: completed,
-              onChanged: (_) => widget.onToggle(),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 1),
+        child: Material(
+          color: _showActions ? AppColors.neutral00 : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: completed,
+                    onChanged: (_) => widget.onToggle(),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    textCapitalization: TextCapitalization.sentences,
+                    minLines: 1,
+                    maxLines: 3,
+                    style: textTheme.bodyMedium?.copyWith(
+                      decoration:
+                          completed ? TextDecoration.lineThrough : null,
+                      color: completed ? AppColors.neutral60 : AppColors.black,
+                      height: 1.35,
+                    ),
+                    decoration: _borderlessFieldDecoration,
+                    onChanged: widget.onTitleChanged,
+                    onSubmitted: (_) => _focusNode.unfocus(),
+                  ),
+                ),
+                AnimatedOpacity(
+                  duration: const Duration(milliseconds: 120),
+                  opacity: _showActions ? 1 : 0.35,
+                  child: IconButton(
+                    tooltip: 'Eliminar elemento',
+                    onPressed: widget.onDelete,
+                    icon: const Icon(Icons.close, size: 16),
+                    color: AppColors.neutral40,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 28,
+                      minHeight: 28,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              textCapitalization: TextCapitalization.sentences,
-              style: textTheme.bodyMedium?.copyWith(
-                decoration:
-                    completed ? TextDecoration.lineThrough : null,
-                color: completed ? AppColors.neutral60 : AppColors.black,
-              ),
-              decoration: const InputDecoration(
-                hintText: 'Nuevo elemento',
-                isDense: true,
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 4),
-              ),
-              onChanged: widget.onTitleChanged,
-              onSubmitted: (_) => _focusNode.unfocus(),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Eliminar elemento',
-            onPressed: widget.onDelete,
-            icon: const Icon(Icons.close, size: 18),
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          ),
-        ],
+        ),
       ),
     );
   }
