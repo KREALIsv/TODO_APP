@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_surface.dart';
 import '../../../global/themes/app_colors.dart';
+import '../../settings/presentation/privacy_security_screen.dart';
 import '../../settings/presentation/widgets/settings_section.dart';
 import '../../sync/data/device_identity.dart';
 import '../../sync/data/sync_service.dart';
@@ -164,25 +165,23 @@ class _AccountScreenState extends State<AccountScreen> {
               ),
               const SizedBox(height: 20),
               SettingsSectionLabel(
-                label: 'Dispositivos',
+                label: 'Privacidad y seguridad',
                 textTheme: textTheme,
                 accent: accent,
               ),
               SettingsCard(
                 children: [
                   SettingsRow(
-                    icon: Icons.qr_code_scanner_rounded,
-                    title: 'Vincular dispositivo',
-                    subtitle: 'Confirma un código de otro equipo',
+                    icon: Icons.shield_outlined,
+                    title: 'Privacidad y seguridad',
+                    subtitle: privacySecuritySettingsSummary(
+                      authenticated: true,
+                    ),
+                    trailing: privacySecuritySettingsTrailing(
+                      authenticated: true,
+                    ),
                     accent: accent,
-                    onTap: () => AuthFlow.openApprovePairing(context),
-                  ),
-                  const SettingsDivider(),
-                  SettingsRow(
-                    icon: Icons.devices_other_outlined,
-                    title: 'Dispositivos vinculados',
-                    accent: accent,
-                    onTap: () => AuthFlow.openLinkedDevices(context),
+                    onTap: () => PrivacySecurityScreen.open(context),
                   ),
                 ],
               ),
