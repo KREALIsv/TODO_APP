@@ -36,7 +36,6 @@ class SyncService extends ChangeNotifier {
 
   late Box<dynamic> _box;
   Timer? _debounce;
-  bool _wasAuthenticated = false;
   SyncState _state = SyncState.unavailable;
   String? _errorMessage;
   bool _syncing = false;
@@ -56,7 +55,6 @@ class SyncService extends ChangeNotifier {
     _dayEntries.changes.addListener(_scheduleSync);
     DeviceIdentity.instance.addListener(_scheduleSync);
     Timer.periodic(const Duration(seconds: 30), (_) => syncNow());
-    _wasAuthenticated = _auth.isAuthenticated;
     _onAuthChanged();
   }
 
@@ -342,7 +340,6 @@ class SyncService extends ChangeNotifier {
         unawaited(_box.put(_accountEmailKey, email));
       }
     }
-    _wasAuthenticated = authenticated;
     _state = isAvailable ? SyncState.idle : SyncState.unavailable;
     notifyListeners();
     if (isAvailable) unawaited(syncNow());

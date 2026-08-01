@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_surface.dart';
 import '../../../global/themes/tokens.dart';
 import '../../notes/data/notes_repository.dart';
+import '../../notes/domain/note_item.dart';
 import '../data/sync_service.dart';
 import '../domain/sync_conflict.dart';
 import 'sync_conflict_resolve_sheet.dart';
