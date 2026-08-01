@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../sync/data/sync_service.dart';
-import '../../sync/presentation/account_switch_gate_sheet.dart';
+import '../../features/sync/data/sync_service.dart';
+import '../../features/sync/presentation/account_switch_gate_sheet.dart';
 
 /// Prompts the user when they sign in with a different account while local
 /// content from the previous account is still on this device.
