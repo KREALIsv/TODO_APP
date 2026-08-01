@@ -4,35 +4,46 @@ import '../../../../core/theme/app_surface.dart';
 import '../../data/day_entries_repository.dart';
 import '../../domain/date_only.dart';
 import '../../domain/day_entry.dart';
-import 'day_outcome_meta.dart';
+import '../../domain/task_when_save_hint.dart';
 
-/// Chronological day log for a single task (BuJo history inside the card sheet).
-class TaskDayHistorySection extends StatelessWidget {
+/// Chronological day log for a single task (BuJo history).
+class TaskDayHistorySection extends StatefulWidget {
   const TaskDayHistorySection({
     super.key,
     required this.noteId,
     this.dayEntriesRepository,
     this.onDayTap,
-    this.maxVisible = 6,
+    this.collapsedCount = 3,
+    this.expandable = true,
+    this.padding = const EdgeInsets.fromLTRB(8, 0, 8, 4),
   });
 
   final String noteId;
   final DayEntriesRepository? dayEntriesRepository;
   final ValueChanged<DateTime>? onDayTap;
-  final int maxVisible;
+  final int collapsedCount;
+  final bool expandable;
+  final EdgeInsets padding;
 
   DayEntriesRepository get _dayEntries =>
       dayEntriesRepository ?? DayEntriesRepository.instance;
+
+  @override
+  State<TaskDayHistorySection> createState() => _TaskDayHistorySectionState();
+}
+
+class _TaskDayHistorySectionState extends State<TaskDayHistorySection> {
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: _dayEntries.changes,
       builder: (context, _) {
-        final entries = _dayEntries.entriesForNote(noteId);
+        final entries = _dayEntries.entriesForNote(widget.noteId);
         if (entries.isEmpty) {
           return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: widget.padding,
             child: Text(
               'Sin días registrados aún. Aparecerán aquí cuando planifiques, '
               'migres o completes esta tarea en un día.',
@@ -43,11 +54,15 @@ class TaskDayHistorySection extends StatelessWidget {
           );
         }
 
-        final visible = entries.take(maxVisible).toList(growable: false);
+        final canCollapse =
+            widget.expandable && entries.length > widget.collapsedCount;
+        final visible = !canCollapse || _expanded
+            ? entries
+            : entries.take(widget.collapsedCount).toList(growable: false);
         final hiddenCount = entries.length - visible.length;
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+          padding: widget.padding,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -63,18 +78,28 @@ class TaskDayHistorySection extends StatelessWidget {
               for (final entry in visible)
                 _TaskDayHistoryTile(
                   entry: entry,
-                  onTap: onDayTap == null
+                  onTap: widget.onDayTap == null
                       ? null
-                      : () => onDayTap!(dateOnly(entry.day)),
+                      : () => widget.onDayTap!(dateOnly(entry.day)),
                 ),
-              if (hiddenCount > 0)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-                  child: Text(
-                    '+ $hiddenCount día${hiddenCount == 1 ? '' : 's'} más',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppSurface.secondary(context),
-                        ),
+              if (canCollapse && !_expanded)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => setState(() => _expanded = true),
+                    child: Text(
+                      hiddenCount == 1
+                          ? 'Ver más (1 día)'
+                          : 'Ver más ($hiddenCount días)',
+                    ),
+                  ),
+                )
+              else if (canCollapse && _expanded)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => setState(() => _expanded = false),
+                    child: const Text('Ver menos'),
                   ),
                 ),
             ],
@@ -97,7 +122,10 @@ class _TaskDayHistoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final canNavigate = onTap != null;
+    final outcomeLabel = dayOutcomeShortLabel(entry);
+    final dimmed = entry.outcome == DayOutcome.open ||
+        entry.outcome == DayOutcome.cancelled ||
+        entry.outcome == DayOutcome.backlogged;
 
     return ListTile(
       dense: true,
@@ -106,10 +134,22 @@ class _TaskDayHistoryTile extends StatelessWidget {
       onTap: onTap,
       title: Text(
         formatDayMonthYear(entry.day),
-        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        style: textTheme.bodyMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          decoration: entry.outcome == DayOutcome.completed ||
+                  entry.outcome == DayOutcome.cancelled
+              ? TextDecoration.lineThrough
+              : null,
+          color: dimmed ? AppSurface.secondary(context) : null,
+        ),
       ),
-      subtitle: DayOutcomeMeta(entry: entry),
-      trailing: canNavigate
+      subtitle: Text(
+        outcomeLabel,
+        style: textTheme.bodySmall?.copyWith(
+          color: AppSurface.secondary(context),
+        ),
+      ),
+      trailing: onTap != null
           ? Icon(
               Icons.chevron_right,
               size: 18,
