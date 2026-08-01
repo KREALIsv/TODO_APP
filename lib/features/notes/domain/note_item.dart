@@ -1,3 +1,5 @@
+import 'checklist_item.dart';
+
 enum NoteType { note, task }
 
 /// Sentinel so [NoteItem.copyWith] can explicitly set nullable fields to null.
@@ -22,6 +24,8 @@ class NoteItem {
     this.reminderMinutesBefore,
     this.coverAttachmentId,
     this.syncConflictOfNoteId,
+    this.checklistTitle,
+    this.checklistItems = const [],
   });
 
   final String id;
@@ -50,7 +54,18 @@ class NoteItem {
   /// resolution and points at the canonical note id.
   final String? syncConflictOfNoteId;
 
+  /// Optional checklist section title. `null` = no checklist section.
+  final String? checklistTitle;
+
+  /// Subtasks inside [checklistTitle] section.
+  final List<ChecklistItem> checklistItems;
+
   bool get isSyncConflictCopy => syncConflictOfNoteId != null;
+
+  bool get hasChecklist => checklistTitle != null;
+
+  int get checklistCompletedCount =>
+      checklistItems.where((item) => item.completed).length;
 
   String get preview {
     final source = title.trim().isNotEmpty ? title : body;
@@ -89,6 +104,9 @@ class NoteItem {
       'coverAttachmentId': coverAttachmentId,
       if (syncConflictOfNoteId != null)
         'syncConflictOfNoteId': syncConflictOfNoteId,
+      if (checklistTitle != null) 'checklistTitle': checklistTitle,
+      if (checklistItems.isNotEmpty)
+        'checklistItems': checklistItemsToMap(checklistItems),
     };
   }
 
@@ -134,6 +152,8 @@ class NoteItem {
       reminderMinutesBefore: reminder,
       coverAttachmentId: map['coverAttachmentId'] as String?,
       syncConflictOfNoteId: map['syncConflictOfNoteId'] as String?,
+      checklistTitle: map['checklistTitle'] as String?,
+      checklistItems: checklistItemsFromMap(map['checklistItems']),
     );
   }
 
@@ -155,6 +175,8 @@ class NoteItem {
     Object? reminderMinutesBefore = _unset,
     Object? coverAttachmentId = _unset,
     Object? syncConflictOfNoteId = _unset,
+    Object? checklistTitle = _unset,
+    List<ChecklistItem>? checklistItems,
   }) {
     return NoteItem(
       id: id ?? this.id,
@@ -184,6 +206,10 @@ class NoteItem {
       syncConflictOfNoteId: identical(syncConflictOfNoteId, _unset)
           ? this.syncConflictOfNoteId
           : syncConflictOfNoteId as String?,
+      checklistTitle: identical(checklistTitle, _unset)
+          ? this.checklistTitle
+          : checklistTitle as String?,
+      checklistItems: checklistItems ?? this.checklistItems,
     );
   }
 }
