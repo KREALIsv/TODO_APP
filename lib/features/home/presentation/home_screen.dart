@@ -21,6 +21,7 @@ import '../../notes/presentation/widgets/note_compose_sheet.dart';
 import '../../notes/presentation/widgets/quick_capture_field.dart';
 import '../../notes/presentation/widgets/swipeable_note_card.dart';
 import '../../notes/presentation/widgets/task_section_header.dart';
+import '../../profile/presentation/profile_navigation.dart';
 import '../../profile/presentation/profile_screen.dart';
 import '../../sync/domain/sync_conflict.dart';
 import '../../sync/presentation/sync_conflict_list_card.dart';
@@ -39,6 +40,7 @@ class HomeScreen extends StatefulWidget {
     this.embeddedInShell = false,
     this.onOpenSettings,
     this.onRegisterDayReset,
+    this.onRegisterDayNavigation,
     this.onOpenNoteEditor,
     this.selectedNoteId,
   });
@@ -50,6 +52,7 @@ class HomeScreen extends StatefulWidget {
   final bool embeddedInShell;
   final VoidCallback? onOpenSettings;
   final ValueChanged<VoidCallback>? onRegisterDayReset;
+  final ValueChanged<void Function(DateTime)>? onRegisterDayNavigation;
   final ValueChanged<NoteEditorRequest>? onOpenNoteEditor;
   final String? selectedNoteId;
 
@@ -114,6 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     _clock.start();
     widget.onRegisterDayReset?.call(_resetSelectedDayToToday);
+    widget.onRegisterDayNavigation?.call(_onSelectedDayChanged);
   }
 
   @override
@@ -151,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openProfile(BuildContext context) async {
-    final filter = await Navigator.of(context).push<NotesFilter>(
+    final result = await Navigator.of(context).push<ProfileNavigationResult>(
       MaterialPageRoute(
         builder: (_) => ProfileScreen(
           repository: _repo,
@@ -159,8 +163,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-    if (filter != null && mounted) {
-      _setActiveFilter(filter);
+    if (!mounted || result == null) return;
+    if (result.day != null) {
+      _onSelectedDayChanged(result.day!);
+    }
+    if (result.filter != null) {
+      _setActiveFilter(result.filter!);
     }
   }
 
@@ -306,6 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
             repository: _repo,
             selected: widget.selectedNoteId == item.id,
             onTap: () => onTap(item),
+            onNavigateToDay: _onSelectedDayChanged,
           );
         },
       ),
@@ -622,6 +631,7 @@ class _HomeScreenState extends State<HomeScreen> {
       DayReplaySliver(
         rows: rows,
         onOpen: (item) => _openEditor(context, item: item),
+        onNavigateToDay: _onSelectedDayChanged,
       ),
     ];
   }

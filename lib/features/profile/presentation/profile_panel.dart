@@ -11,6 +11,9 @@ import '../../settings/data/settings_repository.dart';
 import '../../settings/presentation/widgets/list_background_layer.dart';
 import '../../shell/presentation/desktop_column_header.dart';
 import 'profile_account_section.dart';
+import 'profile_navigation.dart';
+
+export 'profile_navigation.dart';
 
 enum ProfilePanelDensity {
   /// Full-width fluid layout (mobile profile screen).
@@ -29,6 +32,7 @@ class ProfilePanel extends StatelessWidget {
     this.density = ProfilePanelDensity.fullScreen,
     this.onFilterSelected,
     this.onOpenSettings,
+    this.onNavigateToDay,
   });
 
   final NotesRepository? repository;
@@ -36,6 +40,7 @@ class ProfilePanel extends StatelessWidget {
   final ProfilePanelDensity density;
   final ValueChanged<NotesFilter>? onFilterSelected;
   final VoidCallback? onOpenSettings;
+  final ValueChanged<DateTime>? onNavigateToDay;
 
   NotesRepository get _repo => repository ?? NotesRepository.instance;
   SettingsRepository get _settings => settings ?? SettingsRepository.instance;
@@ -87,6 +92,7 @@ class ProfilePanel extends StatelessWidget {
                     isEmpty: isEmpty,
                     showDayNumbers: _settings.showHeatmapDayNumbers,
                     density: density,
+                    onNavigateToDay: onNavigateToDay,
                   ),
                   const SizedBox(height: 16),
                   ProfileSecondaryStats(
@@ -149,6 +155,7 @@ class ProfileActivityHero extends StatelessWidget {
     required this.isEmpty,
     required this.showDayNumbers,
     required this.density,
+    this.onNavigateToDay,
   });
 
   final TextTheme textTheme;
@@ -156,6 +163,7 @@ class ProfileActivityHero extends StatelessWidget {
   final bool isEmpty;
   final bool showDayNumbers;
   final ProfilePanelDensity density;
+  final ValueChanged<DateTime>? onNavigateToDay;
 
   static const _dayLabelWidth = 14.0;
 
@@ -258,6 +266,10 @@ class ProfileActivityHero extends StatelessWidget {
               semanticsLabel:
                   'Actividad de las últimas $weeks semanas, $totalEvents registros',
               onCellTap: (day, count) {
+                if (onNavigateToDay != null) {
+                  onNavigateToDay!(day);
+                  return;
+                }
                 final messenger = ScaffoldMessenger.of(context);
                 messenger.hideCurrentSnackBar();
                 messenger.showSnackBar(
@@ -400,7 +412,7 @@ class ProfileContentRows extends StatelessWidget {
       onFilterSelected!(filter);
       return;
     }
-    Navigator.of(context).pop(filter);
+    Navigator.of(context).pop(ProfileNavigationResult(filter: filter));
   }
 
   @override
