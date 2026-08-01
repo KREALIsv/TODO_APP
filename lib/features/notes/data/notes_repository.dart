@@ -9,6 +9,7 @@ import '../domain/day_log.dart';
 import '../domain/day_migration.dart';
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
+import '../../sync/domain/sync_conflict.dart';
 import 'attachments_repository.dart';
 import 'day_entries_repository.dart';
 import 'task_reminders_service.dart';
@@ -95,6 +96,22 @@ class NotesRepository {
     final raw = _box.get(id);
     if (raw == null) return null;
     return NoteItem.fromMap(Map<dynamic, dynamic>.from(raw));
+  }
+
+  /// Notes created automatically when sync could not merge two versions.
+  List<NoteItem> getSyncConflictCopies() {
+    return _readAllRaw()
+        .where((item) => item.title.startsWith(syncConflictTitlePrefix))
+        .toList(growable: false);
+  }
+
+  /// Deletes all sync conflict copies. Returns how many were removed.
+  Future<int> deleteSyncConflictCopies() async {
+    final conflicts = getSyncConflictCopies();
+    for (final item in conflicts) {
+      await delete(item.id);
+    }
+    return conflicts.length;
   }
 
   Future<void> _syncReminder(NoteItem item) async {

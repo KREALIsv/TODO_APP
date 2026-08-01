@@ -110,6 +110,46 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _syncNow(BuildContext context) => AuthFlow.syncNow(context);
 
+  Future<void> _purgeSyncConflicts(BuildContext context) async {
+    final conflicts = _repo.getSyncConflictCopies();
+    if (conflicts.isEmpty) {
+      if (!context.mounted) return;
+      await AppAlerts.show(
+        context,
+        message: 'No hay copias de conflicto de sincronización.',
+        type: AppAlertType.success,
+      );
+      return;
+    }
+
+    final confirmed = await AppAlerts.confirm(
+      context,
+      title: 'Eliminar copias de conflicto',
+      message:
+          'Se borrarán ${conflicts.length} tarjeta${conflicts.length == 1 ? '' : 's'} '
+          'creadas por conflictos de sincronización.\n\n'
+          'Las tareas originales no se tocan. Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar copias',
+      isDestructive: true,
+    );
+    if (!confirmed || !context.mounted) return;
+
+    final removed = await _repo.deleteSyncConflictCopies();
+    if (!context.mounted) return;
+    if (AuthService.instance.isAuthenticated &&
+        DeviceIdentity.instance.syncEnabled) {
+      await SyncService.instance.syncNow();
+    }
+    if (!context.mounted) return;
+    await AppAlerts.show(
+      context,
+      message: removed == 1
+          ? 'Se eliminó 1 copia de conflicto.'
+          : 'Se eliminaron $removed copias de conflicto.',
+      type: AppAlertType.success,
+    );
+  }
+
   Future<void> _toggleDeviceSync(BuildContext context) async {
     final next = !DeviceIdentity.instance.syncEnabled;
     await DeviceIdentity.instance.setSyncEnabled(next);
@@ -427,6 +467,17 @@ class SettingsScreen extends StatelessWidget {
             accent: accent,
             onTap: () => _import(context),
           ),
+          if (_repo.getSyncConflictCopies().isNotEmpty) ...[
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.copy_all_outlined,
+              title: 'Eliminar copias de conflicto',
+              trailing: '${_repo.getSyncConflictCopies().length}',
+              iconColor: AppColors.error,
+              titleColor: AppColors.error,
+              onTap: () => _purgeSyncConflicts(context),
+            ),
+          ],
           const SettingsDivider(),
           SettingsRow(
             icon: Icons.delete_forever_outlined,

@@ -385,4 +385,26 @@ void main() {
     expect(repo.getAll(), isEmpty);
     expect(repo.getArchived(), isEmpty);
   });
+
+  test('deleteSyncConflictCopies removes only conflict copies', () async {
+    await repo.add(buildItem(id: 'real', title: 'Tarea real'));
+    await repo.add(
+      buildItem(
+        id: 'conflict',
+        title: 'Conflicto de sincronización · Tarea real',
+      ),
+    );
+    await repo.add(
+      buildItem(
+        id: 'conflict-2',
+        title: 'Conflicto de sincronización · Otra',
+      ),
+    );
+
+    expect(repo.getSyncConflictCopies().length, 2);
+    final removed = await repo.deleteSyncConflictCopies();
+    expect(removed, 2);
+    expect(repo.getSyncConflictCopies(), isEmpty);
+    expect(repo.getById('real')?.title, 'Tarea real');
+  });
 }

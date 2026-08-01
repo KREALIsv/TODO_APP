@@ -13,6 +13,7 @@ import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
 import '../../notes/domain/note_item.dart';
+import '../domain/sync_conflict.dart';
 import 'device_identity.dart';
 import 'device_registry.dart';
 import 'wodo_api_config.dart';
@@ -26,6 +27,7 @@ class SyncService extends ChangeNotifier {
   static const _boxName = 'sync_state';
   static const _snapshotKey = 'snapshot';
   static const _cursorKey = 'cursor';
+  static const _accountEmailKey = 'account_email';
 
   final AuthService _auth = AuthService.instance;
   final NotesRepository _notes = NotesRepository.instance;
@@ -149,6 +151,7 @@ class SyncService extends ChangeNotifier {
     String token,
     Map<String, Map<String, Map<String, dynamic>>> beforePull,
   ) async {
+    final updatedDuringPull = <String>{};
     String? cursor = _box.get(_cursorKey) as String?;
     do {
       final payload = await _request(
@@ -162,7 +165,11 @@ class SyncService extends ChangeNotifier {
       final data = payload['data'];
       if (data is! List) return;
       for (final item in data.whereType<Map>()) {
-        await _applyRemote(Map<String, dynamic>.from(item), beforePull);
+        await _applyRemote(
+          Map<String, dynamic>.from(item),
+          beforePull,
+          updatedDuringPull,
+        );
       }
       cursor = payload['nextCursor'] as String?;
       if (cursor != null) await _box.put(_cursorKey, cursor);
@@ -172,6 +179,7 @@ class SyncService extends ChangeNotifier {
   Future<void> _applyRemote(
     Map<String, dynamic> mutation,
     Map<String, Map<String, Map<String, dynamic>>> beforePull,
+    Set<String> updatedDuringPull,
   ) async {
     final entityType = mutation['entityType'] as String?;
     final entityId = mutation['entityId'] as String?;
@@ -201,6 +209,7 @@ class SyncService extends ChangeNotifier {
           entityId,
           payload,
           beforePull['note']?[entityId],
+          updatedDuringPull,
         );
         break;
       case 'tag':
@@ -223,21 +232,22 @@ class SyncService extends ChangeNotifier {
     String entityId,
     Map<String, dynamic> payload,
     Map<String, dynamic>? synced,
+    Set<String> updatedDuringPull,
   ) async {
     final remote = NoteItem.fromMap(payload);
     final local = _notes.getById(entityId);
-    if (local != null && synced != null && !_sameMap(local.toMap(), synced)) {
-      final remoteChangedAt = remote.updatedAt;
-      if (!remoteChangedAt.isAfter(local.updatedAt)) return;
-      final conflict = local.copyWith(
-        id: const Uuid().v4(),
-        title: 'Conflicto de sincronización · ${local.displayTitle}',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
+    if (shouldCreateSyncConflict(
+      local: local,
+      syncedSnapshot: synced,
+      remote: remote,
+      entityUpdatedDuringPull: updatedDuringPull.contains(entityId),
+    )) {
+      await _notes.saveFromSync(
+        buildSyncConflictCopy(local!, id: const Uuid().v4()),
       );
-      await _notes.saveFromSync(conflict);
     }
     await _notes.saveFromSync(remote);
+    updatedDuringPull.add(entityId);
   }
 
   Map<String, Map<String, Map<String, dynamic>>> _readSnapshot() {
@@ -316,13 +326,26 @@ class SyncService extends ChangeNotifier {
 
   void _onAuthChanged() {
     final authenticated = _auth.isAuthenticated;
-    if (authenticated && !_wasAuthenticated) {
-      unawaited(_box.delete(_cursorKey));
-      unawaited(_box.delete(_snapshotKey));
+    if (authenticated) {
+      final email = _auth.userEmail;
+      final previousEmail = _box.get(_accountEmailKey) as String?;
+      if (previousEmail != null &&
+          email != null &&
+          previousEmail != email) {
+        unawaited(_resetSyncProgress());
+      }
+      if (email != null) {
+        unawaited(_box.put(_accountEmailKey, email));
+      }
     }
     _wasAuthenticated = authenticated;
     _state = isAvailable ? SyncState.idle : SyncState.unavailable;
     notifyListeners();
     if (isAvailable) unawaited(syncNow());
+  }
+
+  Future<void> _resetSyncProgress() async {
+    await _box.delete(_cursorKey);
+    await _box.delete(_snapshotKey);
   }
 }
