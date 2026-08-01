@@ -214,6 +214,7 @@ void main() {
     );
 
     final tomorrow = dateOnly(DateTime.now()).add(const Duration(days: 1));
+    final today = dateOnly(DateTime.now());
     await repo.applyTaskWhen(
       't',
       todayOn: false,
@@ -225,12 +226,17 @@ void main() {
     expect(after.dueAt, tomorrow);
     expect(
       dayEntries.findForNoteDay('t', tomorrow)?.via,
-      DayVia.due,
+      DayVia.scheduledIn,
     );
     expect(
       dayEntries.findForNoteDay('t', tomorrow)?.outcome,
       DayOutcome.open,
     );
+    expect(
+      dayEntries.findForNoteDay('t', today)?.outcome,
+      DayOutcome.scheduled,
+    );
+    expect(dayEntries.findForNoteDay('t', today)?.targetDay, tomorrow);
   });
 
   test('toggleCompleted marks DayEntry completed and reopen restores open',
