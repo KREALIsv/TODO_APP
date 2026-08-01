@@ -17,6 +17,7 @@ import '../../notes/domain/note_item.dart';
 import '../domain/account_switch_gate.dart';
 import '../domain/sync_conflict.dart';
 import '../domain/sync_snapshot.dart';
+import '../domain/sync_tags.dart';
 import 'device_identity.dart';
 import 'device_registry.dart';
 import 'wodo_api_config.dart';
@@ -104,7 +105,7 @@ class SyncService extends ChangeNotifier {
     final notes = buildSyncNoteSection(_notes.exportAllMaps());
     final tags = <String, Map<String, dynamic>>{
       for (final name in _tags.getAll())
-        _tagId(name): {
+        tagSyncEntityId(name): {
           'name': name,
           'colorId': _tags.getColorId(name),
           'opacity': _tags.getOpacity(name),
@@ -206,8 +207,12 @@ class SyncService extends ChangeNotifier {
           await _notes.delete(entityId);
           break;
         case 'tag':
-          final name = beforePull['tag']?[entityId]?['name'];
-          if (name is String) await _tags.remove(name);
+          final name = resolveTagNameForDelete(
+            entityId: entityId,
+            beforePullTags: beforePull['tag'],
+            catalogNames: _tags.getAll(),
+          );
+          if (name != null) await _tags.remove(name);
           break;
         case 'dayEntry':
           await _dayEntries.deleteFromSync(entityId);
@@ -308,8 +313,6 @@ class SyncService extends ChangeNotifier {
     if (first == null || second == null) return first == second;
     return jsonEncode(first) == jsonEncode(second);
   }
-
-  String _tagId(String name) => 'tag_${name.trim().toLowerCase()}';
 
   Future<Map<String, dynamic>> _request(
     String path, {
