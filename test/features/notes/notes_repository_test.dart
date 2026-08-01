@@ -58,12 +58,13 @@ void main() {
     bool completed = false,
     DateTime? updatedAt,
     List<String> tags = const [],
+    String title = '',
   }) {
     final now = DateTime(2026, 7, 16, 12);
     return NoteItem(
       id: id,
       type: type,
-      title: 'Title $id',
+      title: title.isEmpty ? 'Title $id' : title,
       body: 'Body $id',
       pinned: pinned,
       completed: completed,
@@ -397,8 +398,8 @@ void main() {
     await repo.add(
       buildItem(
         id: 'conflict-2',
-        title: 'Conflicto de sincronización · Otra',
-      ),
+        title: 'Copia enlazada',
+      ).copyWith(syncConflictOfNoteId: 'real'),
     );
 
     expect(repo.getSyncConflictCopies().length, 2);
@@ -406,5 +407,60 @@ void main() {
     expect(removed, 2);
     expect(repo.getSyncConflictCopies(), isEmpty);
     expect(repo.getById('real')?.title, 'Tarea real');
+  });
+
+  test('conflict copies are hidden from getAll', () async {
+    await repo.add(buildItem(id: 'real', title: 'Visible'));
+    await repo.add(
+      buildItem(id: 'copy', title: 'Copia')
+          .copyWith(syncConflictOfNoteId: 'real'),
+    );
+
+    expect(repo.getAll().map((e) => e.id), ['real']);
+  });
+
+  test('resolveSyncConflictKeepRemote deletes only the copy', () async {
+    await repo.add(buildItem(id: 'real', title: 'Nube'));
+    await repo.add(
+      buildItem(id: 'copy', title: 'Local')
+          .copyWith(syncConflictOfNoteId: 'real'),
+    );
+
+    await repo.resolveSyncConflictKeepRemote('copy');
+
+    expect(repo.getById('copy'), isNull);
+    expect(repo.getById('real')?.title, 'Nube');
+  });
+
+  test('resolveSyncConflictKeepLocal overwrites canonical note', () async {
+    await repo.add(buildItem(id: 'real', title: 'Nube'));
+    await repo.add(
+      buildItem(id: 'copy', title: 'Local', type: NoteType.task)
+          .copyWith(syncConflictOfNoteId: 'real', body: 'mi texto'),
+    );
+
+    await repo.resolveSyncConflictKeepLocal('copy');
+
+    expect(repo.getById('copy'), isNull);
+    expect(repo.getById('real')?.title, 'Local');
+    expect(repo.getById('real')?.body, 'mi texto');
+  });
+
+  test('resolveSyncConflictKeepBoth promotes copy to standalone note', () async {
+    await repo.add(buildItem(id: 'real', title: 'Nube'));
+    await repo.add(
+      buildItem(
+        id: 'copy',
+        title: 'Conflicto de sincronización · Local',
+      ).copyWith(syncConflictOfNoteId: 'real'),
+    );
+
+    await repo.resolveSyncConflictKeepBoth('copy');
+
+    final copy = repo.getById('copy');
+    expect(copy, isNotNull);
+    expect(copy!.title, 'Local');
+    expect(copy.syncConflictOfNoteId, isNull);
+    expect(repo.getById('real')?.title, 'Nube');
   });
 }

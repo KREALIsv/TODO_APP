@@ -243,7 +243,11 @@ class SyncService extends ChangeNotifier {
       entityUpdatedDuringPull: updatedDuringPull.contains(entityId),
     )) {
       await _notes.saveFromSync(
-        buildSyncConflictCopy(local!, id: const Uuid().v4()),
+        buildSyncConflictCopy(
+          local!,
+          id: const Uuid().v4(),
+          originalNoteId: entityId,
+        ),
       );
     }
     await _notes.saveFromSync(remote);

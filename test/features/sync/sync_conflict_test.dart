@@ -6,6 +6,7 @@ NoteItem _task({
   required String id,
   required String title,
   required DateTime updatedAt,
+  String? syncConflictOfNoteId,
 }) {
   return NoteItem(
     id: id,
@@ -16,6 +17,7 @@ NoteItem _task({
     completed: false,
     createdAt: updatedAt,
     updatedAt: updatedAt,
+    syncConflictOfNoteId: syncConflictOfNoteId,
   );
 }
 
@@ -70,32 +72,68 @@ void main() {
     );
   });
 
-  test('shouldCreateSyncConflict is false when remote is older than local', () {
-    final synced = _task(id: 'a', title: 'V1', updatedAt: base);
-    final local = _task(id: 'a', title: 'Edit local', updatedAt: base.add(const Duration(hours: 2)));
-    final remote = _task(id: 'a', title: 'Remoto viejo', updatedAt: base.add(const Duration(hours: 1)));
-
+  test('isSyncConflictCopy detects metadata and legacy title prefix', () {
     expect(
-      shouldCreateSyncConflict(
-        local: local,
-        syncedSnapshot: synced.toMap(),
-        remote: remote,
-        entityUpdatedDuringPull: false,
-      ),
+      isSyncConflictCopy(_task(id: 'a', title: 'Normal', updatedAt: base)),
       isFalse,
+    );
+    expect(
+      isSyncConflictCopy(
+        _task(
+          id: 'b',
+          title: 'Copia',
+          updatedAt: base,
+          syncConflictOfNoteId: 'canonical',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      isSyncConflictCopy(
+        _task(
+          id: 'c',
+          title: 'Conflicto de sincronización · Vieja',
+          updatedAt: base,
+        ),
+      ),
+      isTrue,
     );
   });
 
-  test('buildSyncConflictCopy prefixes title and assigns new id', () {
+  test('buildSyncConflictCopy links to canonical note without title prefix', () {
     final local = _task(id: 'a', title: 'Mi tarea', updatedAt: base);
     final copy = buildSyncConflictCopy(
       local,
       id: 'copy-id',
+      originalNoteId: 'a',
       now: base.add(const Duration(days: 1)),
     );
 
     expect(copy.id, 'copy-id');
-    expect(copy.title, 'Conflicto de sincronización · Mi tarea');
+    expect(copy.title, 'Mi tarea');
+    expect(copy.syncConflictOfNoteId, 'a');
     expect(copy.updatedAt, base.add(const Duration(days: 1)));
+  });
+
+  test('mergeConflictLocalOntoCanonical applies local fields', () {
+    final canonical = _task(id: 'a', title: 'Nube', updatedAt: base);
+    final local = _task(
+      id: 'copy',
+      title: 'Conflicto de sincronización · Local',
+      updatedAt: base.add(const Duration(hours: 1)),
+      syncConflictOfNoteId: 'a',
+    ).copyWith(body: 'detalle local', completed: true);
+
+    final merged = mergeConflictLocalOntoCanonical(
+      canonical: canonical,
+      localSnapshot: local,
+      now: base.add(const Duration(days: 1)),
+    );
+
+    expect(merged.id, 'a');
+    expect(merged.title, 'Local');
+    expect(merged.body, 'detalle local');
+    expect(merged.completed, isTrue);
+    expect(merged.syncConflictOfNoteId, isNull);
   });
 }

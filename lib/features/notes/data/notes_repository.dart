@@ -76,14 +76,18 @@ class NotesRepository {
 
   /// Active (non-archived) items, sorted by [updatedAt] desc.
   List<NoteItem> getAll() {
-    final items = _readAllRaw().where((item) => !item.isArchived).toList();
+    final items = _readAllRaw()
+        .where((item) => !item.isArchived && !isSyncConflictCopy(item))
+        .toList();
     items.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return items;
   }
 
   /// Archived items sorted by [archivedAt] desc.
   List<NoteItem> getArchived() {
-    final items = _readAllRaw().where((item) => item.isArchived).toList();
+    final items = _readAllRaw()
+        .where((item) => item.isArchived && !isSyncConflictCopy(item))
+        .toList();
     items.sort((a, b) {
       final aAt = a.archivedAt ?? a.updatedAt;
       final bAt = b.archivedAt ?? b.updatedAt;
@@ -101,8 +105,71 @@ class NotesRepository {
   /// Notes created automatically when sync could not merge two versions.
   List<NoteItem> getSyncConflictCopies() {
     return _readAllRaw()
-        .where((item) => item.title.startsWith(syncConflictTitlePrefix))
+        .where(isSyncConflictCopy)
+        .toList(growable: false)
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
+  int get pendingSyncConflictCount => getSyncConflictCopies().length;
+
+  List<SyncConflictPair> getPendingSyncConflicts() {
+    return getSyncConflictCopies()
+        .map(
+          (copy) => SyncConflictPair(
+            copy: copy,
+            canonical: copy.syncConflictOfNoteId == null
+                ? null
+                : getById(copy.syncConflictOfNoteId!),
+          ),
+        )
         .toList(growable: false);
+  }
+
+  /// Keeps the canonical (cloud) version and removes the local snapshot copy.
+  Future<void> resolveSyncConflictKeepRemote(String conflictCopyId) async {
+    final copy = getById(conflictCopyId);
+    if (copy == null || !isSyncConflictCopy(copy)) return;
+    await delete(conflictCopyId);
+  }
+
+  /// Replaces the canonical note with the local snapshot and removes the copy.
+  Future<void> resolveSyncConflictKeepLocal(String conflictCopyId) async {
+    final copy = getById(conflictCopyId);
+    if (copy == null || !isSyncConflictCopy(copy)) return;
+
+    final canonicalId = copy.syncConflictOfNoteId;
+    if (canonicalId == null) {
+      await _promoteConflictCopyToStandalone(copy);
+      return;
+    }
+
+    final canonical = getById(canonicalId);
+    if (canonical == null) {
+      await _promoteConflictCopyToStandalone(copy);
+      return;
+    }
+
+    await update(
+      mergeConflictLocalOntoCanonical(
+        canonical: canonical,
+        localSnapshot: copy,
+        now: DateTime.now(),
+      ),
+    );
+    await delete(conflictCopyId);
+  }
+
+  /// Turns the conflict copy into a regular standalone note.
+  Future<void> resolveSyncConflictKeepBoth(String conflictCopyId) async {
+    final copy = getById(conflictCopyId);
+    if (copy == null || !isSyncConflictCopy(copy)) return;
+    await _promoteConflictCopyToStandalone(copy);
+  }
+
+  Future<void> _promoteConflictCopyToStandalone(NoteItem copy) async {
+    await update(
+      clearSyncConflictMetadata(copy).copyWith(updatedAt: DateTime.now()),
+    );
   }
 
   /// Deletes all sync conflict copies. Returns how many were removed.
