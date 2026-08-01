@@ -104,6 +104,8 @@ NoteItem mergeConflictLocalOntoCanonical({
     archivedAt: cleaned.archivedAt,
     reminderMinutesBefore: cleaned.reminderMinutesBefore,
     coverAttachmentId: cleaned.coverAttachmentId,
+    checklistTitle: cleaned.checklistTitle,
+    checklistItems: cleaned.checklistItems,
     updatedAt: now,
     syncConflictOfNoteId: null,
   );
