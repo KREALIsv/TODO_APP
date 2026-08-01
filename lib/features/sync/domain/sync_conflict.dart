@@ -27,6 +27,14 @@ bool isSyncConflictCopy(NoteItem item) {
       item.title.startsWith(syncConflictTitlePrefix);
 }
 
+/// Detects conflict copies in serialized note maps (sync payloads / snapshots).
+bool isSyncConflictNoteMap(Map<String, dynamic> map) {
+  final link = map['syncConflictOfNoteId'];
+  if (link is String && link.isNotEmpty) return true;
+  final title = map['title'];
+  return title is String && title.startsWith(syncConflictTitlePrefix);
+}
+
 String conflictCopyLabel(NoteItem copy) {
   if (copy.title.startsWith(syncConflictTitlePrefix)) {
     return copy.title.substring(syncConflictTitlePrefix.length).trim();

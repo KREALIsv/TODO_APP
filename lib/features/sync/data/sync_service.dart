@@ -14,6 +14,7 @@ import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
 import '../../notes/domain/note_item.dart';
 import '../domain/sync_conflict.dart';
+import '../domain/sync_snapshot.dart';
 import 'device_identity.dart';
 import 'device_registry.dart';
 import 'wodo_api_config.dart';
@@ -86,9 +87,7 @@ class SyncService extends ChangeNotifier {
   }
 
   Map<String, Map<String, Map<String, dynamic>>> _snapshot() {
-    final notes = <String, Map<String, dynamic>>{
-      for (final item in _notes.exportAllMaps()) item['id'] as String: item,
-    };
+    final notes = buildSyncNoteSection(_notes.exportAllMaps());
     final tags = <String, Map<String, dynamic>>{
       for (final name in _tags.getAll())
         _tagId(name): {
@@ -107,35 +106,38 @@ class SyncService extends ChangeNotifier {
     String token,
     Map<String, Map<String, Map<String, dynamic>>> current,
   ) async {
-    final previous = _readSnapshot();
-    final mutations = <Map<String, dynamic>>[];
-    for (final entityType in current.keys) {
-      final before =
-          previous[entityType] ?? const <String, Map<String, dynamic>>{};
-      final after =
-          current[entityType] ?? const <String, Map<String, dynamic>>{};
-      for (final entry in after.entries) {
-        if (_sameMap(before[entry.key], entry.value)) continue;
-        mutations.add(
+    final rawPrevious = _readSnapshotRaw();
+    final previous = sanitizeSyncSnapshot(rawPrevious);
+    var mutations = buildSyncPushMutations(
+      previous: previous,
+      current: current,
+      mutationBuilder: ({
+        required entityType,
+        required entityId,
+        required operation,
+        payload,
+      }) =>
           _mutation(
-            entityType: entityType,
-            entityId: entry.key,
-            operation: before.containsKey(entry.key) ? 'UPDATE' : 'CREATE',
-            payload: entry.value,
-          ),
-        );
-      }
-      for (final entityId in before.keys) {
-        if (after.containsKey(entityId)) continue;
-        mutations.add(
+        entityType: entityType,
+        entityId: entityId,
+        operation: operation,
+        payload: payload,
+      ),
+    );
+    mutations = withConflictCopyCleanupDeletes(
+      rawPrevious: rawPrevious,
+      mutations: mutations,
+      deleteBuilder: ({
+        required entityType,
+        required entityId,
+        required operation,
+      }) =>
           _mutation(
-            entityType: entityType,
-            entityId: entityId,
-            operation: 'DELETE',
-          ),
-        );
-      }
-    }
+        entityType: entityType,
+        entityId: entityId,
+        operation: operation,
+      ),
+    );
     for (var index = 0; index < mutations.length; index += 100) {
       final end = index + 100 > mutations.length
           ? mutations.length
@@ -232,6 +234,8 @@ class SyncService extends ChangeNotifier {
     Map<String, dynamic>? synced,
     Set<String> updatedDuringPull,
   ) async {
+    if (shouldIgnoreRemoteNoteMutation(payload)) return;
+
     final remote = NoteItem.fromMap(payload);
     final local = _notes.getById(entityId);
     if (shouldCreateSyncConflict(
@@ -253,6 +257,10 @@ class SyncService extends ChangeNotifier {
   }
 
   Map<String, Map<String, Map<String, dynamic>>> _readSnapshot() {
+    return sanitizeSyncSnapshot(_readSnapshotRaw());
+  }
+
+  Map<String, Map<String, Map<String, dynamic>>> _readSnapshotRaw() {
     final raw = _box.get(_snapshotKey);
     if (raw is! Map) return {};
     return {
