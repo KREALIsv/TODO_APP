@@ -24,9 +24,25 @@ import 'package:todos_app/features/pairing/presentation/qr_login_screen.dart';
 import 'package:todos_app/features/settings/data/settings_repository.dart';
 import 'package:todos_app/features/settings/presentation/settings_screen.dart';
 
-const _out = '../../../opt/cursor/artifacts/screenshots/pr-ui-gallery';
 const _desktop = Size(1280, 900);
 const _mobile = Size(480, 900);
+
+/// Golden output: [WODO_GOLDEN_DIR], cloud artifacts, or `test/screenshots/goldens`.
+String _resolveGoldenDir() {
+  final fromEnv = Platform.environment['WODO_GOLDEN_DIR']?.trim();
+  if (fromEnv != null && fromEnv.isNotEmpty) {
+    return fromEnv;
+  }
+
+  const cloud = '/opt/cursor/artifacts/screenshots/pr-ui-gallery';
+  if (Directory(cloud).existsSync()) {
+    return cloud;
+  }
+
+  return 'goldens';
+}
+
+late final String _out;
 
 final _previewPairing = PairingStart(
   pairingId: 'demo-pairing',
@@ -44,7 +60,8 @@ void main() {
   late Directory hiveDir;
 
   setUpAll(() async {
-    Directory('/opt/cursor/artifacts/screenshots/pr-ui-gallery').createSync(recursive: true);
+    _out = _resolveGoldenDir();
+    Directory(_out).createSync(recursive: true);
     hiveDir = Directory.systemTemp.createTempSync('wodo_gallery_hive_');
     Hive.init(hiveDir.path);
     await NotesRepository.instance.initWithBox(

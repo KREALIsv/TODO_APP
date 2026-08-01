@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -9,12 +10,24 @@ Future<ByteData> _fileFont(String path) async {
   return ByteData.sublistView(bytes.buffer.asUint8List());
 }
 
-String? _materialFontsDir() {
-  final candidates = <String>[];
+String? _flutterSdkRoot() {
+  try {
+    final result = Process.runSync('flutter', ['--version', '--machine']);
+    if (result.exitCode == 0) {
+      final stdout = result.stdout.toString().trim();
+      if (stdout.isNotEmpty) {
+        final json = jsonDecode(stdout) as Map<String, dynamic>;
+        final root = json['flutterRoot']?.toString();
+        if (root != null && root.isNotEmpty) return root;
+      }
+    }
+  } catch (_) {
+    // Fall through to env / PATH resolution.
+  }
 
   final flutterRoot = Platform.environment['FLUTTER_ROOT'];
   if (flutterRoot != null && flutterRoot.isNotEmpty) {
-    candidates.add('$flutterRoot/bin/cache/artifacts/material_fonts');
+    return flutterRoot;
   }
 
   try {
@@ -22,20 +35,22 @@ String? _materialFontsDir() {
     if (which.exitCode == 0) {
       final flutterBin = which.stdout.toString().trim();
       if (flutterBin.isNotEmpty) {
-        final sdkRoot = File(flutterBin).parent.parent.path;
-        candidates.add('$sdkRoot/bin/cache/artifacts/material_fonts');
+        return File(flutterBin).parent.parent.path;
       }
     }
   } catch (_) {
-    // `which` may be unavailable on some platforms; fall through to defaults.
+    // Ignore; fonts are optional for tests.
   }
 
-  candidates.add('/opt/flutter/bin/cache/artifacts/material_fonts');
-
-  for (final path in candidates) {
-    if (Directory(path).existsSync()) return path;
-  }
   return null;
+}
+
+String? _materialFontsDir() {
+  final sdkRoot = _flutterSdkRoot();
+  if (sdkRoot == null) return null;
+
+  final fontRoot = '$sdkRoot/bin/cache/artifacts/material_fonts';
+  return Directory(fontRoot).existsSync() ? fontRoot : null;
 }
 
 Future<void> _loadTestFonts() async {

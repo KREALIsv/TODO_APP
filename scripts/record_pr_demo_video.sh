@@ -2,7 +2,12 @@
 # Graba un video real del flujo del PR: Chrome + wodo_demo + ffmpeg x11grab.
 set -euo pipefail
 export DISPLAY=:1
-OUT="${1:-/opt/cursor/artifacts/wodo-pr25-demo.mp4}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_artifacts_root.sh
+source "$SCRIPT_DIR/_artifacts_root.sh"
+
+OUT="${1:-$WODO_ARTIFACTS_ROOT/wodo-pr25-demo.mp4}"
 BASE="${WODO_WEB_URL:-http://127.0.0.1:8090}"
 PROFILE="/tmp/wodo-video-demo"
 CLASS="WodoVideoDemo"

@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -uo pipefail
 export DISPLAY=:1
-OUT=/opt/cursor/artifacts/screenshots/pr-ui-gallery-real
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_artifacts_root.sh
+source "$SCRIPT_DIR/_artifacts_root.sh"
+
+OUT="$WODO_ARTIFACTS_ROOT/screenshots/pr-ui-gallery-real"
 mkdir -p "$OUT"
 pkill -f wodo-cal-qr 2>/dev/null || true
 pkill -f google-chrome 2>/dev/null || true

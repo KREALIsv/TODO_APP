@@ -2,7 +2,11 @@
 # PR UI gallery — real Chrome (DISPLAY) + xdotool + scrot
 set -euo pipefail
 
-OUT="/opt/cursor/artifacts/screenshots/pr-ui-gallery"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_artifacts_root.sh
+source "$SCRIPT_DIR/_artifacts_root.sh"
+
+OUT="${WODO_GOLDEN_DIR:-$WODO_ARTIFACTS_ROOT/screenshots/pr-ui-gallery}"
 URL="${WODO_WEB_URL:-http://127.0.0.1:8090}"
 DISPLAY="${DISPLAY:-:1}"
 export DISPLAY

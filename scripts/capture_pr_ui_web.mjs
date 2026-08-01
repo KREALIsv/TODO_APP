@@ -1,11 +1,50 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 
-const OUT = '/opt/cursor/artifacts/screenshots/pr-ui-gallery';
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(scriptDir, '..');
+
+function resolveArtifactsRoot() {
+  if (process.env.WODO_ARTIFACTS_DIR?.trim()) {
+    return process.env.WODO_ARTIFACTS_DIR.trim();
+  }
+  const cloud = '/opt/cursor/artifacts';
+  if (fs.existsSync(cloud)) {
+    return cloud;
+  }
+  return path.join(repoRoot, 'artifacts');
+}
+
+function resolveChrome() {
+  if (process.env.CHROME_BIN?.trim()) {
+    return process.env.CHROME_BIN.trim();
+  }
+  for (const candidate of [
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/local/bin/google-chrome',
+  ]) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  try {
+    return execSync('which google-chrome', { encoding: 'utf8' }).trim();
+  } catch {
+    throw new Error(
+      'Chrome not found. Set CHROME_BIN or install google-chrome.',
+    );
+  }
+}
+
+const OUT =
+  process.env.WODO_GOLDEN_DIR?.trim() ??
+  path.join(resolveArtifactsRoot(), 'screenshots', 'pr-ui-gallery');
 const BASE = process.env.WODO_WEB_URL ?? 'http://127.0.0.1:8090';
-const CHROME = '/usr/local/bin/google-chrome';
+const CHROME = resolveChrome();
 const PROFILE = '/tmp/wodo-gallery-puppeteer';
 const DEBUG_PORT = 9222;
 

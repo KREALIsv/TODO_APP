@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 export DISPLAY=:1
-OUT="/opt/cursor/artifacts/screenshots/pr-ui-gallery-real"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_artifacts_root.sh
+source "$SCRIPT_DIR/_artifacts_root.sh"
+
+OUT="$WODO_ARTIFACTS_ROOT/screenshots/pr-ui-gallery-real"
 BASE="${WODO_WEB_URL:-http://127.0.0.1:8090}"
 PROFILE="/tmp/wodo-real-gallery"
 CLASS="WodoGalleryCapture"
