@@ -14,6 +14,7 @@ import '../../encryption/presentation/recovery_code_screen.dart';
 import '../../pairing/presentation/approve_pairing_screen.dart';
 import '../../pairing/presentation/linked_devices_screen.dart';
 import '../../pairing/presentation/qr_login_screen.dart';
+import '../../settings/presentation/privacy_security_screen.dart';
 import 'account_screen.dart';
 import 'auth_screen.dart';
 
@@ -152,6 +153,10 @@ abstract final class AuthFlow {
         builder: (_) => const LinkDeviceGate(),
       ),
     );
+  }
+
+  static Future<void> openPrivacySecurity(BuildContext context) {
+    return PrivacySecurityScreen.open(context);
   }
 
   static Future<void> enableCloudProtection(BuildContext context) async {

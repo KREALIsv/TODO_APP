@@ -474,8 +474,8 @@ class AuthPairingHint extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'En el otro dispositivo: Ajustes → Vincular dispositivo → '
-              'escanea el QR o introduce el código.',
+              'En el otro dispositivo: Ajustes → Privacidad y seguridad → '
+              'Vincular dispositivo → escanea el QR o introduce el código.',
               style: textTheme.bodySmall?.copyWith(
                 color: AppSurface.secondary(context),
                 height: 1.35,

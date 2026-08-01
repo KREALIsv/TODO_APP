@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import '../../../core/theme/app_surface.dart';
 import '../../../global/constants/config.dart';
@@ -8,7 +7,6 @@ import '../../../global/widgets/app_alerts.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/auth_flow.dart';
 import '../../encryption/data/vault_service.dart';
-import '../../encryption/domain/cloud_vault_state.dart';
 import '../../notes/data/attachments_repository.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
@@ -21,6 +19,7 @@ import 'about_screen.dart';
 import 'archived_screen.dart';
 import 'data_backup.dart';
 import 'fondo_picker_screen.dart';
+import 'privacy_security_screen.dart';
 import 'widgets/list_background_layer.dart';
 import 'widgets/settings_section.dart';
 
@@ -323,47 +322,6 @@ class SettingsScreen extends StatelessWidget {
             ),
             const SettingsDivider(),
             SettingsRow(
-              icon: Icons.qr_code_scanner_rounded,
-              title: 'Vincular dispositivo',
-              subtitle: 'Escanea el QR o introduce el código',
-              accent: accent,
-              onTap: () => AuthFlow.openApprovePairing(context),
-            ),
-            const SettingsDivider(),
-            SettingsRow(
-              icon: Icons.devices_other_outlined,
-              title: 'Dispositivos vinculados',
-              accent: accent,
-              onTap: () => AuthFlow.openLinkedDevices(context),
-            ),
-            const SettingsDivider(),
-            if (!VaultService.instance.accountEncryptionEnabled)
-              SettingsRow(
-                icon: Icons.lock_outline_rounded,
-                title: 'Proteger mis datos en la nube',
-                subtitle: 'Opcional · encriptación de extremo a extremo',
-                accent: accent,
-                onTap: () => AuthFlow.enableCloudProtection(context),
-              )
-            else if (VaultService.instance.state == CloudVaultState.authOnly ||
-                VaultService.instance.state == CloudVaultState.revoked)
-              SettingsRow(
-                icon: Icons.link_rounded,
-                title: 'Vincula este dispositivo',
-                subtitle: 'QR o código de recuperación',
-                accent: accent,
-                onTap: () => AuthFlow.openLinkDeviceGate(context),
-              )
-            else
-              SettingsRow(
-                icon: Icons.verified_user_outlined,
-                title: 'Datos protegidos en la nube',
-                trailing: 'Activo',
-                accent: accent,
-                showChevron: false,
-              ),
-            const SettingsDivider(),
-            SettingsRow(
               icon: Icons.cloud_sync_outlined,
               title: 'Sincronizar aquí',
               trailing: DeviceIdentity.instance.syncEnabled ? 'Activa' : 'Pausada',
@@ -388,6 +346,28 @@ class SettingsScreen extends StatelessWidget {
               accent: accent,
               onTap: () => _openAccount(context),
             ),
+        ],
+      ),
+      const SizedBox(height: 20),
+      SettingsSectionLabel(
+        label: 'Privacidad y seguridad',
+        textTheme: textTheme,
+        accent: accent,
+      ),
+      SettingsCard(
+        children: [
+          SettingsRow(
+            icon: Icons.shield_outlined,
+            title: 'Privacidad y seguridad',
+            subtitle: privacySecuritySettingsSummary(
+              authenticated: AuthService.instance.isAuthenticated,
+            ),
+            trailing: privacySecuritySettingsTrailing(
+              authenticated: AuthService.instance.isAuthenticated,
+            ),
+            accent: accent,
+            onTap: () => PrivacySecurityScreen.open(context),
+          ),
         ],
       ),
       const SizedBox(height: 20),
