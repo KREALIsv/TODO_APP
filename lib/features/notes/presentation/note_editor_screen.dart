@@ -198,7 +198,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             isTask && _dueAt != null ? _reminderMinutesBefore : null,
         coverAttachmentId: _coverAttachmentId,
       );
-      await _repo.update(toSave);
+      await _repo.saveTaskFromEditor(previous: existing, next: toSave);
     }
 
     _discardUnsavedAttachments = false;

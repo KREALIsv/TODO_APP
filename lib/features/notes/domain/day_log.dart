@@ -9,6 +9,17 @@ List<DayEntry> entriesForDay(List<DayEntry> all, DateTime day) {
   return all.where((e) => dateOnly(e.day) == key).toList(growable: false);
 }
 
+/// All day log rows for a task, newest calendar day first.
+List<DayEntry> entriesForNote(List<DayEntry> all, String noteId) {
+  final rows = all.where((e) => e.noteId == noteId).toList();
+  rows.sort((a, b) {
+    final dayCmp = b.day.compareTo(a.day);
+    if (dayCmp != 0) return dayCmp;
+    return b.createdAt.compareTo(a.createdAt);
+  });
+  return rows;
+}
+
 /// Resolved row for Diario UI: note + its entry for a day.
 class DayLogRow {
   const DayLogRow({required this.note, required this.entry});
