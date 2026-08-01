@@ -70,6 +70,9 @@ class DayEntriesRepository {
   List<DayEntry> entriesForDay(DateTime day) =>
       day_log.entriesForDay(getAll(), day);
 
+  List<DayEntry> entriesForNote(String noteId) =>
+      day_log.entriesForNote(getAll(), noteId);
+
   /// Open pending rows for [day].
   List<DayEntry> openPendingForDay(DateTime day) {
     return entriesForDay(

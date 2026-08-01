@@ -20,6 +20,8 @@ class SwipeableNoteCard extends StatelessWidget {
     this.repository,
     this.enableSwipe = true,
     this.selected = false,
+    this.actionDay,
+    this.onNavigateToDay,
   });
 
   final NoteItem item;
@@ -27,6 +29,8 @@ class SwipeableNoteCard extends StatelessWidget {
   final NotesRepository? repository;
   final bool enableSwipe;
   final bool selected;
+  final DateTime? actionDay;
+  final ValueChanged<DateTime>? onNavigateToDay;
 
   NotesRepository get _repo => repository ?? NotesRepository.instance;
 
@@ -122,6 +126,8 @@ class SwipeableNoteCard extends StatelessWidget {
       context,
       item: item,
       repository: _repo,
+      actionDay: actionDay,
+      onNavigateToDay: onNavigateToDay,
     );
     if (action == null || !context.mounted) return;
 

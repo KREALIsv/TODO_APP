@@ -170,6 +170,38 @@ void main() {
     expect(closed?.outcome, DayOutcome.backlogged);
   });
 
+  test('applyTaskWhen closes origin and opens destination when due date moves',
+      () async {
+    final origin = dateOnly(DateTime.now().subtract(const Duration(days: 3)));
+    final destination =
+        dateOnly(DateTime.now().subtract(const Duration(days: 1)));
+    await repo.add(
+      buildItem(
+        id: 'task',
+        type: NoteType.task,
+      ).copyWith(dueAt: origin),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: origin,
+      via: DayVia.due,
+    );
+
+    await repo.applyTaskWhen(
+      'task',
+      todayOn: false,
+      dueAt: destination,
+      dueHasTime: false,
+    );
+
+    final closed = dayEntries.findForNoteDay('task', origin)!;
+    expect(closed.outcome, DayOutcome.scheduled);
+    expect(closed.targetDay, destination);
+    final opened = dayEntries.findForNoteDay('task', destination)!;
+    expect(opened.outcome, DayOutcome.open);
+    expect(opened.via, DayVia.scheduledIn);
+  });
+
   test('applyTaskWhen matches exclusive Hoy / Mañana semantics', () async {
     await repo.add(buildItem(id: 't', type: NoteType.task));
 

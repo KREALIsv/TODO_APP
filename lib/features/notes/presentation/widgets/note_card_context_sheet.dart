@@ -5,6 +5,7 @@ import '../../data/notes_repository.dart';
 import '../../domain/date_only.dart';
 import '../../domain/note_item.dart';
 import '../../domain/task_dates.dart';
+import 'task_day_history_section.dart';
 import 'task_when_field.dart';
 
 /// Actions returned by [showNoteCardContextSheet] (when-chips apply in-place).
@@ -15,6 +16,7 @@ Future<NoteCardContextAction?> showNoteCardContextSheet(
   required NoteItem item,
   NotesRepository? repository,
   DateTime? actionDay,
+  ValueChanged<DateTime>? onNavigateToDay,
 }) {
   return showModalBottomSheet<NoteCardContextAction>(
     context: context,
@@ -25,6 +27,7 @@ Future<NoteCardContextAction?> showNoteCardContextSheet(
         item: item,
         repository: repository ?? NotesRepository.instance,
         actionDay: actionDay,
+        onNavigateToDay: onNavigateToDay,
       );
     },
   );
@@ -36,11 +39,13 @@ class NoteCardContextSheet extends StatefulWidget {
     required this.item,
     required this.repository,
     this.actionDay,
+    this.onNavigateToDay,
   });
 
   final NoteItem item;
   final NotesRepository repository;
   final DateTime? actionDay;
+  final ValueChanged<DateTime>? onNavigateToDay;
 
   @override
   State<NoteCardContextSheet> createState() => _NoteCardContextSheetState();
@@ -147,6 +152,16 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
             reminderMinutesBefore: _reminderMinutesBefore,
             onChanged: _onWhenChanged,
           ),
+        ),
+        const Divider(height: 1),
+        TaskDayHistorySection(
+          noteId: _item.id,
+          onDayTap: widget.onNavigateToDay == null
+              ? null
+              : (day) {
+                  Navigator.of(context).pop();
+                  widget.onNavigateToDay!(day);
+                },
         ),
         const Divider(height: 1),
         _actionTile(

@@ -339,6 +339,12 @@ class NotesRepository {
       ),
     );
     await _syncDayEntry(() async {
+      final previousDue =
+          current.dueAt != null ? dateOnly(current.dueAt!) : null;
+      final nextDue = dueAt != null ? dateOnly(dueAt) : null;
+      final previousTodayDay =
+          previousToday != null ? dateOnly(previousToday) : null;
+
       if (todayOn && nextTodayAt != null) {
         await _dayEntries.ensurePlanned(
           noteId: id,
@@ -346,17 +352,53 @@ class NotesRepository {
           via: DayVia.todaySwitch,
           now: now,
         );
-      } else if (!todayOn && previousToday != null) {
+        return;
+      }
+
+      if (!todayOn &&
+          previousDue != null &&
+          nextDue != null &&
+          previousDue != nextDue) {
+        await _dayEntries.applyMigrationPatches(
+          noteId: id,
+          patches: scheduleTo(current, previousDue, nextDue, now),
+          now: now,
+        );
+        return;
+      }
+
+      if (!todayOn &&
+          previousTodayDay != null &&
+          nextDue != null &&
+          previousTodayDay != nextDue) {
+        await _dayEntries.applyMigrationPatches(
+          noteId: id,
+          patches: scheduleTo(current, previousTodayDay, nextDue, now),
+          now: now,
+        );
+        return;
+      }
+
+      if (!todayOn && previousTodayDay != null) {
         await _dayEntries.markBackloggedIfOpen(
           noteId: id,
-          day: dateOnly(previousToday),
+          day: previousTodayDay,
           outcomeAt: now,
         );
       }
-      if (dueAt != null && !todayOn) {
+
+      if (!todayOn && previousDue != null && nextDue == null) {
+        await _dayEntries.markBackloggedIfOpen(
+          noteId: id,
+          day: previousDue,
+          outcomeAt: now,
+        );
+      }
+
+      if (!todayOn && nextDue != null) {
         await _dayEntries.ensurePlanned(
           noteId: id,
-          day: dateOnly(dueAt),
+          day: nextDue,
           via: DayVia.due,
           now: now,
         );

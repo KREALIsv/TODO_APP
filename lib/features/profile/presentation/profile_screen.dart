@@ -4,6 +4,7 @@ import '../../../core/theme/app_surface.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../settings/data/settings_repository.dart';
 import '../../settings/presentation/settings_screen.dart';
+import 'profile_navigation.dart';
 import 'profile_panel.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -49,6 +50,9 @@ class ProfileScreen extends StatelessWidget {
         settings: _settings,
         density: ProfilePanelDensity.fullScreen,
         onOpenSettings: () => _openSettings(context),
+        onNavigateToDay: (day) {
+          Navigator.of(context).pop(ProfileNavigationResult(day: day));
+        },
       ),
     );
   }
