@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../global/themes/app_colors.dart';
+import '../../../../global/widgets/outlined_add_chip.dart';
 import '../../domain/checklist_item.dart';
 
 typedef ChecklistChanged = void Function({
@@ -140,51 +141,59 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
     widget.onChanged(title: null, items: const []);
   }
 
+  Widget _buildAddChecklistPopover({required Widget child}) {
+    return OverlayPortal(
+      controller: _addMenuController,
+      overlayChildBuilder: (context) {
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            ModalBarrier(
+              color: Colors.transparent,
+              onDismiss: _closeAddMenu,
+            ),
+            CompositedTransformFollower(
+              link: _anchorLink,
+              showWhenUnlinked: false,
+              targetAnchor: Alignment.topLeft,
+              followerAnchor: Alignment.topLeft,
+              offset: const Offset(0, 6),
+              child: _AddChecklistPopover(
+                onCancel: _closeAddMenu,
+                onSubmit: _confirmAddChecklist,
+              ),
+            ),
+          ],
+        );
+      },
+      child: CompositedTransformTarget(
+        link: _anchorLink,
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
     if (!_hasChecklist) {
       if (!widget.showAddButton) return const SizedBox.shrink();
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: OverlayPortal(
-          controller: _addMenuController,
-          overlayChildBuilder: (context) {
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                ModalBarrier(
-                  color: Colors.transparent,
-                  onDismiss: _closeAddMenu,
-                ),
-                CompositedTransformFollower(
-                  link: _anchorLink,
-                  showWhenUnlinked: false,
-                  targetAnchor: Alignment.topLeft,
-                  followerAnchor: Alignment.topLeft,
-                  offset: const Offset(0, 6),
-                  child: _AddChecklistPopover(
-                    onCancel: _closeAddMenu,
-                    onSubmit: _confirmAddChecklist,
-                  ),
-                ),
-              ],
-            );
-          },
-          child: CompositedTransformTarget(
-            link: _anchorLink,
-            child: Tooltip(
-              message: 'Crear lista de comprobación',
-              child: _ActionChip(
-                icon: Icons.check_box_outlined,
-                label: 'Checklist',
-                selected: _addMenuController.isShowing,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Checklist', style: textTheme.labelLarge),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _buildAddChecklistPopover(
+              child: OutlinedAddChip(
+                label: 'Añadir checklist',
                 onPressed: _toggleAddMenu,
               ),
             ),
           ),
-        ),
+        ],
       );
     }
 
@@ -197,12 +206,6 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
       children: [
         Row(
           children: [
-            const Icon(
-              Icons.check_box_outlined,
-              size: 20,
-              color: AppColors.neutral60,
-            ),
-            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 widget.title!,
@@ -248,15 +251,12 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
               onTitleChanged: (title) => _updateItemTitle(item.id, title),
               onDelete: () => _removeItem(item.id),
             )),
-        TextButton.icon(
-          onPressed: _addItem,
-          icon: const Icon(Icons.add, size: 18),
-          label: const Text('Añadir elemento'),
-          style: TextButton.styleFrom(
-            foregroundColor: AppColors.neutral60,
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-            alignment: Alignment.centerLeft,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedAddChip(
+            label: 'Añadir elemento',
+            compact: widget.items.isNotEmpty,
+            onPressed: _addItem,
           ),
         ),
       ],
@@ -366,59 +366,6 @@ class _AddChecklistPopoverState extends State<_AddChecklistPopover> {
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionChip extends StatelessWidget {
-  const _ActionChip({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    this.selected = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Material(
-      color: selected ? AppColors.neutral80 : AppColors.neutral00,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-        side: BorderSide(
-          color: selected ? AppColors.neutral80 : AppColors.neutral20,
-        ),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: selected ? AppColors.white : AppColors.neutral60,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: textTheme.bodyLarge?.copyWith(
-                  color: selected ? AppColors.white : AppColors.neutral60,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
           ),
         ),
       ),

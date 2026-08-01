@@ -340,17 +340,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         ),
         if (isTask) ...[
           const SizedBox(height: 24),
-          ChecklistEditor(
-            title: _checklistTitle,
-            items: _checklistItems,
-            onChanged: ({required title, required items}) {
-              setState(() {
-                _checklistTitle = title;
-                _checklistItems = items;
-              });
-            },
-          ),
-          const SizedBox(height: 24),
           TaskWhenField(
             dueAt: _dueAt,
             dueHasTime: _dueHasTime,
@@ -381,6 +370,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           },
           onChanged: (tags) => setState(() => _tags = tags),
         ),
+        if (isTask) ...[
+          const SizedBox(height: 24),
+          ChecklistEditor(
+            title: _checklistTitle,
+            items: _checklistItems,
+            onChanged: ({required title, required items}) {
+              setState(() {
+                _checklistTitle = title;
+                _checklistItems = items;
+              });
+            },
+          ),
+        ],
         const SizedBox(height: 24),
         AttachmentsEditor(
           noteId: _noteId,
