@@ -21,7 +21,7 @@ void main() {
     );
 
     expect(find.text('Checklist'), findsOneWidget);
-    expect(find.byIcon(Icons.check_box_outlined), findsOneWidget);
+    expect(find.text('Añadir checklist'), findsOneWidget);
   });
 
   testWidgets('ChecklistEditor shows items and progress when checklist exists', (
@@ -46,10 +46,10 @@ void main() {
     expect(find.text('Paso 1'), findsOneWidget);
     expect(find.text('Paso 2'), findsOneWidget);
     expect(find.text('1/2'), findsOneWidget);
-    expect(find.text('Añadir elemento'), findsOneWidget);
+    expect(find.byTooltip('Añadir elemento'), findsOneWidget);
   });
 
-  testWidgets('tapping Checklist opens anchored popover', (
+  testWidgets('tapping Añadir checklist opens anchored popover', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -64,10 +64,10 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Checklist'));
+    await tester.tap(find.text('Añadir checklist'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Añadir checklist'), findsOneWidget);
+    expect(find.text('Añadir checklist'), findsNWidgets(2));
     expect(find.text('Título'), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
   });
