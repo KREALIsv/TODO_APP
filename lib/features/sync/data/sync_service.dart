@@ -7,19 +7,21 @@ import 'package:hive_ce/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
+import '../../settings/presentation/data_backup.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/domain/auth_session_expired_exception.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
 import '../../notes/domain/note_item.dart';
+import '../domain/account_switch_gate.dart';
 import '../domain/sync_conflict.dart';
 import '../domain/sync_snapshot.dart';
 import 'device_identity.dart';
 import 'device_registry.dart';
 import 'wodo_api_config.dart';
 
-enum SyncState { unavailable, idle, syncing, error }
+enum SyncState { unavailable, idle, syncing, error, accountSwitchRequired }
 
 class SyncService extends ChangeNotifier {
   SyncService._();
@@ -29,6 +31,8 @@ class SyncService extends ChangeNotifier {
   static const _snapshotKey = 'snapshot';
   static const _cursorKey = 'cursor';
   static const _accountEmailKey = 'account_email';
+  static const _pendingSwitchFromKey = 'account_switch_from';
+  static const _pendingSwitchToKey = 'account_switch_to';
 
   final AuthService _auth = AuthService.instance;
   final NotesRepository _notes = NotesRepository.instance;
@@ -47,6 +51,15 @@ class SyncService extends ChangeNotifier {
       WodoApiConfig.isConfigured &&
       _auth.isAuthenticated &&
       DeviceIdentity.instance.syncEnabled;
+  bool get requiresAccountSwitch => _state == SyncState.accountSwitchRequired;
+  bool get canSync => isAvailable && !requiresAccountSwitch;
+
+  AccountSwitchPrompt? get pendingAccountSwitch {
+    final from = _box.get(_pendingSwitchFromKey) as String?;
+    final to = _box.get(_pendingSwitchToKey) as String?;
+    if (from == null || to == null) return null;
+    return AccountSwitchPrompt(fromEmail: from, toEmail: to);
+  }
 
   Future<void> init() async {
     _box = await Hive.openBox<dynamic>(_boxName);
@@ -54,13 +67,13 @@ class SyncService extends ChangeNotifier {
     _notes.changes.addListener(_scheduleSync);
     _tags.changes.addListener(_scheduleSync);
     _dayEntries.changes.addListener(_scheduleSync);
-    DeviceIdentity.instance.addListener(_scheduleSync);
+    DeviceIdentity.instance.addListener(_onSyncEligibilityChanged);
     Timer.periodic(const Duration(seconds: 30), (_) => syncNow());
     _onAuthChanged();
   }
 
   Future<void> syncNow() async {
-    if (_syncing || !isAvailable) return;
+    if (_syncing || !canSync) return;
     _syncing = true;
     _state = SyncState.syncing;
     _errorMessage = null;
@@ -73,6 +86,7 @@ class SyncService extends ChangeNotifier {
       await _push(token, beforePull);
       await _pull(token, beforePull);
       await _box.put(_snapshotKey, _snapshot());
+      await _markBoundToCurrentAccount();
       _state = SyncState.idle;
     } on AuthSessionExpiredException {
       _state = SyncState.unavailable;
@@ -329,28 +343,118 @@ class SyncService extends ChangeNotifier {
   }
 
   void _scheduleSync() {
-    if (!isAvailable) return;
+    if (!canSync) return;
     _debounce?.cancel();
     _debounce = Timer(const Duration(seconds: 1), syncNow);
   }
 
+  Future<void> resolveAccountSwitchUploadLocal() async {
+    final prompt = pendingAccountSwitch;
+    if (prompt == null) return;
+    await _clearPendingAccountSwitch();
+    await _resetSyncProgress();
+    await _markBoundToCurrentAccount();
+    _state = SyncState.idle;
+    notifyListeners();
+    await syncNow();
+  }
+
+  Future<void> resolveAccountSwitchDownloadCloud() async {
+    final prompt = pendingAccountSwitch;
+    if (prompt == null) return;
+    await _clearPendingAccountSwitch();
+    await _resetSyncProgress();
+    await resetAllAppContent(
+      notes: _notes,
+      tags: _tags,
+      dayEntries: _dayEntries,
+    );
+    await _markBoundToCurrentAccount();
+    _state = SyncState.idle;
+    notifyListeners();
+    await syncNow();
+  }
+
+  Future<void> resolveAccountSwitchKeepLocalPaused() async {
+    final prompt = pendingAccountSwitch;
+    if (prompt == null) return;
+    await _clearPendingAccountSwitch();
+    await DeviceIdentity.instance.setSyncEnabled(false);
+    _state = SyncState.unavailable;
+    notifyListeners();
+  }
+
+  void _onSyncEligibilityChanged() {
+    if (!_auth.isAuthenticated) return;
+    if (_evaluateAndApplyAccountSwitchGate()) return;
+    _scheduleSync();
+  }
+
   void _onAuthChanged() {
     final authenticated = _auth.isAuthenticated;
-    if (authenticated) {
-      final email = _auth.userEmail;
-      final previousEmail = _box.get(_accountEmailKey) as String?;
-      if (previousEmail != null &&
-          email != null &&
-          previousEmail != email) {
-        unawaited(_resetSyncProgress());
-      }
-      if (email != null) {
-        unawaited(_box.put(_accountEmailKey, email));
-      }
+    if (!authenticated) {
+      unawaited(_clearPendingAccountSwitch());
+      _state = SyncState.unavailable;
+      notifyListeners();
+      return;
     }
+
+    if (_evaluateAndApplyAccountSwitchGate()) return;
+
     _state = isAvailable ? SyncState.idle : SyncState.unavailable;
     notifyListeners();
-    if (isAvailable) unawaited(syncNow());
+    if (canSync) unawaited(syncNow());
+  }
+
+  bool _evaluateAndApplyAccountSwitchGate() {
+    final restored = pendingAccountSwitch;
+    if (restored != null) {
+      _state = SyncState.accountSwitchRequired;
+      notifyListeners();
+      return true;
+    }
+
+    final email = _auth.userEmail;
+    final boundEmail = _box.get(_accountEmailKey) as String?;
+    final prompt = detectAccountSwitchPrompt(
+      boundAccountEmail: boundEmail,
+      currentEmail: email,
+      hasLocalContent: deviceHasAccountSpecificContent(
+        notes: _notes,
+        dayEntries: _dayEntries,
+      ),
+    );
+    if (prompt != null) {
+      unawaited(_setPendingAccountSwitch(prompt));
+      _state = SyncState.accountSwitchRequired;
+      notifyListeners();
+      return true;
+    }
+
+    if (boundEmail != null &&
+        email != null &&
+        boundEmail.trim().toLowerCase() != email.trim().toLowerCase()) {
+      unawaited(_resetSyncProgress());
+      unawaited(_markBoundToCurrentAccount());
+    }
+
+    return false;
+  }
+
+  Future<void> _setPendingAccountSwitch(AccountSwitchPrompt prompt) async {
+    await _box.put(_pendingSwitchFromKey, prompt.fromEmail);
+    await _box.put(_pendingSwitchToKey, prompt.toEmail);
+  }
+
+  Future<void> _clearPendingAccountSwitch() async {
+    await _box.delete(_pendingSwitchFromKey);
+    await _box.delete(_pendingSwitchToKey);
+  }
+
+  Future<void> _markBoundToCurrentAccount() async {
+    final email = _auth.userEmail;
+    if (email == null || email.isEmpty) return;
+    await _box.put(_accountEmailKey, email.trim().toLowerCase());
   }
 
   Future<void> _resetSyncProgress() async {

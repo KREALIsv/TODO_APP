@@ -481,6 +481,7 @@ class SettingsScreen extends StatelessWidget {
     if (!DeviceIdentity.instance.syncEnabled) return 'Pausada';
     return switch (SyncService.instance.state) {
       SyncState.unavailable => 'Inicia sesión',
+      SyncState.accountSwitchRequired => 'Requiere acción',
       SyncState.idle => 'Actualizado',
       SyncState.syncing => 'Sincronizando',
       SyncState.error => 'Error',

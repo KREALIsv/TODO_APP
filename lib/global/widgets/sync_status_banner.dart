@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../features/notes/data/notes_repository.dart';
 import '../../features/sync/data/sync_service.dart';
+import '../../features/sync/presentation/account_switch_gate_sheet.dart';
 import '../../features/sync/presentation/sync_conflicts_screen.dart';
 
 /// Small, non-blocking banners for cloud sync activity and pending conflicts.
@@ -28,8 +29,11 @@ class SyncStatusBanner extends StatelessWidget {
       listenable: Listenable.merge([_sync, _notes.changes]),
       builder: (context, _) {
         final syncing = _sync.state == SyncState.syncing;
+        final accountSwitchRequired =
+            _sync.state == SyncState.accountSwitchRequired;
         final conflictCount = _notes.pendingSyncConflictCount;
-        final showConflictBanner = !syncing && conflictCount > 0;
+        final showConflictBanner =
+            !syncing && !accountSwitchRequired && conflictCount > 0;
 
         return Stack(
           fit: StackFit.expand,
@@ -50,6 +54,27 @@ class SyncStatusBanner extends StatelessWidget {
                         ? _SyncingBanner(key: const ValueKey('sync-banner'))
                         : const SizedBox.shrink(
                             key: ValueKey('sync-banner-off'),
+                          ),
+                  ),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    switchInCurve: Curves.easeOut,
+                    switchOutCurve: Curves.easeIn,
+                    child: accountSwitchRequired
+                        ? _AccountSwitchBanner(
+                            key: const ValueKey('account-switch-banner'),
+                            onTap: () {
+                              final prompt = _sync.pendingAccountSwitch;
+                              if (prompt == null) return;
+                              showAccountSwitchGateSheet(
+                                context,
+                                prompt: prompt,
+                                syncService: _sync,
+                              );
+                            },
+                          )
+                        : const SizedBox.shrink(
+                            key: ValueKey('account-switch-banner-off'),
                           ),
                   ),
                   AnimatedSwitcher(
@@ -109,6 +134,57 @@ class _SyncingBanner extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountSwitchBanner extends StatelessWidget {
+  const _AccountSwitchBanner({
+    super.key,
+    required this.onTap,
+  });
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      elevation: 2,
+      color: colorScheme.tertiaryContainer,
+      child: SafeArea(
+        bottom: false,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.switch_account_outlined,
+                  size: 18,
+                  color: colorScheme.onTertiaryContainer,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Cambio de cuenta · Elegí qué hacer con tus datos',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onTertiaryContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: colorScheme.onTertiaryContainer,
+                ),
+              ],
+            ),
           ),
         ),
       ),
