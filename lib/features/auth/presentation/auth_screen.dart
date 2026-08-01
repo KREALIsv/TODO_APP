@@ -141,10 +141,8 @@ class _AuthScreenState extends State<AuthScreen> {
   String get _subtitle {
     if (widget.contextMessage != null) return widget.contextMessage!;
     return _registering
-        ? 'Crea tu cuenta para sincronizar notas y tareas entre dispositivos. '
-              'Tus datos locales se mantienen sin conexión.'
-        : 'Entra con tu cuenta WODO para sincronizar entre dispositivos. '
-              'Sin sesión, todo sigue guardándose aquí en local.';
+        ? 'Sincroniza notas y tareas entre dispositivos.'
+        : 'Entra con tu cuenta o sigue en modo local.';
   }
 
   @override
@@ -159,7 +157,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final title = _registering ? 'Crear cuenta' : 'Iniciar sesión';
+    final title = widget.contextTitle ?? (_registering ? 'Crear cuenta' : 'Iniciar sesión');
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -172,6 +170,37 @@ class _AuthScreenState extends State<AuthScreen> {
       body: AuthPageShell(
         title: title,
         subtitle: _subtitle,
+        footer: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_canUseAnotherAccount && !_showRememberedEmailHint)
+              AuthTextLink(
+                label: 'Usar otra cuenta',
+                onPressed: _submitting ? null : _useAnotherAccount,
+              ),
+            AuthTextLink(
+              label: _registering
+                  ? 'Ya tengo una cuenta'
+                  : 'Crear una cuenta nueva',
+              onPressed: _submitting ? null : _toggleMode,
+            ),
+            if (_registering) ...[
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  'Al crear la cuenta aceptas que WODO guarde tus datos '
+                  'sincronizados de forma segura en la nube.',
+                  textAlign: TextAlign.center,
+                  style: textTheme.labelSmall?.copyWith(
+                    color: AppSurface.secondary(context),
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
         child: Form(
           key: _formKey,
           child: Column(
@@ -183,7 +212,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   actionLabel: 'Cambiar',
                   onAction: _submitting ? null : _useAnotherAccount,
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
               ],
               TextFormField(
                 controller: _email,
@@ -203,7 +232,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _password,
                 obscureText: _obscurePassword,
@@ -240,20 +269,19 @@ class _AuthScreenState extends State<AuthScreen> {
                 },
               ),
               if (!_registering) ...[
-                const SizedBox(height: 4),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: _submitting ? null : _openForgotPassword,
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
                     ),
                     child: const Text('¿Olvidaste tu contraseña?'),
                   ),
                 ),
-              ] else
-                const SizedBox(height: 8),
-              const SizedBox(height: 8),
+              ],
+              const SizedBox(height: 12),
               AuthPrimaryButton(
                 label: _registering
                     ? 'Crear cuenta y sincronizar'
@@ -262,143 +290,14 @@ class _AuthScreenState extends State<AuthScreen> {
                 onPressed: _submit,
               ),
               if (!_registering) ...[
-                const SizedBox(height: 20),
-                const _AuthDivider(label: 'o'),
-                const SizedBox(height: 16),
-                _PairingLoginOption(enabled: !_submitting, onTap: _openQrLogin),
-              ],
-              const SizedBox(height: 16),
-              if (_canUseAnotherAccount && !_showRememberedEmailHint)
-                Center(
-                  child: TextButton(
-                    onPressed: _submitting ? null : _useAnotherAccount,
-                    child: const Text('Usar otra cuenta'),
-                  ),
-                ),
-              Center(
-                child: TextButton(
-                  onPressed: _submitting ? null : _toggleMode,
-                  child: Text(
-                    _registering
-                        ? 'Ya tengo una cuenta'
-                        : 'Crear una cuenta nueva',
-                  ),
-                ),
-              ),
-              if (_registering) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Al crear la cuenta aceptas que WODO guarde tus datos '
-                  'sincronizados de forma segura en la nube.',
-                  textAlign: TextAlign.center,
-                  style: textTheme.labelSmall?.copyWith(
-                    color: AppSurface.secondary(context),
-                    height: 1.4,
-                  ),
+                const SizedBox(height: 18),
+                const AuthDivider(label: 'o'),
+                const SizedBox(height: 14),
+                AuthPairingOption(
+                  enabled: !_submitting,
+                  onTap: _openQrLogin,
                 ),
               ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AuthDivider extends StatelessWidget {
-  const _AuthDivider({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = AppSurface.border(context);
-    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
-      color: AppSurface.secondary(context),
-      fontWeight: FontWeight.w500,
-    );
-
-    return Row(
-      children: [
-        Expanded(child: Divider(color: color)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(label, style: style),
-        ),
-        Expanded(child: Divider(color: color)),
-      ],
-    );
-  }
-}
-
-class _PairingLoginOption extends StatelessWidget {
-  const _PairingLoginOption({required this.enabled, required this.onTap});
-
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Material(
-      color: colorScheme.primary.withValues(alpha: 0.06),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: colorScheme.primary.withValues(alpha: 0.25),
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.qr_code_2_rounded,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Entrar con otro dispositivo',
-                      style: textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Muestra un QR y apruébalo desde un equipo donde ya '
-                      'tengas sesión.',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: AppSurface.secondary(context),
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.arrow_forward_rounded,
-                size: 20,
-                color: colorScheme.primary,
-              ),
             ],
           ),
         ),
