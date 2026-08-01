@@ -31,18 +31,30 @@ class ChecklistEditor extends StatefulWidget {
 
 class _ChecklistEditorState extends State<ChecklistEditor> {
   static const _uuid = Uuid();
+  final _addMenuController = OverlayPortalController();
+  final _anchorLink = LayerLink();
 
   bool get _hasChecklist => widget.title != null;
 
-  Future<void> _showAddChecklistDialog() async {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => const _AddChecklistDialog(),
-    );
+  void _toggleAddMenu() {
+    setState(() {
+      if (_addMenuController.isShowing) {
+        _addMenuController.hide();
+      } else {
+        _addMenuController.show();
+      }
+    });
+  }
 
-    if (!mounted || result == null) return;
-    final title = result.isEmpty ? 'Checklist' : result;
-    widget.onChanged(title: title, items: widget.items);
+  void _closeAddMenu() {
+    if (!_addMenuController.isShowing) return;
+    setState(_addMenuController.hide);
+  }
+
+  void _confirmAddChecklist(String title) {
+    _closeAddMenu();
+    final resolved = title.trim().isEmpty ? 'Checklist' : title.trim();
+    widget.onChanged(title: resolved, items: widget.items);
   }
 
   void _toggleItem(String id) {
@@ -124,12 +136,41 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
       if (!widget.showAddButton) return const SizedBox.shrink();
       return Align(
         alignment: Alignment.centerLeft,
-        child: Tooltip(
-          message: 'Crear lista de comprobación',
-          child: _ActionChip(
-            icon: Icons.check_box_outlined,
-            label: 'Checklist',
-            onPressed: _showAddChecklistDialog,
+        child: OverlayPortal(
+          controller: _addMenuController,
+          overlayChildBuilder: (context) {
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                ModalBarrier(
+                  color: Colors.transparent,
+                  onDismiss: _closeAddMenu,
+                ),
+                CompositedTransformFollower(
+                  link: _anchorLink,
+                  showWhenUnlinked: false,
+                  targetAnchor: Alignment.topLeft,
+                  followerAnchor: Alignment.topLeft,
+                  offset: const Offset(0, 6),
+                  child: _AddChecklistPopover(
+                    onCancel: _closeAddMenu,
+                    onSubmit: _confirmAddChecklist,
+                  ),
+                ),
+              ],
+            );
+          },
+          child: CompositedTransformTarget(
+            link: _anchorLink,
+            child: Tooltip(
+              message: 'Crear lista de comprobación',
+              child: _ActionChip(
+                icon: Icons.check_box_outlined,
+                label: 'Checklist',
+                selected: _addMenuController.isShowing,
+                onPressed: _toggleAddMenu,
+              ),
+            ),
           ),
         ),
       );
@@ -208,20 +249,34 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
   }
 }
 
-class _AddChecklistDialog extends StatefulWidget {
-  const _AddChecklistDialog();
+class _AddChecklistPopover extends StatefulWidget {
+  const _AddChecklistPopover({
+    required this.onCancel,
+    required this.onSubmit,
+  });
+
+  final VoidCallback onCancel;
+  final ValueChanged<String> onSubmit;
 
   @override
-  State<_AddChecklistDialog> createState() => _AddChecklistDialogState();
+  State<_AddChecklistPopover> createState() => _AddChecklistPopoverState();
 }
 
-class _AddChecklistDialogState extends State<_AddChecklistDialog> {
+class _AddChecklistPopoverState extends State<_AddChecklistPopover> {
   late final TextEditingController _controller;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: 'Checklist');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _controller.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _controller.text.length,
+        );
+      }
+    });
   }
 
   @override
@@ -230,31 +285,75 @@ class _AddChecklistDialogState extends State<_AddChecklistDialog> {
     super.dispose();
   }
 
-  void _submit() => Navigator.pop(context, _controller.text.trim());
+  void _submit() => widget.onSubmit(_controller.text);
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Añadir checklist'),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        textCapitalization: TextCapitalization.sentences,
-        decoration: const InputDecoration(
-          labelText: 'Título',
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+
+    return TapRegion(
+      onTapOutside: (_) => widget.onCancel(),
+      child: Material(
+        elevation: 6,
+        color: scheme.surface,
+        shadowColor: Colors.black26,
+        borderRadius: BorderRadius.circular(12),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 280, maxWidth: 320),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Añadir checklist',
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Cerrar',
+                      onPressed: widget.onCancel,
+                      icon: const Icon(Icons.close, size: 18),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Título',
+                    isDense: true,
+                  ),
+                  onSubmitted: (_) => _submit(),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton(
+                    onPressed: _submit,
+                    child: const Text('Añadir'),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        onSubmitted: (_) => _submit(),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('Añadir'),
-        ),
-      ],
     );
   }
 }
@@ -264,20 +363,24 @@ class _ActionChip extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.selected = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Material(
-      color: AppColors.neutral00,
+      color: selected ? AppColors.neutral80 : AppColors.neutral00,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: AppColors.neutral20),
+        side: BorderSide(
+          color: selected ? AppColors.neutral80 : AppColors.neutral20,
+        ),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
@@ -287,12 +390,16 @@ class _ActionChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 18, color: AppColors.neutral60),
+              Icon(
+                icon,
+                size: 18,
+                color: selected ? AppColors.white : AppColors.neutral60,
+              ),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: textTheme.bodyLarge?.copyWith(
-                  color: AppColors.neutral60,
+                  color: selected ? AppColors.white : AppColors.neutral60,
                   fontWeight: FontWeight.w600,
                 ),
               ),

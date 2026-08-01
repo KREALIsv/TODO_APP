@@ -49,7 +49,7 @@ void main() {
     expect(find.text('Añadir elemento'), findsOneWidget);
   });
 
-  testWidgets('tapping Checklist opens add dialog', (
+  testWidgets('tapping Checklist opens anchored popover', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -69,5 +69,6 @@ void main() {
 
     expect(find.text('Añadir checklist'), findsOneWidget);
     expect(find.text('Título'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
   });
 }
