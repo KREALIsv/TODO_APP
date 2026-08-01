@@ -35,37 +35,10 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
   bool get _hasChecklist => widget.title != null;
 
   Future<void> _showAddChecklistDialog() async {
-    final controller = TextEditingController(text: 'Checklist');
     final result = await showDialog<String>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Añadir checklist'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'Título',
-            ),
-            onSubmitted: (_) =>
-                Navigator.pop(dialogContext, controller.text.trim()),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.pop(dialogContext, controller.text.trim()),
-              child: const Text('Añadir'),
-            ),
-          ],
-        );
-      },
+      builder: (dialogContext) => const _AddChecklistDialog(),
     );
-    controller.dispose();
 
     if (!mounted || result == null) return;
     final title = result.isEmpty ? 'Checklist' : result;
@@ -229,6 +202,57 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
             label: 'Añadir elemento',
             onPressed: _addItem,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddChecklistDialog extends StatefulWidget {
+  const _AddChecklistDialog();
+
+  @override
+  State<_AddChecklistDialog> createState() => _AddChecklistDialogState();
+}
+
+class _AddChecklistDialogState extends State<_AddChecklistDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: 'Checklist');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.pop(context, _controller.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Añadir checklist'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: const InputDecoration(
+          labelText: 'Título',
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Añadir'),
         ),
       ],
     );
