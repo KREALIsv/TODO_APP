@@ -281,8 +281,7 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
         Align(
           alignment: Alignment.centerLeft,
           child: OutlinedAddChip(
-            label: 'Añadir elemento',
-            compact: widget.items.isNotEmpty,
+            label: 'Añade un elemento',
             onPressed: _addItem,
           ),
         ),

@@ -47,7 +47,7 @@ void main() {
     expect(find.text('Paso 1'), findsOneWidget);
     expect(find.text('Paso 2'), findsOneWidget);
     expect(find.text('1/2'), findsOneWidget);
-    expect(find.byTooltip('Añadir elemento'), findsOneWidget);
+    expect(find.text('Añade un elemento'), findsOneWidget);
   });
 
   testWidgets('tapping Añadir checklist opens anchored popover', (
