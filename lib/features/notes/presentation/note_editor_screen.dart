@@ -6,11 +6,13 @@ import '../../shell/presentation/desktop_column_header.dart';
 import '../data/attachments_repository.dart';
 import '../data/notes_repository.dart';
 import '../data/tags_repository.dart';
+import '../domain/checklist_item.dart';
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
 import '../domain/task_groups.dart';
 import '../domain/task_when_save_hint.dart';
 import 'widgets/attachments_editor.dart';
+import 'widgets/checklist_editor.dart';
 import 'widgets/note_task_type_switch.dart';
 import 'widgets/tags_editor.dart';
 import 'widgets/task_day_history_section.dart';
@@ -54,6 +56,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   bool _todayOn = false;
   int? _reminderMinutesBefore;
   String? _coverAttachmentId;
+  String? _checklistTitle;
+  List<ChecklistItem> _checklistItems = const [];
   late final String _noteId;
   bool _discardUnsavedAttachments = true;
   final _sessionAddedAttachmentIds = <String>{};
@@ -91,6 +95,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         (!_isEditing && (item?.type ?? widget.initialType) == NoteType.task);
     _reminderMinutesBefore = item?.reminderMinutesBefore;
     _coverAttachmentId = item?.coverAttachmentId;
+    _checklistTitle = item?.checklistTitle;
+    _checklistItems = List<ChecklistItem>.from(item?.checklistItems ?? const []);
     _noteId = item?.id ?? _uuid.v4();
     _discardUnsavedAttachments = true;
 
@@ -154,6 +160,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     await _tagsRepo.ensureTags(_tags);
 
+    final checklistItems = isTask
+        ? _checklistItems
+            .where((item) => item.title.trim().isNotEmpty)
+            .toList()
+        : const <ChecklistItem>[];
+    final checklistTitle = isTask ? _checklistTitle : null;
+
     DateTime? completedAt;
     if (isTask && _completed) {
       completedAt = existing?.completedAt ?? now;
@@ -178,6 +191,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         reminderMinutesBefore:
             isTask && _dueAt != null ? _reminderMinutesBefore : null,
         coverAttachmentId: _coverAttachmentId,
+        checklistTitle: checklistTitle,
+        checklistItems: checklistItems,
       );
       await _repo.add(toSave);
     } else {
@@ -200,6 +215,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         reminderMinutesBefore:
             isTask && _dueAt != null ? _reminderMinutesBefore : null,
         coverAttachmentId: _coverAttachmentId,
+        checklistTitle: checklistTitle,
+        checklistItems: checklistItems,
       );
       await _repo.saveTaskFromEditor(previous: existing, next: toSave);
     }
@@ -368,6 +385,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           },
           onChanged: (tags) => setState(() => _tags = tags),
         ),
+        if (isTask) ...[
+          const SizedBox(height: 24),
+          ChecklistEditor(
+            title: _checklistTitle,
+            items: _checklistItems,
+            onChanged: ({required title, required items}) {
+              setState(() {
+                _checklistTitle = title;
+                _checklistItems = items;
+              });
+            },
+          ),
+        ],
         const SizedBox(height: 24),
         AttachmentsEditor(
           noteId: _noteId,
@@ -389,6 +419,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 _dueHasTime = false;
                 _todayOn = false;
                 _reminderMinutesBefore = null;
+                _checklistTitle = null;
+                _checklistItems = const [];
               }
             });
           },

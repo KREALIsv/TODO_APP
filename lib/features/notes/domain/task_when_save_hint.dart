@@ -1,6 +1,7 @@
 import 'date_only.dart';
 import 'day_entry.dart';
 import 'note_item.dart';
+import 'task_dates.dart';
 
 /// Plain-language preview of the main BuJo day-entry change on editor save.
 ///

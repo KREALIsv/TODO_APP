@@ -604,6 +604,9 @@ class NotesRepository {
       createdAt: now,
       updatedAt: now,
       coverAttachmentId: newCoverId,
+      checklistItems: current.checklistItems
+          .map((item) => item.copyWith(id: _uuid.v4()))
+          .toList(),
     );
     await add(copy);
     return copy;

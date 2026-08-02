@@ -165,19 +165,8 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
         ),
         const Divider(height: 1),
         _actionTile(
-          icon: Icons.chevron_right,
-          label: 'Migrar a mañana',
-          onTap: () => _applyDayAction(
-            () => _repo.migrateTaskToDay(
-              _item.id,
-              dateOnly(DateTime.now()).add(const Duration(days: 1)),
-              fromDay: widget.actionDay,
-            ),
-          ),
-        ),
-        _actionTile(
           icon: Icons.event_outlined,
-          label: 'Agendar…',
+          label: 'Agendar otro día',
           onTap: _scheduleTask,
         ),
         _actionTile(
@@ -185,16 +174,6 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
           label: 'Enviar a Backlog',
           onTap: () => _applyDayAction(
             () => _repo.sendTaskToBacklog(
-              _item.id,
-              fromDay: widget.actionDay,
-            ),
-          ),
-        ),
-        _actionTile(
-          icon: Icons.remove_circle_outline,
-          label: 'Descartar del día',
-          onTap: () => _applyDayAction(
-            () => _repo.cancelTaskOnDay(
               _item.id,
               fromDay: widget.actionDay,
             ),

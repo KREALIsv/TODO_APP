@@ -14,6 +14,9 @@ import '../../settings/data/settings_repository.dart';
 import '../../settings/presentation/widgets/list_background_layer.dart';
 import '../../shell/presentation/desktop_column_header.dart';
 import 'profile_account_section.dart';
+import 'profile_navigation.dart';
+
+export 'profile_navigation.dart';
 
 enum ProfilePanelDensity {
   /// Full-width fluid layout (mobile profile screen).

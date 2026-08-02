@@ -6,7 +6,7 @@ import '../../domain/date_only.dart';
 import '../../domain/day_entry.dart';
 import '../../domain/task_when_save_hint.dart';
 
-/// Chronological day log for a single task (BuJo history).
+/// Chronological day log for a single task (BuJo history, text-only).
 class TaskDayHistorySection extends StatefulWidget {
   const TaskDayHistorySection({
     super.key,
@@ -38,9 +38,9 @@ class _TaskDayHistorySectionState extends State<TaskDayHistorySection> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: _dayEntries.changes,
+      listenable: widget._dayEntries.changes,
       builder: (context, _) {
-        final entries = _dayEntries.entriesForNote(widget.noteId);
+        final entries = widget._dayEntries.entriesForNote(widget.noteId);
         if (entries.isEmpty) {
           return Padding(
             padding: widget.padding,
