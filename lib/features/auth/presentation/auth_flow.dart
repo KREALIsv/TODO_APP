@@ -135,6 +135,8 @@ abstract final class AuthFlow {
         SyncState.error => 'Datos protegidos · error al sincronizar',
         SyncState.idle => 'Datos protegidos · al día',
         SyncState.unavailable => 'Datos protegidos · listo para sincronizar',
+        SyncState.accountSwitchRequired =>
+          'Datos protegidos · elegí qué hacer con tus datos locales',
       };
     }
     return switch (syncState) {
