@@ -3,14 +3,29 @@ import 'day_entry.dart';
 import 'note_item.dart';
 import 'task_dates.dart';
 
-/// Plain-language preview of the main BuJo day-entry change on editor save.
-///
-/// One sentence, no chip timeline — prioritizes the outcome the user cares about.
+/// Preview when «¿Cuándo?» changes in the editor (applied on save).
 String? taskWhenSaveHint({
   required NoteItem previous,
   required bool nextTodayOn,
   required DateTime? nextDueAt,
   DateTime? now,
+}) {
+  return taskWhenChangeHint(
+    previous: previous,
+    nextTodayOn: nextTodayOn,
+    nextDueAt: nextDueAt,
+    now: now,
+    onSave: true,
+  );
+}
+
+/// Plain-language preview for a «¿Cuándo?» change (context menu = instant).
+String? taskWhenChangeHint({
+  required NoteItem previous,
+  required bool nextTodayOn,
+  required DateTime? nextDueAt,
+  DateTime? now,
+  bool onSave = false,
 }) {
   if (previous.type != NoteType.task) return null;
   final reference = now ?? DateTime.now();
@@ -18,6 +33,7 @@ String? taskWhenSaveHint({
     return null;
   }
 
+  final prefix = onSave ? 'Al guardar: ' : '';
   final prevToday = previous.isTodayCommitment(reference);
   final prevDue =
       previous.dueAt != null ? dateOnly(previous.dueAt!) : null;
@@ -26,30 +42,23 @@ String? taskWhenSaveHint({
       previous.todayAt != null ? dateOnly(previous.todayAt!) : null;
 
   if (nextTodayOn) {
-    return 'Al guardar: quedará en Hoy y en el Diario de hoy.';
+    return '${prefix}Quedará en Hoy.';
   }
 
-  if (prevDue != null && nextDue != null && prevDue != nextDue) {
-    return 'Al guardar: ${formatDayMonth(prevDue)} quedará agendado hacia '
-        '${formatDayMonth(nextDue)} y ${formatDayMonth(nextDue)} aparecerá pendiente.';
-  }
-
-  if (prevTodayDay != null && nextDue != null && prevTodayDay != nextDue) {
-    return 'Al guardar: ${formatDayMonth(prevTodayDay)} quedará agendado hacia '
-        '${formatDayMonth(nextDue)} y ${formatDayMonth(nextDue)} aparecerá pendiente.';
+  final origin = prevTodayDay ?? prevDue;
+  if (origin != null && nextDue != null && origin != nextDue) {
+    return '${prefix}Del ${formatDayMonth(origin)} al ${formatDayMonth(nextDue)}.';
   }
 
   if ((prevToday || prevDue != null) && nextDue == null && !nextTodayOn) {
-    final origin = prevTodayDay ?? prevDue;
     if (origin != null) {
-      return 'Al guardar: ${formatDayMonth(origin)} pasará a Backlog '
-          '(→ Backlog en el Diario).';
+      return '${prefix}Se quita del día (${formatDayMonth(origin)}).';
     }
-    return 'Al guardar: volverá al Backlog sin día asignado.';
+    return '${prefix}Sin día asignado.';
   }
 
   if (nextDue != null) {
-    return 'Al guardar: quedará planificada para ${formatDayMonth(nextDue)}.';
+    return '${prefix}Planificada para el ${formatDayMonth(nextDue)}.';
   }
 
   return null;

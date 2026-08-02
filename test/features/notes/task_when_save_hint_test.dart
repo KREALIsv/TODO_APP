@@ -43,19 +43,27 @@ void main() {
       nextDueAt: DateTime(2026, 7, 31),
       now: now,
     );
-    expect(hint, contains('28 Jul'));
-    expect(hint, contains('31 Jul'));
-    expect(hint, contains('agendado'));
+    expect(hint, 'Al guardar: Del 28 Jul al 31 Jul.');
   });
 
-  test('hints backlog when clearing commitment', () {
+  test('instant hint uses shorter copy without save prefix', () {
+    final hint = taskWhenChangeHint(
+      previous: task(dueAt: DateTime(2026, 8, 3)),
+      nextTodayOn: false,
+      nextDueAt: DateTime(2026, 8, 19),
+      now: now,
+    );
+    expect(hint, 'Del 3 Aug al 19 Aug.');
+  });
+
+  test('hints removing day commitment when clearing date', () {
     final hint = taskWhenSaveHint(
       previous: task(dueAt: DateTime(2026, 7, 30)),
       nextTodayOn: false,
       nextDueAt: null,
       now: now,
     );
-    expect(hint, contains('Backlog'));
+    expect(hint, contains('Se quita del día'));
   });
 
   test('dayOutcomeShortLabel covers BuJo states without icons', () {

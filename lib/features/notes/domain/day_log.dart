@@ -4,18 +4,47 @@ import 'note_item.dart';
 import 'task_dates.dart';
 
 /// Filters [all] to entries whose [DayEntry.day] matches [day] (dateOnly).
+///
+/// When several rows exist for the same note on one day, keeps the latest event
+/// (for Diario — one row per task per day).
 List<DayEntry> entriesForDay(List<DayEntry> all, DateTime day) {
   final key = dateOnly(day);
-  return all.where((e) => dateOnly(e.day) == key).toList(growable: false);
+  final byNote = <String, DayEntry>{};
+
+  for (final entry in all) {
+    if (dateOnly(entry.day) != key) continue;
+    final existing = byNote[entry.noteId];
+    if (existing == null || _isNewerDayEvent(entry, existing)) {
+      byNote[entry.noteId] = entry;
+    }
+  }
+
+  return byNote.values.toList(growable: false);
 }
 
-/// All day log rows for a task, newest calendar day first.
+bool _isNewerDayEvent(DayEntry candidate, DayEntry incumbent) {
+  if (candidate.outcome == DayOutcome.open &&
+      incumbent.outcome != DayOutcome.open) {
+    return true;
+  }
+  if (incumbent.outcome == DayOutcome.open &&
+      candidate.outcome != DayOutcome.open) {
+    return false;
+  }
+  final candidateAt = candidate.outcomeAt ?? candidate.createdAt;
+  final incumbentAt = incumbent.outcomeAt ?? incumbent.createdAt;
+  return candidateAt.isAfter(incumbentAt);
+}
+
+/// All day log rows for a task, newest event first (may include several per day).
 List<DayEntry> entriesForNote(List<DayEntry> all, String noteId) {
   final rows = all.where((e) => e.noteId == noteId).toList();
   rows.sort((a, b) {
-    final dayCmp = b.day.compareTo(a.day);
-    if (dayCmp != 0) return dayCmp;
-    return b.createdAt.compareTo(a.createdAt);
+    final aTime = a.outcomeAt ?? a.createdAt;
+    final bTime = b.outcomeAt ?? b.createdAt;
+    final timeCmp = bTime.compareTo(aTime);
+    if (timeCmp != 0) return timeCmp;
+    return b.day.compareTo(a.day);
   });
   return rows;
 }
