@@ -202,6 +202,53 @@ void main() {
     expect(opened.via, DayVia.scheduledIn);
   });
 
+  test('rescheduling back and forth preserves both moves in history', () async {
+    final aug3 = dateOnly(DateTime(2026, 8, 3));
+    final aug19 = dateOnly(DateTime(2026, 8, 19));
+    await repo.add(
+      buildItem(
+        id: 'task',
+        type: NoteType.task,
+      ).copyWith(dueAt: aug3),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: aug3,
+      via: DayVia.due,
+    );
+
+    await repo.applyTaskWhen(
+      'task',
+      todayOn: false,
+      dueAt: aug19,
+      dueHasTime: false,
+    );
+    await repo.applyTaskWhen(
+      'task',
+      todayOn: false,
+      dueAt: aug3,
+      dueHasTime: false,
+    );
+
+    final history = dayEntries.entriesForNote('task');
+    expect(
+      history.where((e) => e.outcome == DayOutcome.scheduled).length,
+      2,
+    );
+    final aug3Events =
+        history.where((e) => dateOnly(e.day) == aug3).toList(growable: false);
+    expect(
+      aug3Events.any(
+        (e) =>
+            e.outcome == DayOutcome.scheduled &&
+            e.targetDay != null &&
+            dateOnly(e.targetDay!) == aug19,
+      ),
+      isTrue,
+    );
+    expect(aug3Events.any((e) => e.outcome == DayOutcome.open), isTrue);
+  });
+
   test('applyTaskWhen matches exclusive Hoy / Mañana semantics', () async {
     await repo.add(buildItem(id: 't', type: NoteType.task));
 

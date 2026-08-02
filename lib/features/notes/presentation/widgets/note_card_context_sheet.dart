@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_surface.dart';
 import '../../../../global/themes/app_colors.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/date_only.dart';
 import '../../domain/note_item.dart';
 import '../../domain/task_dates.dart';
+import '../../domain/task_when_save_hint.dart';
 import 'task_day_history_section.dart';
 import 'task_when_field.dart';
+import 'task_when_save_hint_banner.dart';
 
 /// Actions returned by [showNoteCardContextSheet] (when-chips apply in-place).
 enum NoteCardContextAction { pin, duplicate, archive, restore, delete }
@@ -57,6 +58,7 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
   late DateTime? _dueAt;
   late bool _dueHasTime;
   late int? _reminderMinutesBefore;
+  String? _changeHint;
 
   NoteItem get _item => widget.item;
   NotesRepository get _repo => widget.repository;
@@ -79,6 +81,8 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
     bool dueHasTime = false,
     int? reminderMinutesBefore,
   }) async {
+    final previousTodayOn = _todayOn;
+    final previousDueAt = _dueAt;
     setState(() {
       _todayOn = todayOn;
       _dueAt = dueAt;
@@ -92,6 +96,17 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
       dueHasTime: dueHasTime,
       reminderMinutesBefore: reminderMinutesBefore,
     );
+    if (!mounted) return;
+    setState(() {
+      _changeHint = taskWhenChangeHint(
+        previous: _item.copyWith(
+          todayAt: previousTodayOn ? (_item.todayAt ?? DateTime.now()) : null,
+          dueAt: previousDueAt,
+        ),
+        nextTodayOn: todayOn,
+        nextDueAt: dueAt,
+      );
+    });
   }
 
   Future<void> _applyDayAction(Future<void> Function() action) async {
@@ -155,6 +170,11 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
             onChanged: _onWhenChanged,
           ),
         ),
+        if (_changeHint != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: TaskWhenSaveHintBanner(message: _changeHint!),
+          ),
         const Divider(height: 1),
         TaskDayHistorySection(
           noteId: _item.id,
@@ -171,17 +191,7 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
           label: 'Agendar otro día',
           onTap: _scheduleTask,
         ),
-        _actionTile(
-          icon: Icons.inbox_outlined,
-          label: 'Enviar a Backlog',
-          onTap: () => _applyDayAction(
-            () => _repo.sendTaskToBacklog(
-              _item.id,
-              fromDay: widget.actionDay,
-            ),
-          ),
-        ),
-        if (_hasDayCommitment) _removeFromDayButton(textTheme),
+        if (_hasDayCommitment) _removeFromDayButton(),
         const Divider(height: 1),
       ],
       _actionTile(
@@ -209,28 +219,18 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
     ];
   }
 
-  /// Tertiary BuJo action: drop today's commitment without sending to backlog.
-  Widget _removeFromDayButton(TextTheme textTheme) {
+  /// Drops the task's calendar commitment for the current action day.
+  Widget _removeFromDayButton() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Align(
-        alignment: Alignment.center,
-        child: TextButton(
-          style: TextButton.styleFrom(
-            foregroundColor: AppSurface.secondary(context),
-            textStyle: textTheme.labelMedium,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: OutlinedButton(
+        onPressed: () => _applyDayAction(
+          () => _repo.cancelTaskOnDay(
+            _item.id,
+            fromDay: widget.actionDay,
           ),
-          onPressed: () => _applyDayAction(
-            () => _repo.cancelTaskOnDay(
-              _item.id,
-              fromDay: widget.actionDay,
-            ),
-          ),
-          child: const Text('Quitar del día'),
         ),
+        child: const Text('Quitar del día'),
       ),
     );
   }

@@ -140,6 +140,22 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     return '$prefix · ${progress.done}/${progress.total} done';
   }
 
+  Future<void> _removeFromDay() async {
+    final existing = widget.item;
+    if (existing == null || existing.type != NoteType.task) return;
+
+    await _repo.cancelTaskOnDay(existing.id);
+    if (!mounted) return;
+
+    final updated = _repo.getById(existing.id);
+    setState(() {
+      _todayOn = updated?.isTodayCommitment() ?? false;
+      _dueAt = updated?.dueAt;
+      _dueHasTime = updated?.dueHasTime ?? false;
+      _reminderMinutesBefore = updated?.reminderMinutesBefore;
+    });
+  }
+
   Future<void> _save() async {
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
@@ -430,6 +446,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           const Divider(height: 1),
           const SizedBox(height: 8),
           TaskDayHistorySection(noteId: _noteId),
+          if (_todayOn || _dueAt != null) ...[
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton(
+                onPressed: _removeFromDay,
+                child: const Text('Quitar del día'),
+              ),
+            ),
+          ],
         ],
       ],
     );
