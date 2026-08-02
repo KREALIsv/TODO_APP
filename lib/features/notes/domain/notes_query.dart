@@ -70,7 +70,16 @@ class NotesQuery {
       return dateOnly(item.createdAt) == key || dateOnly(item.updatedAt) == key;
     }
 
-    if (dateOnly(item.createdAt) == key) return true;
+    if (dateOnly(item.createdAt) == key) {
+      // Captured today, but committed to another calendar day → not «Del día» today.
+      if (item.dueAt != null && dateOnly(item.dueAt!) != key) {
+        return false;
+      }
+      if (item.todayAt != null && dateOnly(item.todayAt!) != key) {
+        return false;
+      }
+      return true;
+    }
     if (item.todayAt != null && dateOnly(item.todayAt!) == key) return true;
     if (item.dueAt != null && dateOnly(item.dueAt!) == key) return true;
     if (item.completedAt != null && dateOnly(item.completedAt!) == key) {
