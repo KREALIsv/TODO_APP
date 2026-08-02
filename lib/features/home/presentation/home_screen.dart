@@ -21,7 +21,10 @@ import '../../notes/presentation/widgets/note_compose_sheet.dart';
 import '../../notes/presentation/widgets/quick_capture_field.dart';
 import '../../notes/presentation/widgets/swipeable_note_card.dart';
 import '../../notes/presentation/widgets/task_section_header.dart';
+import '../../profile/presentation/profile_navigation.dart';
 import '../../profile/presentation/profile_screen.dart';
+import '../../sync/domain/sync_conflict.dart';
+import '../../sync/presentation/sync_conflict_list_card.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../settings/presentation/widgets/list_background_layer.dart';
 import '../../shell/presentation/desktop_panel_state.dart';
@@ -37,6 +40,7 @@ class HomeScreen extends StatefulWidget {
     this.embeddedInShell = false,
     this.onOpenSettings,
     this.onRegisterDayReset,
+    this.onRegisterDayNavigation,
     this.onOpenNoteEditor,
     this.selectedNoteId,
   });
@@ -48,6 +52,7 @@ class HomeScreen extends StatefulWidget {
   final bool embeddedInShell;
   final VoidCallback? onOpenSettings;
   final ValueChanged<VoidCallback>? onRegisterDayReset;
+  final ValueChanged<void Function(DateTime)>? onRegisterDayNavigation;
   final ValueChanged<NoteEditorRequest>? onOpenNoteEditor;
   final String? selectedNoteId;
 
@@ -64,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
   GroupedTasksExpansion _groupedExpansion = const GroupedTasksExpansion();
   bool _pinnedSectionExpanded = true;
   bool _ofDaySectionExpanded = true;
+  bool _conflictsSectionExpanded = true;
   late final ClockRefreshController _clock;
   DateTime _now = DateTime.now();
   late DateTime _selectedDay;
@@ -111,6 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     _clock.start();
     widget.onRegisterDayReset?.call(_resetSelectedDayToToday);
+    widget.onRegisterDayNavigation?.call(_onSelectedDayChanged);
   }
 
   @override
@@ -148,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openProfile(BuildContext context) async {
-    final filter = await Navigator.of(context).push<NotesFilter>(
+    final result = await Navigator.of(context).push<ProfileNavigationResult>(
       MaterialPageRoute(
         builder: (_) => ProfileScreen(
           repository: _repo,
@@ -156,8 +163,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-    if (filter != null && mounted) {
-      _setActiveFilter(filter);
+    if (!mounted || result == null) return;
+    if (result.day != null) {
+      _onSelectedDayChanged(result.day!);
+    }
+    if (result.filter != null) {
+      _setActiveFilter(result.filter!);
     }
   }
 
@@ -272,6 +283,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildConflictList(List<SyncConflictPair> conflicts) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      sliver: SliverList.builder(
+        itemCount: conflicts.length,
+        itemBuilder: (context, index) {
+          return SyncConflictListCard(
+            pair: conflicts[index],
+            repository: _repo,
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildNoteList(
     List<NoteItem> items,
     void Function(NoteItem item) onTap, {
@@ -288,6 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
             repository: _repo,
             selected: widget.selectedNoteId == item.id,
             onTap: () => onTap(item),
+            onNavigateToDay: _onSelectedDayChanged,
           );
         },
       ),
@@ -313,6 +340,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _groupedExpansion = const GroupedTasksExpansion();
     _pinnedSectionExpanded = true;
     _ofDaySectionExpanded = true;
+    _conflictsSectionExpanded = true;
   }
 
   PreferredSizeWidget _buildAppBarBottom(String searchQuery) {
@@ -481,6 +509,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     final groups =
         useGrouped ? TaskGroupsQuery.from(filtered, now: _now) : null;
+    final conflicts = searchQuery.trim().isEmpty &&
+            _effectiveFilter == NotesFilter.all
+        ? _repo.getPendingSyncConflicts()
+        : const <SyncConflictPair>[];
 
     return [
       SliverToBoxAdapter(
@@ -498,6 +530,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      if (conflicts.isNotEmpty) ...[
+        _buildSectionHeader(
+          'Conflictos de sincronización',
+          collapsible: true,
+          expanded: _conflictsSectionExpanded,
+          onToggle: () => setState(
+            () => _conflictsSectionExpanded = !_conflictsSectionExpanded,
+          ),
+        ),
+        if (_conflictsSectionExpanded) _buildConflictList(conflicts),
+      ],
       if (useGrouped && groups != null && !groups.isEmpty)
         ...buildGroupedTasksSlivers(
           groups: groups,
@@ -588,6 +631,7 @@ class _HomeScreenState extends State<HomeScreen> {
       DayReplaySliver(
         rows: rows,
         onOpen: (item) => _openEditor(context, item: item),
+        onNavigateToDay: _onSelectedDayChanged,
       ),
     ];
   }

@@ -36,6 +36,7 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
   String? _editorItemId;
   NoteType _editorInitialType = NoteType.note;
   VoidCallback? _resetHomeDay;
+  void Function(DateTime)? _setHomeSelectedDay;
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
   SettingsRepository get _settings =>
@@ -168,6 +169,7 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
                     density: ProfilePanelDensity.sidebar,
                     onFilterSelected: _onFilterSelected,
                     onOpenSettings: () => _openSettings(layout: layout),
+                    onNavigateToDay: (day) => _setHomeSelectedDay?.call(day),
                   ),
                 ),
                 const VerticalDivider(width: 1, thickness: 1),
@@ -179,6 +181,8 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
                     embeddedInShell: true,
                     onOpenSettings: () => _openSettings(layout: layout),
                     onRegisterDayReset: (callback) => _resetHomeDay = callback,
+                    onRegisterDayNavigation:
+                        (setter) => _setHomeSelectedDay = setter,
                     onOpenNoteEditor:
                         useMasterDetail ? _openNoteEditor : null,
                     selectedNoteId:

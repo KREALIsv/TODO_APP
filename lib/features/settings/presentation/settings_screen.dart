@@ -12,6 +12,7 @@ import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
 import '../data/settings_repository.dart';
+import '../../sync/presentation/sync_conflicts_screen.dart';
 import '../../sync/data/device_identity.dart';
 import '../../sync/data/sync_service.dart';
 import '../domain/list_background.dart';
@@ -451,6 +452,17 @@ class SettingsScreen extends StatelessWidget {
             accent: accent,
             onTap: () => _import(context),
           ),
+          if (_repo.pendingSyncConflictCount > 0) ...[
+            const SettingsDivider(),
+            SettingsRow(
+              icon: Icons.sync_problem_outlined,
+              title: 'Resolver conflictos de sincronización',
+              trailing: '${_repo.pendingSyncConflictCount}',
+              iconColor: AppColors.error,
+              titleColor: AppColors.error,
+              onTap: () => openSyncConflictsScreen(context),
+            ),
+          ],
           const SettingsDivider(),
           SettingsRow(
             icon: Icons.delete_forever_outlined,
@@ -493,6 +505,7 @@ class SettingsScreen extends StatelessWidget {
     if (!DeviceIdentity.instance.syncEnabled) return 'Pausada';
     return switch (SyncService.instance.state) {
       SyncState.unavailable => 'Inicia sesión',
+      SyncState.accountSwitchRequired => 'Requiere acción',
       SyncState.idle => 'Actualizado',
       SyncState.syncing => 'Sincronizando',
       SyncState.error => 'Error',

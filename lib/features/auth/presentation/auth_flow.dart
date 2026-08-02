@@ -140,6 +140,7 @@ abstract final class AuthFlow {
     return switch (syncState) {
       SyncState.syncing => 'Sincronizando…',
       SyncState.error => 'Error al sincronizar',
+      SyncState.accountSwitchRequired => 'Elegí qué hacer con tus datos locales',
       SyncState.idle => 'Datos al día en la nube',
       SyncState.unavailable => isAuthenticated
           ? 'Listo para sincronizar'
@@ -267,6 +268,15 @@ abstract final class AuthFlow {
     if (!context.mounted) return;
 
     final error = SyncService.instance.errorMessage;
+    if (SyncService.instance.requiresAccountSwitch) {
+      await AppAlerts.show(
+        context,
+        message: 'Primero elegí qué hacer con los datos locales de otra cuenta.',
+        type: AppAlertType.warning,
+      );
+      return;
+    }
+
     await AppAlerts.show(
       context,
       message: error == null

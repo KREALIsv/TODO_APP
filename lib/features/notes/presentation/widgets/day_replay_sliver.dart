@@ -19,11 +19,13 @@ class DayReplaySliver extends StatelessWidget {
     super.key,
     required this.rows,
     required this.onOpen,
+    this.onNavigateToDay,
     this.emptyMessage = 'Nada registrado este día',
   });
 
   final List<DayLogRow> rows;
   final void Function(NoteItem item) onOpen;
+  final ValueChanged<DateTime>? onNavigateToDay;
   final String emptyMessage;
 
   @override
@@ -44,7 +46,12 @@ class DayReplaySliver extends StatelessWidget {
       bodyHeader: 'Diario',
       pinnedChild: pinned.isEmpty
           ? null
-          : _DayLogList(rows: pinned, onOpen: onOpen, bottomPadding: 0),
+          : _DayLogList(
+              rows: pinned,
+              onOpen: onOpen,
+              onNavigateToDay: onNavigateToDay,
+              bottomPadding: 0,
+            ),
       bodyChild: rest.isEmpty
           ? SliverToBoxAdapter(
               child: Padding(
@@ -59,7 +66,7 @@ class DayReplaySliver extends StatelessWidget {
                 ),
               ),
             )
-          : _DayLogList(rows: rest, onOpen: onOpen),
+          : _DayLogList(rows: rest, onOpen: onOpen, onNavigateToDay: onNavigateToDay),
     );
   }
 }
@@ -218,11 +225,13 @@ class _DayLogList extends StatelessWidget {
   const _DayLogList({
     required this.rows,
     required this.onOpen,
+    this.onNavigateToDay,
     this.bottomPadding = 88,
   });
 
   final List<DayLogRow> rows;
   final void Function(NoteItem item) onOpen;
+  final ValueChanged<DateTime>? onNavigateToDay;
   final double bottomPadding;
 
   @override
@@ -235,7 +244,11 @@ class _DayLogList extends StatelessWidget {
           final row = rows[index];
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: _DayLogCard(row: row, onTap: () => onOpen(row.note)),
+            child: _DayLogCard(
+              row: row,
+              onTap: () => onOpen(row.note),
+              onNavigateToDay: onNavigateToDay,
+            ),
           );
         },
       ),
@@ -244,10 +257,15 @@ class _DayLogList extends StatelessWidget {
 }
 
 class _DayLogCard extends StatelessWidget {
-  const _DayLogCard({required this.row, required this.onTap});
+  const _DayLogCard({
+    required this.row,
+    required this.onTap,
+    this.onNavigateToDay,
+  });
 
   final DayLogRow row;
   final VoidCallback onTap;
+  final ValueChanged<DateTime>? onNavigateToDay;
 
   @override
   Widget build(BuildContext context) {
@@ -272,6 +290,7 @@ class _DayLogCard extends StatelessWidget {
                   item: note,
                   repository: NotesRepository.instance,
                   actionDay: entry.day,
+                  onNavigateToDay: onNavigateToDay,
                 );
               }
             : null,

@@ -191,6 +191,19 @@ class NoteCard extends StatelessWidget {
                         style: textTheme.labelSmall,
                       ),
                     ],
+                    if (isTask && item.hasChecklist && item.checklistItems.isNotEmpty) ...[
+                      Text(' · ', style: textTheme.labelSmall),
+                      Icon(
+                        Icons.check_box_outlined,
+                        size: 12,
+                        color: AppColors.neutral40,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${item.checklistCompletedCount}/${item.checklistItems.length}',
+                        style: textTheme.labelSmall,
+                      ),
+                    ],
                   ],
                 ),
               ],

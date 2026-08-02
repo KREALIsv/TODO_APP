@@ -58,12 +58,13 @@ void main() {
     bool completed = false,
     DateTime? updatedAt,
     List<String> tags = const [],
+    String title = '',
   }) {
     final now = DateTime(2026, 7, 16, 12);
     return NoteItem(
       id: id,
       type: type,
-      title: 'Title $id',
+      title: title.isEmpty ? 'Title $id' : title,
       body: 'Body $id',
       pinned: pinned,
       completed: completed,
@@ -169,6 +170,38 @@ void main() {
     expect(closed?.outcome, DayOutcome.backlogged);
   });
 
+  test('applyTaskWhen closes origin and opens destination when due date moves',
+      () async {
+    final origin = dateOnly(DateTime.now().subtract(const Duration(days: 3)));
+    final destination =
+        dateOnly(DateTime.now().subtract(const Duration(days: 1)));
+    await repo.add(
+      buildItem(
+        id: 'task',
+        type: NoteType.task,
+      ).copyWith(dueAt: origin),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: origin,
+      via: DayVia.due,
+    );
+
+    await repo.applyTaskWhen(
+      'task',
+      todayOn: false,
+      dueAt: destination,
+      dueHasTime: false,
+    );
+
+    final closed = dayEntries.findForNoteDay('task', origin)!;
+    expect(closed.outcome, DayOutcome.scheduled);
+    expect(closed.targetDay, destination);
+    final opened = dayEntries.findForNoteDay('task', destination)!;
+    expect(opened.outcome, DayOutcome.open);
+    expect(opened.via, DayVia.scheduledIn);
+  });
+
   test('applyTaskWhen matches exclusive Hoy / Mañana semantics', () async {
     await repo.add(buildItem(id: 't', type: NoteType.task));
 
@@ -181,6 +214,7 @@ void main() {
     );
 
     final tomorrow = dateOnly(DateTime.now()).add(const Duration(days: 1));
+    final today = dateOnly(DateTime.now());
     await repo.applyTaskWhen(
       't',
       todayOn: false,
@@ -192,12 +226,17 @@ void main() {
     expect(after.dueAt, tomorrow);
     expect(
       dayEntries.findForNoteDay('t', tomorrow)?.via,
-      DayVia.due,
+      DayVia.scheduledIn,
     );
     expect(
       dayEntries.findForNoteDay('t', tomorrow)?.outcome,
       DayOutcome.open,
     );
+    expect(
+      dayEntries.findForNoteDay('t', today)?.outcome,
+      DayOutcome.scheduled,
+    );
+    expect(dayEntries.findForNoteDay('t', today)?.targetDay, tomorrow);
   });
 
   test('toggleCompleted marks DayEntry completed and reopen restores open',
@@ -384,5 +423,82 @@ void main() {
     await repo.resetAll();
     expect(repo.getAll(), isEmpty);
     expect(repo.getArchived(), isEmpty);
+  });
+
+  test('deleteSyncConflictCopies removes only conflict copies', () async {
+    await repo.add(buildItem(id: 'real', title: 'Tarea real'));
+    await repo.add(
+      buildItem(
+        id: 'conflict',
+        title: 'Conflicto de sincronización · Tarea real',
+      ),
+    );
+    await repo.add(
+      buildItem(
+        id: 'conflict-2',
+        title: 'Copia enlazada',
+      ).copyWith(syncConflictOfNoteId: 'real'),
+    );
+
+    expect(repo.getSyncConflictCopies().length, 2);
+    final removed = await repo.deleteSyncConflictCopies();
+    expect(removed, 2);
+    expect(repo.getSyncConflictCopies(), isEmpty);
+    expect(repo.getById('real')?.title, 'Tarea real');
+  });
+
+  test('conflict copies are hidden from getAll', () async {
+    await repo.add(buildItem(id: 'real', title: 'Visible'));
+    await repo.add(
+      buildItem(id: 'copy', title: 'Copia')
+          .copyWith(syncConflictOfNoteId: 'real'),
+    );
+
+    expect(repo.getAll().map((e) => e.id), ['real']);
+  });
+
+  test('resolveSyncConflictKeepRemote deletes only the copy', () async {
+    await repo.add(buildItem(id: 'real', title: 'Nube'));
+    await repo.add(
+      buildItem(id: 'copy', title: 'Local')
+          .copyWith(syncConflictOfNoteId: 'real'),
+    );
+
+    await repo.resolveSyncConflictKeepRemote('copy');
+
+    expect(repo.getById('copy'), isNull);
+    expect(repo.getById('real')?.title, 'Nube');
+  });
+
+  test('resolveSyncConflictKeepLocal overwrites canonical note', () async {
+    await repo.add(buildItem(id: 'real', title: 'Nube'));
+    await repo.add(
+      buildItem(id: 'copy', title: 'Local', type: NoteType.task)
+          .copyWith(syncConflictOfNoteId: 'real', body: 'mi texto'),
+    );
+
+    await repo.resolveSyncConflictKeepLocal('copy');
+
+    expect(repo.getById('copy'), isNull);
+    expect(repo.getById('real')?.title, 'Local');
+    expect(repo.getById('real')?.body, 'mi texto');
+  });
+
+  test('resolveSyncConflictKeepBoth promotes copy to standalone note', () async {
+    await repo.add(buildItem(id: 'real', title: 'Nube'));
+    await repo.add(
+      buildItem(
+        id: 'copy',
+        title: 'Conflicto de sincronización · Local',
+      ).copyWith(syncConflictOfNoteId: 'real'),
+    );
+
+    await repo.resolveSyncConflictKeepBoth('copy');
+
+    final copy = repo.getById('copy');
+    expect(copy, isNotNull);
+    expect(copy!.title, 'Local');
+    expect(copy.syncConflictOfNoteId, isNull);
+    expect(repo.getById('real')?.title, 'Nube');
   });
 }
