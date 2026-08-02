@@ -160,6 +160,7 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
   }
 
   void _addItem() {
+    if (_hasDraftItem) return;
     final nextOrder = widget.items.isEmpty
         ? 0
         : widget.items.map((e) => e.sortOrder).reduce((a, b) => a > b ? a : b) +
@@ -176,6 +177,9 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
       ],
     );
   }
+
+  bool get _hasDraftItem =>
+      widget.items.any((item) => item.title.trim().isEmpty);
 
   Future<void> _deleteChecklist() async {
     final confirmed = await showDialog<bool>(
@@ -280,10 +284,18 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
             )),
         Align(
           alignment: Alignment.centerLeft,
-          child: OutlinedAddChip(
-            label: 'Añade un elemento',
-            onPressed: _addItem,
-          ),
+          child: _hasDraftItem
+              ? Tooltip(
+                  message: 'Completa el elemento en curso',
+                  child: OutlinedAddChip(
+                    label: 'Añade un elemento',
+                    onPressed: null,
+                  ),
+                )
+              : OutlinedAddChip(
+                  label: 'Añade un elemento',
+                  onPressed: _addItem,
+                ),
         ),
       ],
     );
@@ -502,18 +514,35 @@ class _ChecklistItemRowState extends State<_ChecklistItemRow> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
     final completed = widget.item.completed;
+    final isDraft = widget.item.title.trim().isEmpty;
+    final isEditing = _focused || isDraft;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
       onExit: (_) => setState(() => _hovering = false),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 1),
-        child: Material(
-          color: _showActions ? AppColors.neutral00 : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          decoration: BoxDecoration(
+            color: isEditing
+                ? scheme.primaryContainer.withValues(alpha: 0.38)
+                : _showActions
+                    ? AppColors.neutral00
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: isEditing
+                ? Border.all(
+                    color: scheme.primary.withValues(alpha: 0.42),
+                    width: 1.5,
+                  )
+                : null,
+          ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -522,7 +551,7 @@ class _ChecklistItemRowState extends State<_ChecklistItemRow> {
                   height: 24,
                   child: Checkbox(
                     value: completed,
-                    onChanged: (_) => widget.onToggle(),
+                    onChanged: isDraft ? null : (_) => widget.onToggle(),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     visualDensity: VisualDensity.compact,
                   ),
@@ -533,6 +562,7 @@ class _ChecklistItemRowState extends State<_ChecklistItemRow> {
                     controller: _controller,
                     focusNode: _focusNode,
                     textCapitalization: TextCapitalization.sentences,
+                    textInputAction: TextInputAction.done,
                     minLines: 1,
                     maxLines: 3,
                     style: textTheme.bodyMedium?.copyWith(

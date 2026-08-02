@@ -113,4 +113,90 @@ void main() {
       reason: 'popover should align with the add button',
     );
   });
+
+  testWidgets('cannot add another element while a draft row is empty', (
+    WidgetTester tester,
+  ) async {
+    var checklistItems = const <ChecklistItem>[
+      ChecklistItem(id: '1', title: 'Paso 1', completed: false),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              return ChecklistEditor(
+                title: 'Mi lista',
+                items: checklistItems,
+                onChanged: ({required title, required items}) {
+                  setState(() => checklistItems = items);
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Añade un elemento'));
+    await tester.pumpAndSettle();
+
+    expect(checklistItems.length, 2);
+    expect(checklistItems.last.title, '');
+
+    await tester.tap(find.text('Añade un elemento'));
+    await tester.pumpAndSettle();
+
+    expect(checklistItems.length, 2);
+  });
+
+  testWidgets('draft row shows editing highlight until text is committed', (
+    WidgetTester tester,
+  ) async {
+    var checklistItems = const <ChecklistItem>[
+      ChecklistItem(id: '1', title: '', completed: false),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              return ChecklistEditor(
+                title: 'Mi lista',
+                items: checklistItems,
+                onChanged: ({required title, required items}) {
+                  setState(() => checklistItems = items);
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    final draftRow = tester.widget<AnimatedContainer>(
+      find.ancestor(
+        of: find.byType(TextField),
+        matching: find.byType(AnimatedContainer),
+      ).first,
+    );
+    expect(draftRow.decoration, isNotNull);
+    final decoration = draftRow.decoration! as BoxDecoration;
+    expect(decoration.border, isNotNull);
+
+    await tester.enterText(find.byType(TextField), 'Nuevo paso');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    final committedRow = tester.widget<AnimatedContainer>(
+      find.ancestor(
+        of: find.byType(TextField),
+        matching: find.byType(AnimatedContainer),
+      ).first,
+    );
+    final committedDecoration = committedRow.decoration! as BoxDecoration;
+    expect(committedDecoration.border, isNull);
+  });
 }
