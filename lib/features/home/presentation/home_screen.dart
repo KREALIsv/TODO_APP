@@ -7,14 +7,12 @@ import '../../auth/data/auth_service.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/date_only.dart';
-import '../../notes/domain/day_log.dart';
 import '../../notes/domain/note_item.dart';
 import '../../notes/domain/notes_filter.dart';
 import '../../notes/domain/notes_query.dart';
 import '../../notes/domain/task_groups.dart';
 import '../../notes/presentation/note_editor_screen.dart';
 import '../../notes/presentation/widgets/clock_refresh.dart';
-import '../../notes/presentation/widgets/day_replay_sliver.dart';
 import '../../notes/presentation/widgets/filter_chips_bar.dart';
 import '../../notes/presentation/widgets/grouped_tasks_sliver.dart';
 import '../../notes/presentation/widgets/note_compose_sheet.dart';
@@ -73,7 +71,6 @@ class _HomeScreenState extends State<HomeScreen> {
   late final ClockRefreshController _clock;
   DateTime _now = DateTime.now();
   late DateTime _selectedDay;
-  DateTime? _backfillRequestedFor;
 
   NotesFilter get _effectiveFilter => widget.activeFilter ?? _activeFilter;
 
@@ -131,22 +128,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onSelectedDayChanged(DateTime day) {
     setState(() {
       _selectedDay = dateOnly(day);
-      _backfillRequestedFor = null;
-    });
-  }
-
-  void _maybeBackfillPastDay(DateTime day) {
-    final key = dateOnly(day);
-    final today = dateOnly(_now);
-    if (!key.isBefore(today)) return;
-    if (_backfillRequestedFor == key) return;
-    _backfillRequestedFor = key;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      await _dayEntries.backfillDayIfEmpty(
-        day: key,
-        notes: [..._repo.getAll(), ..._repo.getArchived()],
-      );
     });
   }
 
@@ -223,6 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       repository: _repo,
       initialIsTask: initialIsTask,
+      contextDay: _selectedDay,
     );
   }
 
@@ -482,26 +464,30 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  List<Widget> _buildLiveBodySlivers({
+  List<Widget> _buildDayBodySlivers({
     required TextTheme textTheme,
     required String searchQuery,
     required List<NoteItem> all,
+    required DateTime contextDay,
   }) {
+    final contextDayKey = dateOnly(contextDay);
+    final isToday = contextDayKey == dateOnly(_now);
     final useSectioned = NotesQuery.useSectionedLayout(
       filter: _effectiveFilter,
       searchQuery: searchQuery,
     );
-    final useGrouped = NotesQuery.useGroupedTasksLayout(
-      filter: _effectiveFilter,
-      searchQuery: searchQuery,
-    );
+    final useGrouped = isToday &&
+        NotesQuery.useGroupedTasksLayout(
+          filter: _effectiveFilter,
+          searchQuery: searchQuery,
+        );
     final filtered = NotesQuery.apply(
       items: all,
       filter: _effectiveFilter,
       searchQuery: searchQuery,
     );
     final pinned = NotesQuery.pinnedFrom(filtered);
-    final ofDay = NotesQuery.ofDayFrom(filtered, _now, now: _now);
+    final ofDay = NotesQuery.ofDayFrom(filtered, contextDay, now: _now);
     final emptyMessage = NotesQuery.emptyMessage(
       filter: _effectiveFilter,
       searchQuery: searchQuery,
@@ -518,7 +504,10 @@ class _HomeScreenState extends State<HomeScreen> {
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: QuickCaptureField(repository: _repo),
+          child: QuickCaptureField(
+            repository: _repo,
+            contextDay: contextDay,
+          ),
         ),
       ),
       SliverToBoxAdapter(
@@ -620,82 +609,9 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
   }
 
-  List<Widget> _buildReplaySlivers(DateTime day) {
-    _maybeBackfillPastDay(day);
-    final entries = _dayEntries.entriesForDay(day);
-    final notesById = <String, NoteItem>{
-      for (final n in [..._repo.getAll(), ..._repo.getArchived()]) n.id: n,
-    };
-    final rows = resolveDayLogRows(entries: entries, notesById: notesById);
-    return [
-      DayReplaySliver(
-        rows: rows,
-        onOpen: (item) => _openEditor(context, item: item),
-        onNavigateToDay: _onSelectedDayChanged,
-      ),
-    ];
-  }
-
-  List<Widget> _buildPlanSlivers(DateTime day) {
-    final items = planNotesForDay(_repo.getAll(), day);
-    return [
-      DayPlanSliver(
-        day: day,
-        items: items,
-        onOpen: (item) => _openEditor(context, item: item),
-      ),
-    ];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final searchQuery = _searchController.text;
-    final today = dateOnly(_now);
-    final selected = dateOnly(_selectedDay);
-    final isLiveDay = selected == today;
-    final isPastDay = selected.isBefore(today);
-
-    final scrollBody = _buildScrollBody(
-      textTheme: textTheme,
-      searchQuery: searchQuery,
-      isLiveDay: isLiveDay,
-      isPastDay: isPastDay,
-      selected: selected,
-    );
-
-    final body = widget.embeddedInShell
-        ? scrollBody
-        : ListBackgroundScaffoldBody(child: scrollBody);
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: body,
-      floatingActionButton: isLiveDay
-          ? Tooltip(
-              message: 'Nueva tarea',
-              child: Semantics(
-                button: true,
-                label: 'Nueva tarea',
-                hint: 'Mantén pulsado para crear una nota',
-                child: GestureDetector(
-                  onLongPress: _onFabLongPress,
-                  child: FloatingActionButton(
-                    onPressed: _onFabPressed,
-                    child: const Icon(Icons.add),
-                  ),
-                ),
-              ),
-            )
-          : null,
-    );
-  }
-
   Widget _buildScrollBody({
     required TextTheme textTheme,
     required String searchQuery,
-    required bool isLiveDay,
-    required bool isPastDay,
     required DateTime selected,
   }) {
     return SafeArea(
@@ -709,15 +625,12 @@ class _HomeScreenState extends State<HomeScreen> {
           final isArchivedFilter = _effectiveFilter == NotesFilter.archived;
           final all = isArchivedFilter ? _repo.getArchived() : _repo.getAll();
 
-          final bodySlivers = isLiveDay
-              ? _buildLiveBodySlivers(
-                  textTheme: textTheme,
-                  searchQuery: searchQuery,
-                  all: all,
-                )
-              : isPastDay
-                  ? _buildReplaySlivers(selected)
-                  : _buildPlanSlivers(selected);
+          final bodySlivers = _buildDayBodySlivers(
+            textTheme: textTheme,
+            searchQuery: searchQuery,
+            all: all,
+            contextDay: selected,
+          );
 
           return SlidableAutoCloseBehavior(
             child: CustomScrollView(
@@ -728,6 +641,43 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final searchQuery = _searchController.text;
+    final selected = dateOnly(_selectedDay);
+
+    final scrollBody = _buildScrollBody(
+      textTheme: textTheme,
+      searchQuery: searchQuery,
+      selected: selected,
+    );
+
+    final body = widget.embeddedInShell
+        ? scrollBody
+        : ListBackgroundScaffoldBody(child: scrollBody);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: body,
+      floatingActionButton: Tooltip(
+        message: 'Nueva tarea',
+        child: Semantics(
+          button: true,
+          label: 'Nueva tarea',
+          hint: 'Mantén pulsado para crear una nota',
+          child: GestureDetector(
+            onLongPress: _onFabLongPress,
+            child: FloatingActionButton(
+              onPressed: _onFabPressed,
+              child: const Icon(Icons.add),
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -3,12 +3,20 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
+import '../../domain/date_only.dart';
 import '../../domain/note_item.dart';
 
 class QuickCaptureField extends StatefulWidget {
-  const QuickCaptureField({super.key, this.repository});
+  const QuickCaptureField({
+    super.key,
+    this.repository,
+    this.contextDay,
+  });
 
   final NotesRepository? repository;
+
+  /// Calendar day the note should belong to (defaults to today).
+  final DateTime? contextDay;
 
   @override
   State<QuickCaptureField> createState() => _QuickCaptureFieldState();
@@ -32,7 +40,8 @@ class _QuickCaptureFieldState extends State<QuickCaptureField> {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
-    final now = DateTime.now();
+    final day = dateOnly(widget.contextDay ?? DateTime.now());
+    final timestamp = timestampForContextDay(day);
     await _repo.add(
       NoteItem(
         id: _uuid.v4(),
@@ -41,8 +50,8 @@ class _QuickCaptureFieldState extends State<QuickCaptureField> {
         body: text,
         pinned: false,
         completed: false,
-        createdAt: now,
-        updatedAt: now,
+        createdAt: timestamp,
+        updatedAt: timestamp,
       ),
     );
 

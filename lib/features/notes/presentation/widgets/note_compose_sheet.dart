@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/layout/keyboard_insets.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
+import '../../domain/date_only.dart';
 import '../../domain/note_item.dart';
 import '../../domain/task_groups.dart';
 import 'note_task_type_switch.dart';
@@ -13,6 +14,7 @@ Future<void> showNoteComposeSheet(
   BuildContext context, {
   NotesRepository? repository,
   bool initialIsTask = false,
+  DateTime? contextDay,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -23,6 +25,7 @@ Future<void> showNoteComposeSheet(
       return NoteComposeSheet(
         repository: repository ?? NotesRepository.instance,
         initialIsTask: initialIsTask,
+        contextDay: contextDay,
       );
     },
   );
@@ -33,10 +36,14 @@ class NoteComposeSheet extends StatefulWidget {
     super.key,
     this.repository,
     this.initialIsTask = false,
+    this.contextDay,
   });
 
   final NotesRepository? repository;
   final bool initialIsTask;
+
+  /// Calendar day the new item should belong to (defaults to today).
+  final DateTime? contextDay;
 
   @override
   State<NoteComposeSheet> createState() => _NoteComposeSheetState();
@@ -89,7 +96,11 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
     });
   }
 
-  String _taskSavedMessage() {
+  String _taskSavedMessage(DateTime day) {
+    final isToday = dateOnly(day) == dateOnly(DateTime.now());
+    if (!isToday) {
+      return 'Agendada para ${formatDayMonth(day)}';
+    }
     final progress = TaskGroupsQuery.from(
       _repo.getAll().where((n) => n.type == NoteType.task).toList(),
     ).progress;
@@ -110,8 +121,10 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
       return;
     }
 
-    final now = DateTime.now();
+    final day = dateOnly(widget.contextDay ?? DateTime.now());
+    final timestamp = timestampForContextDay(day);
     final isTask = _isTask;
+    final taskDates = isTask ? taskDatesForContextDay(day) : null;
     await _repo.add(
       NoteItem(
         id: _uuid.v4(),
@@ -120,16 +133,17 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
         body: body,
         pinned: false,
         completed: false,
-        createdAt: now,
-        updatedAt: now,
-        todayAt: isTask ? now : null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        todayAt: taskDates?.todayAt,
+        dueAt: taskDates?.dueAt,
       ),
     );
 
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final savedMessage =
-        isTask ? _taskSavedMessage() : 'Nota guardada';
+        isTask ? _taskSavedMessage(day) : 'Nota guardada';
     Navigator.of(context).pop();
     messenger
       ..hideCurrentSnackBar()
