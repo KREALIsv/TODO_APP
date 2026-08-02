@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_surface.dart';
 import '../../../../global/themes/app_colors.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/date_only.dart';
@@ -61,6 +62,7 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
   NotesRepository get _repo => widget.repository;
   bool get _isTask => _item.type == NoteType.task;
   bool get _showDayActions => _isTask && !_item.isArchived;
+  bool get _hasDayCommitment => _todayOn || _dueAt != null;
 
   @override
   void initState() {
@@ -165,19 +167,8 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
         ),
         const Divider(height: 1),
         _actionTile(
-          icon: Icons.chevron_right,
-          label: 'Migrar a mañana',
-          onTap: () => _applyDayAction(
-            () => _repo.migrateTaskToDay(
-              _item.id,
-              dateOnly(DateTime.now()).add(const Duration(days: 1)),
-              fromDay: widget.actionDay,
-            ),
-          ),
-        ),
-        _actionTile(
           icon: Icons.event_outlined,
-          label: 'Agendar…',
+          label: 'Agendar otro día',
           onTap: _scheduleTask,
         ),
         _actionTile(
@@ -190,16 +181,7 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
             ),
           ),
         ),
-        _actionTile(
-          icon: Icons.remove_circle_outline,
-          label: 'Descartar del día',
-          onTap: () => _applyDayAction(
-            () => _repo.cancelTaskOnDay(
-              _item.id,
-              fromDay: widget.actionDay,
-            ),
-          ),
-        ),
+        if (_hasDayCommitment) _removeFromDayButton(textTheme),
         const Divider(height: 1),
       ],
       _actionTile(
@@ -225,6 +207,32 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
           action: NoteCardContextAction.restore,
         ),
     ];
+  }
+
+  /// Tertiary BuJo action: drop today's commitment without sending to backlog.
+  Widget _removeFromDayButton(TextTheme textTheme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Align(
+        alignment: Alignment.center,
+        child: TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: AppSurface.secondary(context),
+            textStyle: textTheme.labelMedium,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          onPressed: () => _applyDayAction(
+            () => _repo.cancelTaskOnDay(
+              _item.id,
+              fromDay: widget.actionDay,
+            ),
+          ),
+          child: const Text('Quitar del día'),
+        ),
+      ),
+    );
   }
 
   Widget _deleteButton() {

@@ -10,11 +10,14 @@ import '../domain/checklist_item.dart';
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
 import '../domain/task_groups.dart';
+import '../domain/task_when_save_hint.dart';
 import 'widgets/attachments_editor.dart';
 import 'widgets/checklist_editor.dart';
 import 'widgets/note_task_type_switch.dart';
 import 'widgets/tags_editor.dart';
+import 'widgets/task_day_history_section.dart';
 import 'widgets/task_when_field.dart';
+import 'widgets/task_when_save_hint_banner.dart';
 
 class NoteEditorScreen extends StatefulWidget {
   const NoteEditorScreen({
@@ -215,7 +218,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         checklistTitle: checklistTitle,
         checklistItems: checklistItems,
       );
-      await _repo.update(toSave);
+      await _repo.saveTaskFromEditor(previous: existing, next: toSave);
     }
 
     _discardUnsavedAttachments = false;
@@ -360,6 +363,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               });
             },
           ),
+          if (_isEditing && widget.item != null)
+            Builder(
+              builder: (context) {
+                final hint = taskWhenSaveHint(
+                  previous: widget.item!,
+                  nextTodayOn: _todayOn,
+                  nextDueAt: _dueAt,
+                );
+                if (hint == null) return const SizedBox.shrink();
+                return TaskWhenSaveHintBanner(message: hint);
+              },
+            ),
         ],
         const SizedBox(height: 24),
         TagsEditor(
@@ -410,6 +425,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             });
           },
         ),
+        if (isTask && _isEditing) ...[
+          const SizedBox(height: 24),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+          TaskDayHistorySection(noteId: _noteId),
+        ],
       ],
     );
   }

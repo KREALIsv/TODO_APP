@@ -5,6 +5,9 @@ import '../../../global/widgets/activity_stat_card.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/activity_stats.dart';
 import '../../notes/domain/notes_filter.dart';
+import 'profile_navigation.dart';
+
+export 'profile_navigation.dart';
 import '../../notes/presentation/widgets/activity_heatmap.dart';
 import '../../notes/presentation/widgets/monthly_activity_bars.dart';
 import '../../settings/data/settings_repository.dart';

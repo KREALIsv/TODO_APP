@@ -239,6 +239,63 @@ void main() {
     expect(dayEntries.findForNoteDay('t', today)?.targetDay, tomorrow);
   });
 
+  test('saveTaskFromEditor closes origin and opens destination when due moves',
+      () async {
+    final origin = dateOnly(DateTime.now().subtract(const Duration(days: 4)));
+    final destination =
+        dateOnly(DateTime.now().subtract(const Duration(days: 1)));
+    final original = buildItem(
+      id: 'task',
+      type: NoteType.task,
+    ).copyWith(dueAt: origin);
+    await repo.add(original);
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: origin,
+      via: DayVia.due,
+    );
+
+    final edited = original.copyWith(
+      dueAt: destination,
+      todayAt: null,
+      updatedAt: DateTime.now(),
+    );
+    await repo.saveTaskFromEditor(previous: original, next: edited);
+
+    final closed = dayEntries.findForNoteDay('task', origin)!;
+    expect(closed.outcome, DayOutcome.scheduled);
+    expect(closed.targetDay, destination);
+    final opened = dayEntries.findForNoteDay('task', destination)!;
+    expect(opened.outcome, DayOutcome.open);
+    expect(opened.via, DayVia.scheduledIn);
+  });
+
+  test('saveTaskFromEditor marks completion on commitment day', () async {
+    final due = dateOnly(DateTime.now().subtract(const Duration(days: 1)));
+    final original = buildItem(
+      id: 'task',
+      type: NoteType.task,
+    ).copyWith(dueAt: due);
+    await repo.add(original);
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: due,
+      via: DayVia.due,
+    );
+
+    final now = DateTime.now();
+    final edited = original.copyWith(
+      completed: true,
+      completedAt: now,
+      updatedAt: now,
+    );
+    await repo.saveTaskFromEditor(previous: original, next: edited);
+
+    final entry = dayEntries.findForNoteDay('task', due)!;
+    expect(entry.outcome, DayOutcome.completed);
+    expect(entry.outcomeAt, isNotNull);
+  });
+
   test('toggleCompleted marks DayEntry completed and reopen restores open',
       () async {
     await repo.add(buildItem(id: 'task', type: NoteType.task));
