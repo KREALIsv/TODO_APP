@@ -1,6 +1,7 @@
 import 'date_only.dart';
 import 'day_entry.dart';
 import 'note_item.dart';
+import 'task_day_query.dart';
 import 'task_dates.dart';
 
 /// Filters [all] to entries whose [DayEntry.day] matches [day] (dateOnly).
@@ -111,6 +112,10 @@ List<DayEntry> synthesizeEntriesFromNotes({
       outcome = note.completed ? DayOutcome.completed : DayOutcome.open;
       outcomeAt = note.completed ? (note.completedAt ?? created) : null;
       via = DayVia.due;
+    } else if (TaskDayQuery.isInboxCaptureOn(note, day)) {
+      outcome = note.completed ? DayOutcome.completed : DayOutcome.open;
+      outcomeAt = note.completed ? (note.completedAt ?? created) : null;
+      via = DayVia.manual;
     }
 
     if (outcome == null) continue;
@@ -144,13 +149,10 @@ DateTime commitmentDayFor(NoteItem note, DateTime now) {
 
 /// Tasks planned for a future (or any) calendar [day] via dueAt / todayAt.
 List<NoteItem> planNotesForDay(List<NoteItem> notes, DateTime day) {
-  final key = dateOnly(day);
   final out = <NoteItem>[];
   for (final note in notes) {
     if (note.type != NoteType.task || note.isArchived) continue;
-    final dueMatch = note.dueAt != null && dateOnly(note.dueAt!) == key;
-    final todayMatch = note.todayAt != null && dateOnly(note.todayAt!) == key;
-    if (dueMatch || todayMatch) out.add(note);
+    if (TaskDayQuery.isScheduledOn(note, day)) out.add(note);
   }
   out.sort((a, b) {
     if (a.pinned != b.pinned) return a.pinned ? -1 : 1;

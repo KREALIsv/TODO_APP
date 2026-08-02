@@ -142,6 +142,22 @@ void main() {
     expect(groups.today.map((e) => e.id), ['today']);
   });
 
+  test('captured today without commitment enters Hoy not Sin fecha', () {
+    final captured = NoteItem(
+      id: 'new',
+      type: NoteType.task,
+      title: 'new',
+      body: '',
+      pinned: false,
+      completed: false,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final groups = TaskGroupsQuery.from([captured], now: now);
+    expect(groups.today.map((e) => e.id), ['new']);
+    expect(groups.undated, isEmpty);
+  });
+
   test('notes are ignored', () {
     final note = NoteItem(
       id: 'n',

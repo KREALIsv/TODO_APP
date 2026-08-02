@@ -1,5 +1,6 @@
 import 'date_only.dart';
 import 'note_item.dart';
+import 'task_day_query.dart';
 import 'task_dates.dart';
 
 class TodayProgress {
@@ -57,7 +58,7 @@ class TaskGroupsQuery {
     for (final item in tasks) {
       if (item.type != NoteType.task || item.isArchived) continue;
 
-      if (_belongsToToday(item, todayDay, reference)) {
+      if (TaskDayQuery.belongsToHoy(item, now: reference)) {
         today.add(item);
         continue;
       }
@@ -103,32 +104,7 @@ class TaskGroupsQuery {
 
   /// Whether [item] belongs in the Hoy group (PRD §6.2).
   static bool belongsToToday(NoteItem item, {DateTime? now}) {
-    if (item.type != NoteType.task || item.isArchived) return false;
-    final reference = now ?? DateTime.now();
-    return _belongsToToday(item, dateOnly(reference), reference);
-  }
-
-  /// PRD §6.2: switch today OR due today OR overdue incomplete;
-  /// completed today stay in Hoy (due today / switch / inbox); future-due
-  /// completed go to Próximas; overdue completed completed today stay in Hoy.
-  static bool _belongsToToday(
-    NoteItem item,
-    DateTime todayDay,
-    DateTime now,
-  ) {
-    if (item.completed) {
-      if (item.dueAt != null && dateOnly(item.dueAt!).isAfter(todayDay)) {
-        return false;
-      }
-      if (item.isCompletedToday(now)) return true;
-      final commitment = item.isTodayCommitment(now);
-      final dueToday = item.isDueToday(now);
-      return commitment || dueToday;
-    }
-
-    final commitment = item.isTodayCommitment(now);
-    final dueToday = item.isDueToday(now);
-    return commitment || dueToday || item.isOverdue(now);
+    return TaskDayQuery.belongsToHoy(item, now: now);
   }
 
   /// Order: overdue asc → due today with time asc → due today no time →
