@@ -244,5 +244,34 @@ void main() {
       final ofDay = NotesQuery.ofDayFrom(items, today, now: today);
       expect(ofDay.map((e) => e.id).toList(), ['new-task']);
     });
+
+    test('ofDayFrom excludes tasks captured today but scheduled for tomorrow', () {
+      final today = DateTime(2026, 8, 2, 15);
+      final tomorrow = DateTime(2026, 8, 3);
+      final items = [
+        NoteItem(
+          id: 'tomorrow-task',
+          type: NoteType.task,
+          title: 'Reunión chepe',
+          body: '',
+          pinned: false,
+          completed: false,
+          createdAt: today,
+          updatedAt: today,
+          dueAt: tomorrow,
+        ),
+      ];
+
+      expect(
+        NotesQuery.ofDayFrom(items, today, now: today).map((e) => e.id).toList(),
+        isEmpty,
+      );
+      expect(
+        NotesQuery.ofDayFrom(items, tomorrow, now: today)
+            .map((e) => e.id)
+            .toList(),
+        ['tomorrow-task'],
+      );
+    });
   });
 }
