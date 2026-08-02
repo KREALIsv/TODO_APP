@@ -2,6 +2,26 @@
 DateTime dateOnly(DateTime value) =>
     DateTime(value.year, value.month, value.day);
 
+/// Timestamp for creating content on [day]: real [now] when it is today,
+/// otherwise start of that calendar day.
+DateTime timestampForContextDay(DateTime day, {DateTime? now}) {
+  final reference = now ?? DateTime.now();
+  return dateOnly(day) == dateOnly(reference) ? reference : dateOnly(day);
+}
+
+/// Task date fields when composing on a selected calendar [day].
+({DateTime? todayAt, DateTime? dueAt}) taskDatesForContextDay(
+  DateTime day, {
+  DateTime? now,
+}) {
+  final reference = now ?? DateTime.now();
+  final key = dateOnly(day);
+  if (key == dateOnly(reference)) {
+    return (todayAt: reference, dueAt: null);
+  }
+  return (todayAt: null, dueAt: key);
+}
+
 const List<String> _shortMonths = [
   'Jan',
   'Feb',
