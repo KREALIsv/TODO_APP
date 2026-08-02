@@ -44,24 +44,84 @@ class ChecklistEditor extends StatefulWidget {
 
 class _ChecklistEditorState extends State<ChecklistEditor> {
   static const _uuid = Uuid();
-  final _addMenuController = OverlayPortalController();
-  final _anchorLink = LayerLink();
+  final _addButtonKey = GlobalKey();
+  OverlayEntry? _popoverOverlay;
 
   bool get _hasChecklist => widget.title != null;
+  bool get _isAddMenuOpen => _popoverOverlay != null;
 
   void _toggleAddMenu() {
-    setState(() {
-      if (_addMenuController.isShowing) {
-        _addMenuController.hide();
-      } else {
-        _addMenuController.show();
-      }
-    });
+    if (_isAddMenuOpen) {
+      _closeAddMenu();
+    } else {
+      _openAddMenu();
+    }
   }
 
-  void _closeAddMenu() {
-    if (!_addMenuController.isShowing) return;
-    setState(_addMenuController.hide);
+  void _closeAddMenu({bool notify = true}) {
+    _popoverOverlay?.remove();
+    _popoverOverlay = null;
+    if (notify && mounted) setState(() {});
+  }
+
+  void _openAddMenu() {
+    final anchorContext = _addButtonKey.currentContext;
+    if (anchorContext == null) return;
+
+    final anchorBox = anchorContext.findRenderObject() as RenderBox?;
+    if (anchorBox == null || !anchorBox.hasSize) return;
+
+    final overlayState = Overlay.of(context);
+    final overlayBox =
+        overlayState.context.findRenderObject() as RenderBox;
+    final anchorOffset =
+        anchorBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    final anchorSize = anchorBox.size;
+    final overlaySize = overlayBox.size;
+
+    const margin = 16.0;
+    const gap = 6.0;
+    const maxPopoverWidth = 320.0;
+    const estimatedPopoverHeight = 220.0;
+    final popoverWidth = (overlaySize.width - margin * 2)
+        .clamp(240.0, maxPopoverWidth)
+        .toDouble();
+
+    var left = anchorOffset.dx;
+    if (left + popoverWidth > overlaySize.width - margin) {
+      left = overlaySize.width - margin - popoverWidth;
+    }
+    left = left.clamp(margin, overlaySize.width - margin - popoverWidth);
+
+    var top = anchorOffset.dy + anchorSize.height + gap;
+    if (top + estimatedPopoverHeight > overlaySize.height - margin) {
+      top = (anchorOffset.dy - estimatedPopoverHeight - gap)
+          .clamp(margin, top);
+    }
+
+    _popoverOverlay = OverlayEntry(
+      builder: (overlayContext) {
+        return _AnchoredPopoverOverlay(
+          left: left,
+          top: top,
+          width: popoverWidth,
+          onDismiss: _closeAddMenu,
+          child: _AddChecklistPopover(
+            width: popoverWidth,
+            onCancel: _closeAddMenu,
+            onSubmit: _confirmAddChecklist,
+          ),
+        );
+      },
+    );
+    overlayState.insert(_popoverOverlay!);
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _closeAddMenu(notify: false);
+    super.dispose();
   }
 
   void _confirmAddChecklist(String title) {
@@ -141,38 +201,6 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
     widget.onChanged(title: null, items: const []);
   }
 
-  Widget _buildAddChecklistPopover({required Widget child}) {
-    return OverlayPortal(
-      controller: _addMenuController,
-      overlayChildBuilder: (context) {
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            ModalBarrier(
-              color: Colors.transparent,
-              onDismiss: _closeAddMenu,
-            ),
-            CompositedTransformFollower(
-              link: _anchorLink,
-              showWhenUnlinked: false,
-              targetAnchor: Alignment.topLeft,
-              followerAnchor: Alignment.topLeft,
-              offset: const Offset(0, 6),
-              child: _AddChecklistPopover(
-                onCancel: _closeAddMenu,
-                onSubmit: _confirmAddChecklist,
-              ),
-            ),
-          ],
-        );
-      },
-      child: CompositedTransformTarget(
-        link: _anchorLink,
-        child: child,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -186,11 +214,10 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerLeft,
-            child: _buildAddChecklistPopover(
-              child: OutlinedAddChip(
-                label: 'Añadir checklist',
-                onPressed: _toggleAddMenu,
-              ),
+            child: OutlinedAddChip(
+              key: _addButtonKey,
+              label: 'Añadir checklist',
+              onPressed: _toggleAddMenu,
             ),
           ),
         ],
@@ -264,12 +291,50 @@ class _ChecklistEditorState extends State<ChecklistEditor> {
   }
 }
 
+class _AnchoredPopoverOverlay extends StatelessWidget {
+  const _AnchoredPopoverOverlay({
+    required this.left,
+    required this.top,
+    required this.width,
+    required this.onDismiss,
+    required this.child,
+  });
+
+  final double left;
+  final double top;
+  final double width;
+  final VoidCallback onDismiss;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: ModalBarrier(
+            color: Colors.transparent,
+            onDismiss: onDismiss,
+          ),
+        ),
+        Positioned(
+          left: left,
+          top: top,
+          width: width,
+          child: child,
+        ),
+      ],
+    );
+  }
+}
+
 class _AddChecklistPopover extends StatefulWidget {
   const _AddChecklistPopover({
+    required this.width,
     required this.onCancel,
     required this.onSubmit,
   });
 
+  final double width;
   final VoidCallback onCancel;
   final ValueChanged<String> onSubmit;
 
@@ -314,8 +379,8 @@ class _AddChecklistPopoverState extends State<_AddChecklistPopover> {
         color: scheme.surface,
         shadowColor: Colors.black26,
         borderRadius: BorderRadius.circular(12),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 280, maxWidth: 320),
+        child: SizedBox(
+          width: widget.width,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 12, 16),
             child: Column(

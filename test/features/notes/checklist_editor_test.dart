@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:todos_app/features/notes/domain/checklist_item.dart';
 import 'package:todos_app/features/notes/presentation/widgets/checklist_editor.dart';
+import 'package:todos_app/global/widgets/outlined_add_chip.dart';
 
 void main() {
   testWidgets('ChecklistEditor shows add button when no checklist', (
@@ -70,5 +71,46 @@ void main() {
     expect(find.text('Añadir checklist'), findsNWidgets(2));
     expect(find.text('Título'), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
+  });
+
+  testWidgets('add checklist popover anchors below button within viewport', (
+    WidgetTester tester,
+  ) async {
+    const viewport = Size(360, 640);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(size: viewport),
+          child: Scaffold(
+            body: ChecklistEditor(
+              title: null,
+              items: const [],
+              onChanged: ({required title, required items}) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final buttonFinder = find.byType(OutlinedAddChip);
+    await tester.tap(buttonFinder);
+    await tester.pumpAndSettle();
+
+    final buttonRect = tester.getRect(buttonFinder);
+    final popoverRect = tester.getRect(
+      find.ancestor(
+        of: find.text('Título'),
+        matching: find.byType(Material),
+      ),
+    );
+
+    expect(popoverRect.top, greaterThan(buttonRect.bottom));
+    expect(popoverRect.left, greaterThanOrEqualTo(16));
+    expect(popoverRect.right, lessThanOrEqualTo(viewport.width - 16));
+    expect(
+      (popoverRect.left - buttonRect.left).abs(),
+      lessThan(24),
+      reason: 'popover should align with the add button',
+    );
   });
 }
