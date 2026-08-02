@@ -174,6 +174,20 @@ DateTime startOfMonth(DateTime value) {
   return DateTime(day.year, day.month);
 }
 
+/// Monday-first days for a month grid, including leading/trailing adjacent days.
+List<DateTime> monthGridDays(DateTime month) {
+  final first = startOfMonth(month);
+  final last = DateTime(first.year, first.month + 1, 0);
+  final startOffset = first.weekday - DateTime.monday;
+  final gridStart = first.subtract(Duration(days: startOffset));
+  final daysToSunday = DateTime.sunday - last.weekday;
+  final totalDays = startOffset + last.day + daysToSunday;
+  return List<DateTime>.generate(
+    totalDays,
+    (i) => gridStart.add(Duration(days: i)),
+  );
+}
+
 /// Event counts for the last [months] calendar months (oldest → newest).
 /// Uses the same write-activity definition as the heatmap.
 List<MonthActivityBar> monthlyEventBars({

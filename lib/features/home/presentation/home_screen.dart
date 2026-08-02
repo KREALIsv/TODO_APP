@@ -39,6 +39,7 @@ class HomeScreen extends StatefulWidget {
     this.onOpenSettings,
     this.onRegisterDayReset,
     this.onRegisterDayNavigation,
+    this.onSelectedDayChanged,
     this.onOpenNoteEditor,
     this.selectedNoteId,
   });
@@ -51,6 +52,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onOpenSettings;
   final ValueChanged<VoidCallback>? onRegisterDayReset;
   final ValueChanged<void Function(DateTime)>? onRegisterDayNavigation;
+  final ValueChanged<DateTime>? onSelectedDayChanged;
   final ValueChanged<NoteEditorRequest>? onOpenNoteEditor;
   final String? selectedNoteId;
 
@@ -126,9 +128,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onSelectedDayChanged(DateTime day) {
+    final normalized = dateOnly(day);
     setState(() {
-      _selectedDay = dateOnly(day);
+      _selectedDay = normalized;
     });
+    widget.onSelectedDayChanged?.call(normalized);
   }
 
   void _resetSelectedDayToToday() {
