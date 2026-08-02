@@ -5,6 +5,7 @@ import '../core/layout/adaptive_breakpoints.dart';
 import '../features/auth/presentation/reset_password_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/notes/data/notes_repository.dart';
+import '../features/notes/domain/date_only.dart';
 import '../features/notes/domain/note_item.dart';
 import '../features/notes/domain/notes_filter.dart';
 import '../features/profile/presentation/profile_panel.dart';
@@ -36,6 +37,7 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
   NoteType _editorInitialType = NoteType.note;
   VoidCallback? _resetHomeDay;
   void Function(DateTime)? _setHomeSelectedDay;
+  DateTime _homeSelectedDay = dateOnly(DateTime.now());
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
   SettingsRepository get _settings =>
@@ -149,6 +151,7 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
                     onFilterSelected: _onFilterSelected,
                     onOpenSettings: () => _openSettings(layout: layout),
                     onNavigateToDay: (day) => _setHomeSelectedDay?.call(day),
+                    selectedDay: _homeSelectedDay,
                   ),
                 ),
                 const VerticalDivider(width: 1, thickness: 1),
@@ -162,6 +165,9 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
                     onRegisterDayReset: (callback) => _resetHomeDay = callback,
                     onRegisterDayNavigation:
                         (setter) => _setHomeSelectedDay = setter,
+                    onSelectedDayChanged: (day) {
+                      setState(() => _homeSelectedDay = day);
+                    },
                     onOpenNoteEditor:
                         useMasterDetail ? _openNoteEditor : null,
                     selectedNoteId:
