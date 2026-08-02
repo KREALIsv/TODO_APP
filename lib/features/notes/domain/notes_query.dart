@@ -1,6 +1,7 @@
 import 'date_only.dart';
 import 'note_item.dart';
 import 'notes_filter.dart';
+import 'task_day_query.dart';
 import 'task_dates.dart';
 
 class NotesQuery {
@@ -70,23 +71,7 @@ class NotesQuery {
       return dateOnly(item.createdAt) == key || dateOnly(item.updatedAt) == key;
     }
 
-    if (dateOnly(item.createdAt) == key) {
-      // Captured today, but committed to another calendar day → not «Del día» today.
-      if (item.dueAt != null && dateOnly(item.dueAt!) != key) {
-        return false;
-      }
-      if (item.todayAt != null && dateOnly(item.todayAt!) != key) {
-        return false;
-      }
-      return true;
-    }
-    if (item.todayAt != null && dateOnly(item.todayAt!) == key) return true;
-    if (item.dueAt != null && dateOnly(item.dueAt!) == key) return true;
-    if (item.completedAt != null && dateOnly(item.completedAt!) == key) {
-      return true;
-    }
-    if (key == dateOnly(reference) && item.isOverdue(reference)) return true;
-    return false;
+    return TaskDayQuery.belongsToDay(item, day, now: reference);
   }
 
   static String emptyMessage({
