@@ -90,7 +90,10 @@ class NoteCard extends StatelessWidget {
                 child: Checkbox(
                   value: isCompleted,
                   onChanged: canToggleCompletion
-                      ? (_) => _repo.toggleCompleted(item.id)
+                      ? (_) => _repo.toggleCompleted(
+                            item.id,
+                            onDay: viewDay,
+                          )
                       : null,
                 ),
               ),

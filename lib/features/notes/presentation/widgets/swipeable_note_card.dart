@@ -63,12 +63,13 @@ class SwipeableNoteCard extends StatelessWidget {
       referenceDay,
       entry: dayEntry,
     );
-    await _repo.toggleCompleted(item.id);
+    final onDay = viewDay ?? actionDay;
+    await _repo.toggleCompleted(item.id, onDay: onDay);
     if (!context.mounted) return;
     await _undoToast(
       context,
       message: wasCompleted ? 'Tarea reabierta' : 'Tarea completada',
-      onUndo: () => _repo.toggleCompleted(item.id),
+      onUndo: () => _repo.toggleCompleted(item.id, onDay: onDay),
     );
   }
 

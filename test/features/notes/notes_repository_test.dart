@@ -360,6 +360,34 @@ void main() {
     expect(repo.getById('task')?.completedAt, isNull);
   });
 
+  test('toggleCompleted attributes completion to commitment day, not today',
+      () async {
+    final yesterday = dateOnly(DateTime(2026, 8, 2));
+    final today = DateTime(2026, 8, 3, 12);
+    await repo.add(
+      buildItem(id: 'task', type: NoteType.task).copyWith(
+        createdAt: yesterday,
+        dueAt: yesterday,
+      ),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: yesterday,
+      via: DayVia.due,
+      now: yesterday,
+    );
+
+    await repo.toggleCompleted('task', onDay: yesterday);
+
+    final task = repo.getById('task')!;
+    expect(dateOnly(task.completedAt!), yesterday);
+    expect(
+      dayEntries.findForNoteDay('task', yesterday)?.outcome,
+      DayOutcome.completed,
+    );
+    expect(dayEntries.findForNoteDay('task', dateOnly(today)), isNull);
+  });
+
   test('migrateTaskToDay creates an open destination and closes origin',
       () async {
     final origin = dateOnly(DateTime.now());

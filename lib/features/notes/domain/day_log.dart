@@ -136,15 +136,29 @@ List<DayEntry> synthesizeEntriesFromNotes({
   return out;
 }
 
-/// Active commitment day for completing a task (todayAt / dueAt / today).
-DateTime commitmentDayFor(NoteItem note, DateTime now) {
-  if (note.isTodayCommitment(now)) {
-    return dateOnly(note.todayAt!);
-  }
-  if (note.dueAt != null) {
-    return dateOnly(note.dueAt!);
-  }
+/// Calendar day a completion should be attributed to.
+///
+/// Prefers an explicit [onDay] (e.g. Home day selector), then the task's
+/// commitment ([todayAt] even when stale, then [dueAt]), else [now].
+DateTime commitmentDayFor(
+  NoteItem note,
+  DateTime now, {
+  DateTime? onDay,
+}) {
+  if (onDay != null) return dateOnly(onDay);
+  if (note.todayAt != null) return dateOnly(note.todayAt!);
+  if (note.dueAt != null) return dateOnly(note.dueAt!);
   return dateOnly(now);
+}
+
+/// Timestamp stored on [NoteItem.completedAt] / [DayEntry.outcomeAt].
+///
+/// Past days anchor to end-of-day so audit views stay on the intended calendar
+/// day; today keeps the real clock time.
+DateTime completionOutcomeAt(DateTime day, DateTime now) {
+  final key = dateOnly(day);
+  if (key == dateOnly(now)) return now;
+  return DateTime(day.year, day.month, day.day, 23, 59, 59);
 }
 
 /// Tasks planned for a future (or any) calendar [day] via dueAt / todayAt.
