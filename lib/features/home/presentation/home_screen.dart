@@ -7,6 +7,7 @@ import '../../auth/data/auth_service.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/date_only.dart';
+import '../../notes/domain/day_entry.dart';
 import '../../notes/domain/note_item.dart';
 import '../../notes/domain/notes_filter.dart';
 import '../../notes/domain/notes_query.dart';
@@ -288,6 +289,8 @@ class _HomeScreenState extends State<HomeScreen> {
     List<NoteItem> items,
     void Function(NoteItem item) onTap, {
     double bottomPadding = 88,
+    DateTime? viewDay,
+    Map<String, DayEntry>? dayEntriesByNoteId,
   }) {
     return SliverPadding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
@@ -300,6 +303,9 @@ class _HomeScreenState extends State<HomeScreen> {
             repository: _repo,
             selected: widget.selectedNoteId == item.id,
             onTap: () => onTap(item),
+            actionDay: viewDay,
+            viewDay: viewDay,
+            dayEntry: dayEntriesByNoteId?[item.id],
             onNavigateToDay: _onSelectedDayChanged,
           );
         },
@@ -490,8 +496,17 @@ class _HomeScreenState extends State<HomeScreen> {
       filter: _effectiveFilter,
       searchQuery: searchQuery,
     );
+    final dayEntriesForView = _dayEntries.entriesForDay(contextDay);
+    final dayEntriesByNoteId = {
+      for (final entry in dayEntriesForView) entry.noteId: entry,
+    };
     final pinned = NotesQuery.pinnedFrom(filtered);
-    final ofDay = NotesQuery.ofDayFrom(filtered, contextDay, now: _now);
+    final ofDay = NotesQuery.ofDayFrom(
+      filtered,
+      contextDay,
+      now: _now,
+      dayEntriesByNoteId: dayEntriesByNoteId,
+    );
     final emptyMessage = NotesQuery.emptyMessage(
       filter: _effectiveFilter,
       searchQuery: searchQuery,
@@ -594,6 +609,8 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildNoteList(
                 ofDay,
                 (item) => _openEditor(context, item: item),
+                viewDay: contextDay,
+                dayEntriesByNoteId: dayEntriesByNoteId,
               ),
         ];
       }() else ...[

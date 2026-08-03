@@ -1,4 +1,6 @@
 import 'date_only.dart';
+import 'day_entry.dart';
+import 'day_view_query.dart';
 import 'note_item.dart';
 import 'notes_filter.dart';
 import 'task_day_query.dart';
@@ -45,17 +47,30 @@ class NotesQuery {
   ///
   /// Notes: created or updated that day.
   /// Tasks: todayAt / dueAt / completedAt on that day, overdue when [day] is
-  /// today, or captured (created) that day so new tasks appear in «Del día».
+  /// today, captured that day, or any stored [DayEntry] for that day (audit).
   static List<NoteItem> ofDayFrom(
     List<NoteItem> items,
     DateTime day, {
     DateTime? now,
+    Map<String, DayEntry>? dayEntriesByNoteId,
   }) {
     final reference = now ?? DateTime.now();
     return items
-        .where(
-          (item) => !item.pinned && belongsToDay(item, day, now: reference),
-        )
+        .where((item) {
+          if (item.pinned) return false;
+          if (item.type == NoteType.task && dayEntriesByNoteId != null) {
+            final entry = dayEntriesByNoteId[item.id];
+            if (DayViewQuery.taskBelongsToDay(
+              item,
+              day,
+              now: reference,
+              entry: entry,
+            )) {
+              return true;
+            }
+          }
+          return belongsToDay(item, day, now: reference);
+        })
         .toList();
   }
 
