@@ -102,4 +102,40 @@ void main() {
       );
     });
   });
+
+  group('DayViewQuery remove from day', () {
+    test('can remove from viewed day even when dueAt is elsewhere', () {
+      final task = NoteItem(
+        id: 't',
+        type: NoteType.task,
+        title: 't',
+        body: '',
+        pinned: false,
+        completed: false,
+        createdAt: day2,
+        updatedAt: now,
+        dueAt: day3,
+      );
+      final openOnDay2 = DayEntry(
+        id: 'e',
+        noteId: 't',
+        day: day2,
+        via: DayVia.manual,
+        outcome: DayOutcome.open,
+        createdAt: day2,
+      );
+
+      expect(
+        DayViewQuery.canRemoveFromDay(task, day2, entry: openOnDay2),
+        isTrue,
+      );
+      expect(
+        DayViewQuery.removeFromDayCandidates(
+          item: task,
+          entries: [openOnDay2],
+        ),
+        containsAll([day2, day3]),
+      );
+    });
+  });
 }

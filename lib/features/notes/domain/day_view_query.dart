@@ -54,6 +54,51 @@ abstract final class DayViewQuery {
     return false;
   }
 
+  /// Whether «Quitar del día» applies while browsing [day].
+  static bool canRemoveFromDay(
+    NoteItem item,
+    DateTime day, {
+    DayEntry? entry,
+    DateTime? now,
+  }) {
+    if (item.isArchived || item.type != NoteType.task) return false;
+    if (entry?.outcome == DayOutcome.open) return true;
+    if (TaskDayQuery.isScheduledOn(item, day)) return true;
+    if (TaskDayQuery.isInboxCaptureOn(item, day)) return true;
+    return TaskDayQuery.belongsToDay(item, day, now: now ?? DateTime.now()) &&
+        entry == null;
+  }
+
+  /// Calendar days the user can detach this task from (open log + commitments).
+  static List<DateTime> removeFromDayCandidates({
+    required NoteItem item,
+    required List<DayEntry> entries,
+    DateTime? now,
+  }) {
+    if (item.type != NoteType.task) return const [];
+    final reference = now ?? DateTime.now();
+    final keys = <DateTime>{};
+
+    for (final entry in entries) {
+      if (entry.outcome != DayOutcome.open) continue;
+      if (canRemoveFromDay(item, entry.day, entry: entry, now: reference)) {
+        keys.add(dateOnly(entry.day));
+      }
+    }
+
+    if (item.todayAt != null) {
+      final day = dateOnly(item.todayAt!);
+      if (canRemoveFromDay(item, day, now: reference)) keys.add(day);
+    }
+    if (item.dueAt != null) {
+      final day = dateOnly(item.dueAt!);
+      if (canRemoveFromDay(item, day, now: reference)) keys.add(day);
+    }
+
+    final list = keys.toList()..sort((a, b) => b.compareTo(a));
+    return list;
+  }
+
   /// Whether completion can be toggled from the list while viewing [day].
   static bool canToggleCompletionOnDay({
     required NoteItem item,

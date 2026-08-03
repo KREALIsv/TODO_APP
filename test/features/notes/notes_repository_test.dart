@@ -484,6 +484,36 @@ void main() {
     );
   });
 
+  test('cancelTaskOnDay on viewed day does not clear due on another day',
+      () async {
+    final day2 = dateOnly(DateTime(2026, 8, 2));
+    final day3 = dateOnly(DateTime(2026, 8, 3));
+    await repo.add(
+      buildItem(id: 'task', type: NoteType.task).copyWith(
+        createdAt: day2,
+        dueAt: day3,
+      ),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: day2,
+      via: DayVia.manual,
+      now: day2,
+    );
+
+    await repo.cancelTaskOnDay('task', fromDay: day2);
+
+    expect(repo.getById('task')?.dueAt, day3);
+    expect(
+      dayEntries.findForNoteDay('task', day2)?.outcome,
+      DayOutcome.cancelled,
+    );
+    expect(
+      dayEntries.findForNoteDay('task', day3)?.outcome,
+      DayOutcome.open,
+    );
+  });
+
   test('duplicate copies content and resets pin/completed/archive', () async {
     await repo.add(
       buildItem(id: 'src', type: NoteType.task, pinned: true, completed: true)
