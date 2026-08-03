@@ -331,16 +331,18 @@ void main() {
     );
 
     final now = DateTime.now();
+    final outcomeAt = DateTime(due.year, due.month, due.day, 23, 59, 59);
     final edited = original.copyWith(
       completed: true,
-      completedAt: now,
+      completedAt: outcomeAt,
       updatedAt: now,
     );
     await repo.saveTaskFromEditor(previous: original, next: edited);
 
     final entry = dayEntries.findForNoteDay('task', due)!;
     expect(entry.outcome, DayOutcome.completed);
-    expect(entry.outcomeAt, isNotNull);
+    expect(entry.outcomeAt, outcomeAt);
+    expect(dayEntries.findForNoteDay('task', dateOnly(now)), isNull);
   });
 
   test('toggleCompleted marks DayEntry completed and reopen restores open',

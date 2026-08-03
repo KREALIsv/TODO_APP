@@ -22,6 +22,7 @@ class DesktopContextPanel extends StatelessWidget {
     required this.view,
     required this.editorItemId,
     required this.editorInitialType,
+    this.editorContextDay,
     required this.onCloseSettings,
     required this.onCloseEditor,
     required this.onEditorSaved,
@@ -33,6 +34,7 @@ class DesktopContextPanel extends StatelessWidget {
   final DesktopPanelView view;
   final String? editorItemId;
   final NoteType editorInitialType;
+  final DateTime? editorContextDay;
   final VoidCallback onCloseSettings;
   final VoidCallback onCloseEditor;
   final ValueChanged<String> onEditorSaved;
@@ -83,6 +85,7 @@ class DesktopContextPanel extends StatelessWidget {
                   repository: _repo,
                   itemId: editorItemId,
                   initialType: editorInitialType,
+                  contextDay: editorContextDay,
                   onClose: onCloseEditor,
                   onSaved: onEditorSaved,
                 ),
@@ -102,6 +105,7 @@ class _EditorBody extends StatelessWidget {
     required this.repository,
     required this.itemId,
     required this.initialType,
+    this.contextDay,
     required this.onClose,
     required this.onSaved,
   });
@@ -109,6 +113,7 @@ class _EditorBody extends StatelessWidget {
   final NotesRepository repository;
   final String? itemId;
   final NoteType initialType;
+  final DateTime? contextDay;
   final VoidCallback onClose;
   final ValueChanged<String> onSaved;
 
@@ -131,6 +136,7 @@ class _EditorBody extends StatelessWidget {
           item: item,
           initialType: initialType,
           repository: repository,
+          contextDay: contextDay,
           embedded: true,
           onClose: onClose,
           onSaved: onSaved,

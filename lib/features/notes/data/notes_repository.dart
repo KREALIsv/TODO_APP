@@ -263,7 +263,9 @@ class NotesRepository {
 
       if (previous.completed != next.completed) {
         if (next.completed) {
-          final day = commitmentDayFor(next, now);
+          final day = next.completedAt != null
+              ? dateOnly(next.completedAt!)
+              : commitmentDayFor(next, now);
           final outcomeAt = completionOutcomeAt(day, next.completedAt ?? now);
           await _dayEntries.markCompleted(
             noteId: next.id,

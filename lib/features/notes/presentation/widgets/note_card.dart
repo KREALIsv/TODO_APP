@@ -74,6 +74,12 @@ class NoteCard extends StatelessWidget {
     final showOutcomeMeta = dayEntry != null &&
         dayEntry!.outcome != DayOutcome.open &&
         dayEntry!.outcome != DayOutcome.completed;
+    final titleColor = dayEntry != null
+        ? DayOutcomeStyle.titleColor(dayEntry!.outcome)
+        : (isCompleted ? AppColors.neutral60 : AppColors.black);
+    final titleStruck = dayEntry != null
+        ? DayOutcomeStyle.isStruck(dayEntry!.outcome)
+        : isCompleted;
     final attachmentCount = _attachments.countFor(item.id);
 
     return Padding(
@@ -117,12 +123,10 @@ class NoteCard extends StatelessWidget {
                       child: Text(
                         item.displayTitle,
                         style: textTheme.labelLarge?.copyWith(
-                          decoration: isCompleted
+                          decoration: titleStruck
                               ? TextDecoration.lineThrough
                               : null,
-                          color: isCompleted
-                              ? AppColors.neutral60
-                              : AppColors.black,
+                          color: titleColor,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -147,7 +151,7 @@ class NoteCard extends StatelessWidget {
                     item.body.trim(),
                     style: textTheme.bodySmall?.copyWith(
                       decoration:
-                          isCompleted ? TextDecoration.lineThrough : null,
+                          titleStruck ? TextDecoration.lineThrough : null,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

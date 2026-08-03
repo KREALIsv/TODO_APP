@@ -28,6 +28,7 @@ class NoteEditorScreen extends StatefulWidget {
     this.repository,
     this.tagsRepository,
     this.embedded = false,
+    this.contextDay,
     this.onClose,
     this.onSaved,
   });
@@ -37,6 +38,9 @@ class NoteEditorScreen extends StatefulWidget {
   final NotesRepository? repository;
   final TagsRepository? tagsRepository;
   final bool embedded;
+
+  /// Home day selector when opened from a specific calendar day.
+  final DateTime? contextDay;
   final VoidCallback? onClose;
   final ValueChanged<String>? onSaved;
 
@@ -203,7 +207,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               dueHasTime: _dueHasTime,
               todayAt: _todayOn ? now : null,
             );
-        final day = commitmentDayFor(draft, now);
+        final day = commitmentDayFor(
+          draft,
+          now,
+          onDay: widget.contextDay,
+        );
         completedAt = completionOutcomeAt(day, now);
       }
     }

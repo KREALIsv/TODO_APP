@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
@@ -74,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final ClockRefreshController _clock;
   DateTime _now = DateTime.now();
   late DateTime _selectedDay;
+  final Set<DateTime> _backfilledDays = {};
 
   NotesFilter get _effectiveFilter => widget.activeFilter ?? _activeFilter;
 
@@ -118,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _clock.start();
     widget.onRegisterDayReset?.call(_resetSelectedDayToToday);
     widget.onRegisterDayNavigation?.call(_onSelectedDayChanged);
+    _scheduleDayBackfill(_selectedDay);
   }
 
   @override
@@ -134,6 +138,22 @@ class _HomeScreenState extends State<HomeScreen> {
       _selectedDay = normalized;
     });
     widget.onSelectedDayChanged?.call(normalized);
+    _scheduleDayBackfill(normalized);
+  }
+
+  void _scheduleDayBackfill(DateTime day) {
+    final key = dateOnly(day);
+    if (_backfilledDays.contains(key)) return;
+    _backfilledDays.add(key);
+    unawaited(_runDayBackfill(key));
+  }
+
+  Future<void> _runDayBackfill(DateTime day) async {
+    await _dayEntries.backfillDayIfEmpty(
+      day: day,
+      notes: _repo.getAll(),
+    );
+    if (mounted) setState(() {});
   }
 
   void _resetSelectedDayToToday() {
@@ -180,7 +200,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     if (widget.onOpenNoteEditor != null) {
       widget.onOpenNoteEditor!(
-        NoteEditorRequest(item: item, initialType: initialType),
+        NoteEditorRequest(
+          item: item,
+          initialType: initialType,
+          contextDay: _selectedDay,
+        ),
       );
       return Future.value();
     }
@@ -190,6 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
           item: item,
           initialType: initialType,
           repository: _repo,
+          contextDay: _selectedDay,
         ),
       ),
     );
