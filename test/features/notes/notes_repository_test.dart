@@ -331,16 +331,18 @@ void main() {
     );
 
     final now = DateTime.now();
+    final outcomeAt = DateTime(due.year, due.month, due.day, 23, 59, 59);
     final edited = original.copyWith(
       completed: true,
-      completedAt: now,
+      completedAt: outcomeAt,
       updatedAt: now,
     );
     await repo.saveTaskFromEditor(previous: original, next: edited);
 
     final entry = dayEntries.findForNoteDay('task', due)!;
     expect(entry.outcome, DayOutcome.completed);
-    expect(entry.outcomeAt, isNotNull);
+    expect(entry.outcomeAt, outcomeAt);
+    expect(dayEntries.findForNoteDay('task', dateOnly(now)), isNull);
   });
 
   test('toggleCompleted marks DayEntry completed and reopen restores open',
@@ -358,6 +360,34 @@ void main() {
     await repo.toggleCompleted('task');
     expect(dayEntries.findForNoteDay('task', day)?.outcome, DayOutcome.open);
     expect(repo.getById('task')?.completedAt, isNull);
+  });
+
+  test('toggleCompleted attributes completion to commitment day, not today',
+      () async {
+    final yesterday = dateOnly(DateTime(2026, 8, 2));
+    final today = DateTime(2026, 8, 3, 12);
+    await repo.add(
+      buildItem(id: 'task', type: NoteType.task).copyWith(
+        createdAt: yesterday,
+        dueAt: yesterday,
+      ),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: yesterday,
+      via: DayVia.due,
+      now: yesterday,
+    );
+
+    await repo.toggleCompleted('task', onDay: yesterday);
+
+    final task = repo.getById('task')!;
+    expect(dateOnly(task.completedAt!), yesterday);
+    expect(
+      dayEntries.findForNoteDay('task', yesterday)?.outcome,
+      DayOutcome.completed,
+    );
+    expect(dayEntries.findForNoteDay('task', dateOnly(today)), isNull);
   });
 
   test('migrateTaskToDay creates an open destination and closes origin',

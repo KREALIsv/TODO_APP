@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
@@ -7,6 +9,7 @@ import '../../auth/data/auth_service.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/date_only.dart';
+import '../../notes/domain/day_entry.dart';
 import '../../notes/domain/note_item.dart';
 import '../../notes/domain/notes_filter.dart';
 import '../../notes/domain/notes_query.dart';
@@ -73,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final ClockRefreshController _clock;
   DateTime _now = DateTime.now();
   late DateTime _selectedDay;
+  final Set<DateTime> _backfilledDays = {};
 
   NotesFilter get _effectiveFilter => widget.activeFilter ?? _activeFilter;
 
@@ -117,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _clock.start();
     widget.onRegisterDayReset?.call(_resetSelectedDayToToday);
     widget.onRegisterDayNavigation?.call(_onSelectedDayChanged);
+    _scheduleDayBackfill(_selectedDay);
   }
 
   @override
@@ -133,6 +138,22 @@ class _HomeScreenState extends State<HomeScreen> {
       _selectedDay = normalized;
     });
     widget.onSelectedDayChanged?.call(normalized);
+    _scheduleDayBackfill(normalized);
+  }
+
+  void _scheduleDayBackfill(DateTime day) {
+    final key = dateOnly(day);
+    if (_backfilledDays.contains(key)) return;
+    _backfilledDays.add(key);
+    unawaited(_runDayBackfill(key));
+  }
+
+  Future<void> _runDayBackfill(DateTime day) async {
+    await _dayEntries.backfillDayIfEmpty(
+      day: day,
+      notes: _repo.getAll(),
+    );
+    if (mounted) setState(() {});
   }
 
   void _resetSelectedDayToToday() {
@@ -179,7 +200,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     if (widget.onOpenNoteEditor != null) {
       widget.onOpenNoteEditor!(
-        NoteEditorRequest(item: item, initialType: initialType),
+        NoteEditorRequest(
+          item: item,
+          initialType: initialType,
+          contextDay: _selectedDay,
+        ),
       );
       return Future.value();
     }
@@ -189,6 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
           item: item,
           initialType: initialType,
           repository: _repo,
+          contextDay: _selectedDay,
         ),
       ),
     );
@@ -288,6 +314,8 @@ class _HomeScreenState extends State<HomeScreen> {
     List<NoteItem> items,
     void Function(NoteItem item) onTap, {
     double bottomPadding = 88,
+    DateTime? viewDay,
+    Map<String, DayEntry>? dayEntriesByNoteId,
   }) {
     return SliverPadding(
       padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
@@ -300,6 +328,9 @@ class _HomeScreenState extends State<HomeScreen> {
             repository: _repo,
             selected: widget.selectedNoteId == item.id,
             onTap: () => onTap(item),
+            actionDay: viewDay,
+            viewDay: viewDay,
+            dayEntry: dayEntriesByNoteId?[item.id],
             onNavigateToDay: _onSelectedDayChanged,
           );
         },
@@ -490,8 +521,17 @@ class _HomeScreenState extends State<HomeScreen> {
       filter: _effectiveFilter,
       searchQuery: searchQuery,
     );
+    final dayEntriesForView = _dayEntries.entriesForDay(contextDay);
+    final dayEntriesByNoteId = {
+      for (final entry in dayEntriesForView) entry.noteId: entry,
+    };
     final pinned = NotesQuery.pinnedFrom(filtered);
-    final ofDay = NotesQuery.ofDayFrom(filtered, contextDay, now: _now);
+    final ofDay = NotesQuery.ofDayFrom(
+      filtered,
+      contextDay,
+      now: _now,
+      dayEntriesByNoteId: dayEntriesByNoteId,
+    );
     final emptyMessage = NotesQuery.emptyMessage(
       filter: _effectiveFilter,
       searchQuery: searchQuery,
@@ -499,6 +539,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     final groups =
         useGrouped ? TaskGroupsQuery.from(filtered, now: _now) : null;
+    final browsePastDay = !isToday && searchQuery.trim().isEmpty;
+    final listItems = browsePastDay ? ofDay : filtered;
+    final auditDay = !isToday ? contextDay : null;
+    final auditEntries = auditDay != null ? dayEntriesByNoteId : null;
     final conflicts = searchQuery.trim().isEmpty &&
             _effectiveFilter == NotesFilter.all
         ? _repo.getPendingSyncConflicts()
@@ -549,7 +593,8 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         )
       else if (filtered.isEmpty ||
-          (useGrouped && groups != null && groups.isEmpty))
+          (useGrouped && groups != null && groups.isEmpty) ||
+          (!useSectioned && listItems.isEmpty))
         _buildEmptyState(context, emptyMessage, textTheme)
       else if (useSectioned) ...() {
         final hasPinned = pinned.isNotEmpty;
@@ -569,6 +614,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 pinned,
                 (item) => _openEditor(context, item: item),
                 bottomPadding: 0,
+                viewDay: contextDay,
+                dayEntriesByNoteId: dayEntriesByNoteId,
               ),
           ],
           _buildSectionHeader(
@@ -594,6 +641,8 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildNoteList(
                 ofDay,
                 (item) => _openEditor(context, item: item),
+                viewDay: contextDay,
+                dayEntriesByNoteId: dayEntriesByNoteId,
               ),
         ];
       }() else ...[
@@ -606,8 +655,10 @@ class _HomeScreenState extends State<HomeScreen> {
           onToggle: () {},
         ),
         _buildNoteList(
-          filtered,
+          listItems,
           (item) => _openEditor(context, item: item),
+          viewDay: auditDay,
+          dayEntriesByNoteId: auditEntries,
         ),
       ],
     ];

@@ -3,8 +3,59 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:todos_app/features/notes/domain/date_only.dart';
 import 'package:todos_app/features/notes/domain/day_entry.dart';
 import 'package:todos_app/features/notes/domain/day_log.dart';
+import 'package:todos_app/features/notes/domain/note_item.dart';
 
 void main() {
+  group('commitmentDayFor', () {
+    final now = DateTime(2026, 8, 3, 15);
+    final yesterday = DateTime(2026, 8, 2);
+
+    NoteItem task({DateTime? todayAt, DateTime? dueAt}) {
+      return NoteItem(
+        id: 't',
+        type: NoteType.task,
+        title: 't',
+        body: '',
+        pinned: false,
+        completed: false,
+        createdAt: yesterday,
+        updatedAt: now,
+        todayAt: todayAt,
+        dueAt: dueAt,
+      );
+    }
+
+    test('uses stale todayAt instead of today', () {
+      expect(
+        commitmentDayFor(task(todayAt: yesterday), now),
+        dateOnly(yesterday),
+      );
+    });
+
+    test('prefers explicit onDay', () {
+      expect(
+        commitmentDayFor(task(dueAt: yesterday), now, onDay: yesterday),
+        dateOnly(yesterday),
+      );
+    });
+  });
+
+  group('completionOutcomeAt', () {
+    test('anchors past days to end of local day', () {
+      final day = DateTime(2026, 8, 2);
+      final now = DateTime(2026, 8, 3, 10);
+      expect(
+        completionOutcomeAt(day, now),
+        DateTime(2026, 8, 2, 23, 59, 59),
+      );
+    });
+
+    test('keeps clock time when completing today', () {
+      final now = DateTime(2026, 8, 3, 10, 30);
+      expect(completionOutcomeAt(now, now), now);
+    });
+  });
+
   test('entriesForNote returns rows sorted by newest day first', () {
     final entries = [
       DayEntry(

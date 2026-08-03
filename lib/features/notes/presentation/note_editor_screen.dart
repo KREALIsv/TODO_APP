@@ -7,6 +7,7 @@ import '../data/attachments_repository.dart';
 import '../data/notes_repository.dart';
 import '../data/tags_repository.dart';
 import '../domain/checklist_item.dart';
+import '../domain/day_log.dart';
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
 import '../domain/task_groups.dart';
@@ -27,6 +28,7 @@ class NoteEditorScreen extends StatefulWidget {
     this.repository,
     this.tagsRepository,
     this.embedded = false,
+    this.contextDay,
     this.onClose,
     this.onSaved,
   });
@@ -36,6 +38,9 @@ class NoteEditorScreen extends StatefulWidget {
   final NotesRepository? repository;
   final TagsRepository? tagsRepository;
   final bool embedded;
+
+  /// Home day selector when opened from a specific calendar day.
+  final DateTime? contextDay;
   final VoidCallback? onClose;
   final ValueChanged<String>? onSaved;
 
@@ -185,7 +190,30 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     DateTime? completedAt;
     if (isTask && _completed) {
-      completedAt = existing?.completedAt ?? now;
+      if (existing?.completedAt != null) {
+        completedAt = existing!.completedAt;
+      } else {
+        final draft = existing ??
+            NoteItem(
+              id: _noteId,
+              type: _type,
+              title: title,
+              body: body,
+              pinned: _pinned,
+              completed: _completed,
+              createdAt: now,
+              updatedAt: now,
+              dueAt: _dueAt,
+              dueHasTime: _dueHasTime,
+              todayAt: _todayOn ? now : null,
+            );
+        final day = commitmentDayFor(
+          draft,
+          now,
+          onDay: widget.contextDay,
+        );
+        completedAt = completionOutcomeAt(day, now);
+      }
     }
 
     final NoteItem toSave;

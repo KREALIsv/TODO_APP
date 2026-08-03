@@ -6,6 +6,8 @@ import '../../../../global/themes/app_colors.dart';
 import '../../../../global/themes/tokens.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../data/notes_repository.dart';
+import '../../domain/day_entry.dart';
+import '../../domain/day_view_query.dart';
 import '../../domain/note_item.dart';
 import '../../domain/task_dates.dart';
 import '../../../sync/presentation/sync_conflict_list_card.dart';
@@ -21,6 +23,8 @@ class SwipeableNoteCard extends StatelessWidget {
     this.enableSwipe = true,
     this.selected = false,
     this.actionDay,
+    this.viewDay,
+    this.dayEntry,
     this.onNavigateToDay,
   });
 
@@ -30,6 +34,8 @@ class SwipeableNoteCard extends StatelessWidget {
   final bool enableSwipe;
   final bool selected;
   final DateTime? actionDay;
+  final DateTime? viewDay;
+  final DayEntry? dayEntry;
   final ValueChanged<DateTime>? onNavigateToDay;
 
   NotesRepository get _repo => repository ?? NotesRepository.instance;
@@ -51,13 +57,19 @@ class SwipeableNoteCard extends StatelessWidget {
   }
 
   Future<void> _complete(BuildContext context) async {
-    final wasCompleted = item.completed;
-    await _repo.toggleCompleted(item.id);
+    final referenceDay = viewDay ?? actionDay ?? DateTime.now();
+    final wasCompleted = DayViewQuery.isDisplayedCompleted(
+      item,
+      referenceDay,
+      entry: dayEntry,
+    );
+    final onDay = viewDay ?? actionDay;
+    await _repo.toggleCompleted(item.id, onDay: onDay);
     if (!context.mounted) return;
     await _undoToast(
       context,
       message: wasCompleted ? 'Tarea reabierta' : 'Tarea completada',
-      onUndo: () => _repo.toggleCompleted(item.id),
+      onUndo: () => _repo.toggleCompleted(item.id, onDay: onDay),
     );
   }
 
@@ -172,6 +184,8 @@ class SwipeableNoteCard extends StatelessWidget {
       onTap: onTap,
       onLongPress: () => _showContextMenu(context),
       flat: enableSwipe,
+      viewDay: viewDay ?? actionDay,
+      dayEntry: dayEntry,
     );
 
     if (!enableSwipe) {
@@ -181,6 +195,20 @@ class SwipeableNoteCard extends StatelessWidget {
     final isTask = item.type == NoteType.task;
     final isArchived = item.isArchived;
     final accent = Theme.of(context).colorScheme.primary;
+    final referenceDay = viewDay ?? actionDay ?? DateTime.now();
+    final displayCompleted = isTask &&
+        DayViewQuery.isDisplayedCompleted(
+          item,
+          referenceDay,
+          entry: dayEntry,
+        );
+    final canToggleCompletion = isTask &&
+        DayViewQuery.canToggleCompletionOnDay(
+          item: item,
+          day: referenceDay,
+          entry: dayEntry,
+          now: DateTime.now(),
+        );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -209,7 +237,7 @@ class SwipeableNoteCard extends StatelessWidget {
                     ),
                   ],
                 )
-              : isTask
+              : isTask && canToggleCompletion
                   ? _pane(
                       extentRatio: 0.28,
                       children: [
@@ -217,10 +245,10 @@ class SwipeableNoteCard extends StatelessWidget {
                           onPressed: (_) => _complete(context),
                           backgroundColor: accent,
                           foregroundColor: AppColors.white,
-                          icon: item.completed
+                          icon: displayCompleted
                               ? Icons.radio_button_unchecked
                               : Icons.check_circle_outline,
-                          label: item.completed ? 'Reabrir' : 'Hecho',
+                          label: displayCompleted ? 'Reabrir' : 'Hecho',
                         ),
                       ],
                     )

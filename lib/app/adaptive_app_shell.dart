@@ -35,6 +35,7 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
   DesktopPanelView _panelView = DesktopPanelView.summary;
   String? _editorItemId;
   NoteType _editorInitialType = NoteType.note;
+  DateTime? _editorContextDay;
   VoidCallback? _resetHomeDay;
   void Function(DateTime)? _setHomeSelectedDay;
   DateTime _homeSelectedDay = dateOnly(DateTime.now());
@@ -56,6 +57,7 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
       _panelView = DesktopPanelView.editor;
       _editorItemId = request.item?.id;
       _editorInitialType = request.initialType;
+      _editorContextDay = request.contextDay;
     });
   }
 
@@ -63,6 +65,7 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
     setState(() {
       _panelView = DesktopPanelView.summary;
       _editorItemId = null;
+      _editorContextDay = null;
     });
   }
 
@@ -184,6 +187,7 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
                       view: _panelView,
                       editorItemId: _editorItemId,
                       editorInitialType: _editorInitialType,
+                      editorContextDay: _editorContextDay,
                       onCloseSettings: _closeSettingsPanel,
                       onCloseEditor: _closeEditorPanel,
                       onEditorSaved: _onEditorSaved,
