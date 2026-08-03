@@ -539,6 +539,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     final groups =
         useGrouped ? TaskGroupsQuery.from(filtered, now: _now) : null;
+    final browsePastDay = !isToday && searchQuery.trim().isEmpty;
+    final listItems = browsePastDay ? ofDay : filtered;
+    final auditDay = !isToday ? contextDay : null;
+    final auditEntries = auditDay != null ? dayEntriesByNoteId : null;
     final conflicts = searchQuery.trim().isEmpty &&
             _effectiveFilter == NotesFilter.all
         ? _repo.getPendingSyncConflicts()
@@ -589,7 +593,8 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         )
       else if (filtered.isEmpty ||
-          (useGrouped && groups != null && groups.isEmpty))
+          (useGrouped && groups != null && groups.isEmpty) ||
+          (!useSectioned && listItems.isEmpty))
         _buildEmptyState(context, emptyMessage, textTheme)
       else if (useSectioned) ...() {
         final hasPinned = pinned.isNotEmpty;
@@ -609,6 +614,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 pinned,
                 (item) => _openEditor(context, item: item),
                 bottomPadding: 0,
+                viewDay: contextDay,
+                dayEntriesByNoteId: dayEntriesByNoteId,
               ),
           ],
           _buildSectionHeader(
@@ -648,8 +655,10 @@ class _HomeScreenState extends State<HomeScreen> {
           onToggle: () {},
         ),
         _buildNoteList(
-          filtered,
+          listItems,
           (item) => _openEditor(context, item: item),
+          viewDay: auditDay,
+          dayEntriesByNoteId: auditEntries,
         ),
       ],
     ];
