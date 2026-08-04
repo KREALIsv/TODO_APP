@@ -28,6 +28,8 @@ class DeviceRegistry {
           'appVersion': appVersion,
         }),
       ),
+      // Device metadata is best-effort; sync endpoints own session invalidation.
+      invalidateSessionOnAuthFailure: false,
     );
   }
 }
