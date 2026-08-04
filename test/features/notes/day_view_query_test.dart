@@ -104,7 +104,7 @@ void main() {
   });
 
   group('DayViewQuery live vs audit rows', () {
-    test('destination open entry is a live row', () {
+    test('destination open entry is a live row on today', () {
       final task = NoteItem(
         id: 't',
         type: NoteType.task,
@@ -126,12 +126,53 @@ void main() {
       );
 
       expect(
-        DayViewQuery.isLiveDayRow(task, day3, entry: openOnDay3),
+        DayViewQuery.isLiveDayRow(task, day3, entry: openOnDay3, now: now),
         isTrue,
       );
       expect(
-        DayViewQuery.showOutcomeMetaForDayRow(task, day3, entry: openOnDay3),
+        DayViewQuery.showOutcomeMetaForDayRow(
+          task,
+          day3,
+          entry: openOnDay3,
+          now: now,
+        ),
         isFalse,
+      );
+    });
+
+    test('past-day open commitment is muted audit row', () {
+      final task = NoteItem(
+        id: 't',
+        type: NoteType.task,
+        title: 'Pendiente de ayer',
+        body: '',
+        pinned: false,
+        completed: false,
+        createdAt: day2,
+        updatedAt: now,
+        dueAt: day2,
+      );
+      final openOnDay2 = DayEntry(
+        id: 'e',
+        noteId: 't',
+        day: day2,
+        via: DayVia.manual,
+        outcome: DayOutcome.open,
+        createdAt: day2,
+      );
+
+      expect(
+        DayViewQuery.isLiveDayRow(task, day2, entry: openOnDay2, now: now),
+        isFalse,
+      );
+      expect(
+        DayViewQuery.showOutcomeMetaForDayRow(
+          task,
+          day2,
+          entry: openOnDay2,
+          now: now,
+        ),
+        isTrue,
       );
     });
 
@@ -140,11 +181,16 @@ void main() {
       final entry = migratedFromDay2();
 
       expect(
-        DayViewQuery.isLiveDayRow(task, day2, entry: entry),
+        DayViewQuery.isLiveDayRow(task, day2, entry: entry, now: now),
         isFalse,
       );
       expect(
-        DayViewQuery.showOutcomeMetaForDayRow(task, day2, entry: entry),
+        DayViewQuery.showOutcomeMetaForDayRow(
+          task,
+          day2,
+          entry: entry,
+          now: now,
+        ),
         isTrue,
       );
     });

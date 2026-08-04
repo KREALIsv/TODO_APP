@@ -57,7 +57,8 @@ class NoteCard extends StatelessWidget {
   Widget _buildBody(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final isTask = item.type == NoteType.task;
-    final referenceDay = viewDay ?? DateTime.now();
+    final now = DateTime.now();
+    final referenceDay = viewDay ?? now;
     final isCompleted = isTask &&
         DayViewQuery.isDisplayedCompleted(
           item,
@@ -69,25 +70,34 @@ class NoteCard extends StatelessWidget {
           item: item,
           day: referenceDay,
           entry: dayEntry,
-          now: DateTime.now(),
+          now: now,
         );
     final showOutcomeMeta = isTask &&
         DayViewQuery.showOutcomeMetaForDayRow(
           item,
           referenceDay,
           entry: dayEntry,
+          now: now,
         );
     final useLiveRow = !isTask ||
-        DayViewQuery.isLiveDayRow(item, referenceDay, entry: dayEntry);
-    final titleColor = isTask && !useLiveRow && dayEntry != null
-        ? DayOutcomeStyle.titleColor(dayEntry!.outcome)
+        DayViewQuery.isLiveDayRow(
+          item,
+          referenceDay,
+          entry: dayEntry,
+          now: now,
+        );
+    final titleColor = isTask && !useLiveRow
+        ? (dayEntry != null
+            ? DayOutcomeStyle.titleColor(dayEntry!.outcome)
+            : (isCompleted ? AppColors.neutral60 : AppColors.neutral40))
         : (isCompleted ? AppColors.neutral60 : AppColors.black);
     final titleStruck = isTask && !useLiveRow && dayEntry != null
         ? DayOutcomeStyle.isStruck(dayEntry!.outcome)
         : isCompleted;
+    final mutedAudit = isTask && !useLiveRow;
     final attachmentCount = _attachments.countFor(item.id);
 
-    return Padding(
+    final body = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -157,6 +167,7 @@ class NoteCard extends StatelessWidget {
                     style: textTheme.bodySmall?.copyWith(
                       decoration:
                           titleStruck ? TextDecoration.lineThrough : null,
+                      color: mutedAudit ? AppColors.neutral40 : null,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -164,25 +175,28 @@ class NoteCard extends StatelessWidget {
                 ],
                 if (item.tags.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      ...item.tags.take(3).map(
-                            (tag) => TagPill(
-                              label: tag,
-                              colors: _tagsRepo.colorFor(tag),
-                              compact: true,
+                  Opacity(
+                    opacity: mutedAudit ? 0.65 : 1,
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        ...item.tags.take(3).map(
+                              (tag) => TagPill(
+                                label: tag,
+                                colors: _tagsRepo.colorFor(tag),
+                                compact: true,
+                              ),
+                            ),
+                        if (item.tags.length > 3)
+                          Text(
+                            '+${item.tags.length - 3}',
+                            style: textTheme.labelSmall?.copyWith(
+                              color: AppColors.neutral60,
                             ),
                           ),
-                      if (item.tags.length > 3)
-                        Text(
-                          '+${item.tags.length - 3}',
-                          style: textTheme.labelSmall?.copyWith(
-                            color: AppColors.neutral60,
-                          ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
                 const SizedBox(height: 6),
@@ -250,6 +264,15 @@ class NoteCard extends StatelessWidget {
         ],
       ),
     );
+
+    // Past-day unfinished commitments: whole card reads quieter.
+    final unfinishedPast = mutedAudit &&
+        !isCompleted &&
+        (dayEntry == null || dayEntry!.outcome == DayOutcome.open);
+    if (unfinishedPast) {
+      return Opacity(opacity: 0.72, child: body);
+    }
+    return body;
   }
 
   Widget? _buildCover(BuildContext context, {required bool completed}) {

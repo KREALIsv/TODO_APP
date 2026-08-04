@@ -48,12 +48,20 @@ abstract final class DayViewQuery {
   }
 
   /// Normal list row (checkbox, black title) vs dimmed audit replay row.
+  ///
+  /// Past days are always diary replay: an unfinished (`open`) commitment
+  /// stays muted so it reads as “was planned here, but wasn’t done”.
   static bool isLiveDayRow(
     NoteItem item,
     DateTime day, {
     DayEntry? entry,
+    DateTime? now,
   }) {
     if (item.type != NoteType.task) return true;
+    final reference = now ?? DateTime.now();
+    if (dateOnly(day).isBefore(dateOnly(reference))) {
+      return false;
+    }
     if (entry?.outcome == DayOutcome.open) return true;
     if (entry == null) return true;
     return TaskDayQuery.isScheduledOn(item, day);
@@ -63,9 +71,10 @@ abstract final class DayViewQuery {
     NoteItem item,
     DateTime day, {
     DayEntry? entry,
+    DateTime? now,
   }) {
     if (entry == null) return false;
-    if (isLiveDayRow(item, day, entry: entry)) return false;
+    if (isLiveDayRow(item, day, entry: entry, now: now)) return false;
     return entry.outcome != DayOutcome.completed;
   }
 
