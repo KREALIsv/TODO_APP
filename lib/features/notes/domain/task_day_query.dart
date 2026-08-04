@@ -31,7 +31,10 @@ abstract final class TaskDayQuery {
     final key = dateOnly(day);
     final reference = now ?? DateTime.now();
 
-    if (isInboxCaptureOn(item, day)) return true;
+    if (isInboxCaptureOn(item, day)) {
+      // Inbox capture only applies to today's list, not historical replay.
+      return key == dateOnly(reference);
+    }
     if (isScheduledOn(item, day)) return true;
     if (item.completedAt != null && dateOnly(item.completedAt!) == key) {
       return true;
