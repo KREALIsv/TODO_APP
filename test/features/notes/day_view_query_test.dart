@@ -102,4 +102,87 @@ void main() {
       );
     });
   });
+
+  group('DayViewQuery live vs audit rows', () {
+    test('destination open entry is a live row', () {
+      final task = NoteItem(
+        id: 't',
+        type: NoteType.task,
+        title: 't',
+        body: '',
+        pinned: false,
+        completed: false,
+        createdAt: day2,
+        updatedAt: now,
+        dueAt: day3,
+      );
+      final openOnDay3 = DayEntry(
+        id: 'e',
+        noteId: 't',
+        day: day3,
+        via: DayVia.migratedIn,
+        outcome: DayOutcome.open,
+        createdAt: day3,
+      );
+
+      expect(
+        DayViewQuery.isLiveDayRow(task, day3, entry: openOnDay3),
+        isTrue,
+      );
+      expect(
+        DayViewQuery.showOutcomeMetaForDayRow(task, day3, entry: openOnDay3),
+        isFalse,
+      );
+    });
+
+    test('migrated origin is audit row with meta', () {
+      final task = migratedTask();
+      final entry = migratedFromDay2();
+
+      expect(
+        DayViewQuery.isLiveDayRow(task, day2, entry: entry),
+        isFalse,
+      );
+      expect(
+        DayViewQuery.showOutcomeMetaForDayRow(task, day2, entry: entry),
+        isTrue,
+      );
+    });
+  });
+
+  group('DayViewQuery remove from day', () {
+    test('can remove from viewed day even when dueAt is elsewhere', () {
+      final task = NoteItem(
+        id: 't',
+        type: NoteType.task,
+        title: 't',
+        body: '',
+        pinned: false,
+        completed: false,
+        createdAt: day2,
+        updatedAt: now,
+        dueAt: day3,
+      );
+      final openOnDay2 = DayEntry(
+        id: 'e',
+        noteId: 't',
+        day: day2,
+        via: DayVia.manual,
+        outcome: DayOutcome.open,
+        createdAt: day2,
+      );
+
+      expect(
+        DayViewQuery.canRemoveFromDay(task, day2, entry: openOnDay2),
+        isTrue,
+      );
+      expect(
+        DayViewQuery.removeFromDayCandidates(
+          item: task,
+          entries: [openOnDay2],
+        ),
+        containsAll([day2, day3]),
+      );
+    });
+  });
 }

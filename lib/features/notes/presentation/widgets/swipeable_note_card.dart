@@ -138,7 +138,7 @@ class SwipeableNoteCard extends StatelessWidget {
       context,
       item: item,
       repository: _repo,
-      actionDay: actionDay,
+      actionDay: viewDay ?? actionDay,
       onNavigateToDay: onNavigateToDay,
     );
     if (action == null || !context.mounted) return;

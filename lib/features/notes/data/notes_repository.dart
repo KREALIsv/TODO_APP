@@ -441,9 +441,26 @@ class NotesRepository {
         previousToday != null ? dateOnly(previousToday) : null;
 
     if (todayOn && nextTodayAt != null) {
+      final todayDay = dateOnly(nextTodayAt);
+      if (previousDue != null && previousDue != todayDay) {
+        await _dayEntries.applyMigrationPatches(
+          noteId: noteId,
+          patches: migrateTo(previous, previousDue, todayDay, now),
+          now: now,
+        );
+        return;
+      }
+      if (previousTodayDay != null && previousTodayDay != todayDay) {
+        await _dayEntries.applyMigrationPatches(
+          noteId: noteId,
+          patches: migrateTo(previous, previousTodayDay, todayDay, now),
+          now: now,
+        );
+        return;
+      }
       await _dayEntries.ensurePlanned(
         noteId: noteId,
-        day: dateOnly(nextTodayAt),
+        day: todayDay,
         via: DayVia.todaySwitch,
         now: now,
       );

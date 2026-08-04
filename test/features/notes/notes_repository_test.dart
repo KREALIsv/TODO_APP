@@ -484,6 +484,60 @@ void main() {
     );
   });
 
+  test('applyTaskWhen moving to Hoy closes previous due day as migrated',
+      () async {
+    final origin = dateOnly(DateTime(2026, 7, 31));
+    final today = DateTime(2026, 8, 4, 12);
+    await repo.add(
+      buildItem(id: 'task', type: NoteType.task).copyWith(dueAt: origin),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: origin,
+      via: DayVia.due,
+    );
+
+    await repo.applyTaskWhen('task', todayOn: true);
+
+    expect(
+      dayEntries.findForNoteDay('task', origin)?.outcome,
+      DayOutcome.migrated,
+    );
+    final todayEntry = dayEntries.findForNoteDay('task', dateOnly(today));
+    expect(todayEntry?.outcome, DayOutcome.open);
+    expect(todayEntry?.via, DayVia.migratedIn);
+  });
+
+  test('cancelTaskOnDay on viewed day does not clear due on another day',
+      () async {
+    final day2 = dateOnly(DateTime(2026, 8, 2));
+    final day3 = dateOnly(DateTime(2026, 8, 3));
+    await repo.add(
+      buildItem(id: 'task', type: NoteType.task).copyWith(
+        createdAt: day2,
+        dueAt: day3,
+      ),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: day2,
+      via: DayVia.manual,
+      now: day2,
+    );
+
+    await repo.cancelTaskOnDay('task', fromDay: day2);
+
+    expect(repo.getById('task')?.dueAt, day3);
+    expect(
+      dayEntries.findForNoteDay('task', day2)?.outcome,
+      DayOutcome.cancelled,
+    );
+    expect(
+      dayEntries.findForNoteDay('task', day3)?.outcome,
+      DayOutcome.open,
+    );
+  });
+
   test('duplicate copies content and resets pin/completed/archive', () async {
     await repo.add(
       buildItem(id: 'src', type: NoteType.task, pinned: true, completed: true)

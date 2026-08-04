@@ -71,13 +71,18 @@ class NoteCard extends StatelessWidget {
           entry: dayEntry,
           now: DateTime.now(),
         );
-    final showOutcomeMeta = dayEntry != null &&
-        dayEntry!.outcome != DayOutcome.open &&
-        dayEntry!.outcome != DayOutcome.completed;
-    final titleColor = dayEntry != null
+    final showOutcomeMeta = isTask &&
+        DayViewQuery.showOutcomeMetaForDayRow(
+          item,
+          referenceDay,
+          entry: dayEntry,
+        );
+    final useLiveRow = !isTask ||
+        DayViewQuery.isLiveDayRow(item, referenceDay, entry: dayEntry);
+    final titleColor = isTask && !useLiveRow && dayEntry != null
         ? DayOutcomeStyle.titleColor(dayEntry!.outcome)
         : (isCompleted ? AppColors.neutral60 : AppColors.black);
-    final titleStruck = dayEntry != null
+    final titleStruck = isTask && !useLiveRow && dayEntry != null
         ? DayOutcomeStyle.isStruck(dayEntry!.outcome)
         : isCompleted;
     final attachmentCount = _attachments.countFor(item.id);

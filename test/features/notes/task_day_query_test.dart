@@ -78,5 +78,17 @@ void main() {
       expect(TaskDayQuery.isInboxCaptureOn(item, today), isFalse);
       expect(TaskDayQuery.belongsToHoy(item, now: today), isFalse);
     });
+
+    test('inbox capture does not appear on past day replay', () {
+      final past = DateTime(2026, 7, 31);
+      final now = DateTime(2026, 8, 4);
+      final item = task(
+        id: 'inbox-past',
+        createdAt: past,
+      );
+      expect(NotesQuery.belongsToDay(item, past, now: now), isFalse);
+      final todayItem = task(id: 'inbox-today', createdAt: now);
+      expect(NotesQuery.belongsToDay(todayItem, now, now: now), isTrue);
+    });
   });
 }
