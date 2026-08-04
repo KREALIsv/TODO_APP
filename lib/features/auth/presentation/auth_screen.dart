@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_surface.dart';
 import '../../../global/widgets/app_alerts.dart';
+import '../../pairing/presentation/qr_login_screen.dart';
 import '../data/auth_service.dart';
 import '../data/auth_session_repository.dart';
 import '../domain/auth_errors.dart';
@@ -9,10 +10,16 @@ import 'forgot_password_screen.dart';
 import 'widgets/auth_page_shell.dart';
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key, this.contextTitle, this.contextMessage});
+  const AuthScreen({
+    super.key,
+    this.contextTitle,
+    this.contextMessage,
+    this.initialRegistering = false,
+  });
 
   final String? contextTitle;
   final String? contextMessage;
+  final bool initialRegistering;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -34,6 +41,7 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   void initState() {
     super.initState();
+    _registering = widget.initialRegistering;
     _password.addListener(_onPasswordChanged);
     _email.addListener(_onEmailChanged);
     final remembered = _sessions.lastLoginEmail;
@@ -108,6 +116,15 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  Future<void> _openQrLogin() async {
+    final signedIn = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => const QrLoginScreen()),
+    );
+    if (signedIn == true && mounted) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
   void _toggleMode() {
     setState(() {
       _registering = !_registering;
@@ -121,10 +138,8 @@ class _AuthScreenState extends State<AuthScreen> {
   String get _subtitle {
     if (widget.contextMessage != null) return widget.contextMessage!;
     return _registering
-        ? 'Crea tu cuenta para sincronizar notas y tareas entre dispositivos. '
-            'Tus datos locales se mantienen sin conexión.'
-        : 'Entra con tu cuenta WODO para sincronizar entre dispositivos. '
-            'Sin sesión, todo sigue guardándose aquí en local.';
+        ? 'Sincroniza notas y tareas entre dispositivos.'
+        : 'Entra con tu cuenta o sigue en modo local.';
   }
 
   @override
@@ -139,13 +154,12 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final title = _registering ? 'Crear cuenta' : 'Iniciar sesión';
+    final title = widget.contextTitle ?? (_registering ? 'Crear cuenta' : 'Iniciar sesión');
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(title),
-        centerTitle: true,
+        leading: const BackButton(),
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -153,6 +167,37 @@ class _AuthScreenState extends State<AuthScreen> {
       body: AuthPageShell(
         title: title,
         subtitle: _subtitle,
+        footer: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_canUseAnotherAccount && !_showRememberedEmailHint)
+              AuthTextLink(
+                label: 'Usar otra cuenta',
+                onPressed: _submitting ? null : _useAnotherAccount,
+              ),
+            AuthTextLink(
+              label: _registering
+                  ? 'Ya tengo una cuenta'
+                  : 'Crear una cuenta nueva',
+              onPressed: _submitting ? null : _toggleMode,
+            ),
+            if (_registering) ...[
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  'Al crear la cuenta aceptas que WODO guarde tus datos '
+                  'sincronizados de forma segura en la nube.',
+                  textAlign: TextAlign.center,
+                  style: textTheme.labelSmall?.copyWith(
+                    color: AppSurface.secondary(context),
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
         child: Form(
           key: _formKey,
           child: Column(
@@ -164,7 +209,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   actionLabel: 'Cambiar',
                   onAction: _submitting ? null : _useAnotherAccount,
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
               ],
               TextFormField(
                 controller: _email,
@@ -184,7 +229,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _password,
                 obscureText: _obscurePassword,
@@ -221,20 +266,19 @@ class _AuthScreenState extends State<AuthScreen> {
                 },
               ),
               if (!_registering) ...[
-                const SizedBox(height: 4),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: _submitting ? null : _openForgotPassword,
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
                     ),
                     child: const Text('¿Olvidaste tu contraseña?'),
                   ),
                 ),
-              ] else
-                const SizedBox(height: 8),
-              const SizedBox(height: 8),
+              ],
+              const SizedBox(height: 12),
               AuthPrimaryButton(
                 label: _registering
                     ? 'Crear cuenta y sincronizar'
@@ -242,34 +286,13 @@ class _AuthScreenState extends State<AuthScreen> {
                 loading: _submitting,
                 onPressed: _submit,
               ),
-              const SizedBox(height: 12),
-              if (_canUseAnotherAccount && !_showRememberedEmailHint)
-                Center(
-                  child: TextButton(
-                    onPressed: _submitting ? null : _useAnotherAccount,
-                    child: const Text('Usar otra cuenta'),
-                  ),
-                ),
-              Center(
-                child: TextButton(
-                  onPressed: _submitting ? null : _toggleMode,
-                  child: Text(
-                    _registering
-                        ? 'Ya tengo una cuenta'
-                        : 'Crear una cuenta nueva',
-                  ),
-                ),
-              ),
-              if (_registering) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Al crear la cuenta aceptas que WODO guarde tus datos '
-                  'sincronizados de forma segura en la nube.',
-                  textAlign: TextAlign.center,
-                  style: textTheme.labelSmall?.copyWith(
-                    color: AppSurface.secondary(context),
-                    height: 1.4,
-                  ),
+              if (!_registering) ...[
+                const SizedBox(height: 18),
+                const AuthDivider(label: 'o'),
+                const SizedBox(height: 14),
+                AuthPairingOption(
+                  enabled: !_submitting,
+                  onTap: _openQrLogin,
                 ),
               ],
             ],

@@ -45,7 +45,7 @@ export class AuthService {
 
     void this.sendWelcomeEmail(user.id, user.email);
 
-    return this.createSession(user.id, dto.clientPlatform);
+    return this.issueSession(user.id, dto.clientPlatform);
   }
 
   async login(dto: LoginDto): Promise<AuthResponseDto> {
@@ -62,7 +62,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.createSession(user.id, dto.clientPlatform);
+    return this.issueSession(user.id, dto.clientPlatform);
   }
 
   async requestPasswordReset(email: string): Promise<void> {
@@ -147,7 +147,7 @@ export class AuthService {
     clientPlatform?: 'web' | 'mobile',
   ): Promise<AuthResponseDto> {
     const session = await this.prisma.session.findUnique({
-      where: { refreshToken },
+      where: { refreshTokenHash: this.hashToken(refreshToken) },
     });
 
     if (!session || session.expiresAt <= new Date()) {
@@ -156,7 +156,7 @@ export class AuthService {
 
     await this.prisma.session.delete({ where: { id: session.id } });
 
-    return this.createSession(session.userId, clientPlatform);
+    return this.issueSession(session.userId, clientPlatform);
   }
 
   async logout(userId: string, sessionUuid: string): Promise<void> {
@@ -192,7 +192,8 @@ export class AuthService {
     }
   }
 
-  private async createSession(
+  /** Creates a new JWT session for [userId] (login, refresh, or pairing grant). */
+  async issueSession(
     userId: string,
     clientPlatform?: 'web' | 'mobile',
   ): Promise<AuthResponseDto> {
@@ -221,7 +222,7 @@ export class AuthService {
     await this.prisma.session.create({
       data: {
         userId,
-        refreshToken,
+        refreshTokenHash: this.hashToken(refreshToken),
         sessionUuid,
         expiresAt: new Date(Date.now() + refreshExpiresIn * 1000),
       },
@@ -232,6 +233,10 @@ export class AuthService {
       refreshToken,
       expiresIn: accessExpiresIn,
     };
+  }
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 
   private parseDuration(exp: string): number {

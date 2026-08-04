@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/layout/adaptive_breakpoints.dart';
+import '../core/web/wodo_demo_launcher.dart';
 import '../features/auth/presentation/reset_password_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/notes/data/notes_repository.dart';
@@ -97,7 +98,10 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
   void initState() {
     super.initState();
     if (kIsWeb) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _openResetFromUrl());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openResetFromUrl();
+        _openDemoFromUrl();
+      });
     }
   }
 
@@ -110,6 +114,23 @@ class _AdaptiveAppShellState extends State<AdaptiveAppShell> {
       MaterialPageRoute<void>(
         builder: (_) => ResetPasswordScreen(token: token),
       ),
+    );
+  }
+
+  void _openDemoFromUrl() {
+    if (!mounted) return;
+    if (Uri.base.queryParameters['wodo_demo']?.trim().isEmpty ?? true) {
+      return;
+    }
+
+    final width = MediaQuery.sizeOf(context).width;
+    final layout = AdaptiveBreakpoints.layoutForWidth(width);
+    WodoDemoLauncher.maybeLaunch(
+      context,
+      layout: layout,
+      repository: _repo,
+      settings: _settings,
+      openSettingsPanel: _openSettings,
     );
   }
 

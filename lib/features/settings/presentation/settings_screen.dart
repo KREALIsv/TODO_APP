@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import '../../../core/theme/app_surface.dart';
 import '../../../global/constants/config.dart';
@@ -7,6 +6,7 @@ import '../../../global/themes/app_colors.dart';
 import '../../../global/widgets/app_alerts.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/auth_flow.dart';
+import '../../encryption/data/vault_service.dart';
 import '../../notes/data/attachments_repository.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
@@ -20,6 +20,7 @@ import 'about_screen.dart';
 import 'archived_screen.dart';
 import 'data_backup.dart';
 import 'fondo_picker_screen.dart';
+import 'privacy_security_screen.dart';
 import 'widgets/list_background_layer.dart';
 import 'widgets/settings_section.dart';
 
@@ -241,6 +242,7 @@ class SettingsScreen extends StatelessWidget {
         AuthService.instance,
         SyncService.instance,
         DeviceIdentity.instance,
+        VaultService.instance,
       ]),
       builder: (context, _) {
         final bg = _settings.listBackground;
@@ -345,6 +347,28 @@ class SettingsScreen extends StatelessWidget {
               accent: accent,
               onTap: () => _openAccount(context),
             ),
+        ],
+      ),
+      const SizedBox(height: 20),
+      SettingsSectionLabel(
+        label: 'Privacidad y seguridad',
+        textTheme: textTheme,
+        accent: accent,
+      ),
+      SettingsCard(
+        children: [
+          SettingsRow(
+            icon: Icons.shield_outlined,
+            title: 'Privacidad y seguridad',
+            subtitle: privacySecuritySettingsSummary(
+              authenticated: AuthService.instance.isAuthenticated,
+            ),
+            trailing: privacySecuritySettingsTrailing(
+              authenticated: AuthService.instance.isAuthenticated,
+            ),
+            accent: accent,
+            onTap: () => PrivacySecurityScreen.open(context),
+          ),
         ],
       ),
       const SizedBox(height: 20),

@@ -19,6 +19,7 @@ enum AuthProvider {
 enum MailFlow {
   welcome
   password_reset
+  vault_recovery
 }
 
 model User {
@@ -27,6 +28,11 @@ model User {
   passwordHash  String?  @map("password_hash") @db.VarChar(255)
   emailVerified Boolean  @default(false) @map("email_verified")
   isAdmin       Boolean  @default(false) @map("is_admin")
+  encryptionEnabled    Boolean  @default(false) @map("encryption_enabled")
+  encryptionVersion    Int      @default(1) @map("encryption_version")
+  encryptedDekRecovery String?  @map("encrypted_dek_recovery") @db.Text
+  dekSalt              String?  @map("dek_salt") @db.VarChar(128)
+  recoveryHint         String?  @map("recovery_hint") @db.VarChar(64)
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -34,6 +40,7 @@ model User {
   identities  UserIdentity[]
   sessions    Session[]
   devices     Device[]
+  pairingSessionsApproved PairingSession[] @relation("PairingApprover")
   notes       Note[]
   tags        Tag[]
   dayEntries  DayEntry[]
@@ -43,6 +50,41 @@ model User {
 
   @@index([email])
   @@map("users")
+}
+
+enum PairingStatus {
+  pending
+  approved
+  consumed
+  expired
+}
+
+model PairingSession {
+  id                String        @id @default(uuid()) @db.Uuid
+  displayCode       String        @map("display_code") @db.VarChar(16)
+  pollTokenHash     String        @unique @map("poll_token_hash") @db.VarChar(128)
+  status            PairingStatus @default(pending)
+  clientPlatform    String?       @map("client_platform") @db.VarChar(16)
+  newAppUserId      String?       @map("new_app_user_id") @db.VarChar(64)
+  ephemeralPub      String?       @map("ephemeral_pub") @db.Text
+  approverUserId    String?       @map("approver_user_id") @db.Uuid
+  grantAccessToken  String?       @map("grant_access_token") @db.Text
+  grantRefreshToken String?       @map("grant_refresh_token") @db.Text
+  grantExpiresIn    Int?          @map("grant_expires_in")
+  grantEmail        String?       @map("grant_email") @db.VarChar(255)
+  grantWrappedDek   String?       @map("grant_wrapped_dek") @db.Text
+  grantApproverPub  String?       @map("grant_approver_pub") @db.Text
+  expiresAt         DateTime      @map("expires_at") @db.Timestamptz(6)
+  approvedAt        DateTime?     @map("approved_at") @db.Timestamptz(6)
+  consumedAt        DateTime?     @map("consumed_at") @db.Timestamptz(6)
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  approver User? @relation("PairingApprover", fields: [approverUserId], references: [id], onDelete: SetNull)
+
+  @@index([displayCode])
+  @@index([status, expiresAt])
+  @@map("pairing_sessions")
 }
 
 model PasswordResetToken {
@@ -92,20 +134,20 @@ model UserIdentity {
 }
 
 model Session {
-  id           String    @id @default(uuid()) @db.Uuid
-  userId       String    @map("user_id") @db.Uuid
-  refreshToken String    @unique @map("refresh_token") @db.VarChar(512)
-  sessionUuid  String    @unique @map("session_uuid") @db.VarChar(64)
-  ipAddress    String?   @map("ip_address") @db.VarChar(45)
-  userAgent    String?   @map("user_agent") @db.Text
-  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash") @db.VarChar(128)
+  sessionUuid      String    @unique @map("session_uuid") @db.VarChar(64)
+  ipAddress        String?   @map("ip_address") @db.VarChar(45)
+  userAgent        String?   @map("user_agent") @db.Text
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([refreshToken])
+  @@index([refreshTokenHash])
   @@index([expiresAt])
   @@map("sessions")
 }
@@ -117,6 +159,9 @@ model Device {
   platform     String?   @db.VarChar(32)
   osVersion    String?   @map("os_version") @db.VarChar(32)
   appVersion   String?   @map("app_version") @db.VarChar(32)
+  trusted      Boolean   @default(false)
+  vaultState   String    @default("none") @map("vault_state") @db.VarChar(16)
+  pairedAt     DateTime? @map("paired_at") @db.Timestamptz(6)
   lastSyncedAt DateTime? @map("last_synced_at") @db.Timestamptz(6)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
