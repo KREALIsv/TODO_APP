@@ -11,6 +11,12 @@ import 'widgets/auth_page_shell.dart';
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key, this.contextTitle, this.contextMessage});
 
+  /// Whether an [AuthScreen] route is currently on screen (used to avoid
+  /// duplicate session-expired dialogs on top of login).
+  static bool get isVisible => _visibleCount > 0;
+
+  static int _visibleCount = 0;
+
   final String? contextTitle;
   final String? contextMessage;
 
@@ -34,6 +40,9 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   void initState() {
     super.initState();
+    AuthScreen._visibleCount++;
+    // User is already on login; do not stack a session-expired modal.
+    _auth.consumeSessionEndedMessage();
     _password.addListener(_onPasswordChanged);
     _email.addListener(_onEmailChanged);
     final remembered = _sessions.lastLoginEmail;
@@ -129,6 +138,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
+    AuthScreen._visibleCount--;
     _password.removeListener(_onPasswordChanged);
     _email.removeListener(_onEmailChanged);
     _email.dispose();
