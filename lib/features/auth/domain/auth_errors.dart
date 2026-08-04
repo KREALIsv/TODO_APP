@@ -29,6 +29,10 @@ abstract final class AuthErrors {
     required int statusCode,
     String? apiMessage,
   }) {
+    final normalized = apiMessage?.trim().toLowerCase() ?? '';
+    if (normalized.contains('invalid credentials')) {
+      return 'Correo o contraseña incorrectos. Revísalos e inténtalo de nuevo.';
+    }
     if (isAuthFailureStatus(statusCode) || looksLikeAuthMessage(apiMessage)) {
       return sessionExpiredMessage();
     }

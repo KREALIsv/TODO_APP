@@ -136,9 +136,13 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Runs [send] with a bearer token; refreshes once on 401/410 before ending session.
+  ///
+  /// When [invalidateSessionOnAuthFailure] is false, auth failures are surfaced
+  /// without clearing the stored session (used for best-effort device registration).
   Future<http.Response> authorizedRequest(
-    Future<http.Response> Function(String token) send,
-  ) async {
+    Future<http.Response> Function(String token) send, {
+    bool invalidateSessionOnAuthFailure = true,
+  }) async {
     var token = await accessToken();
     if (token == null) {
       throw AuthSessionExpiredException(AuthErrors.sessionExpiredMessage());
@@ -160,7 +164,9 @@ class AuthService extends ChangeNotifier {
         statusCode: response.statusCode,
         apiMessage: _decodeMessage(response),
       );
-      await endSessionDueToExpiry(message);
+      if (invalidateSessionOnAuthFailure) {
+        await endSessionDueToExpiry(message);
+      }
       throw AuthSessionExpiredException(message);
     }
 
@@ -196,9 +202,12 @@ class AuthService extends ChangeNotifier {
       payload,
       email: email.trim().toLowerCase(),
     );
-    final token = _sessions.session?.accessToken;
-    if (token != null) {
+    try {
       await DeviceRegistry.instance.register();
+    } on AuthSessionExpiredException {
+      // Sign-in succeeded; device registration is retried during sync.
+    } catch (_) {
+      // Network / server errors should not block login.
     }
     await _sessions.rememberLoginEmail(email.trim().toLowerCase());
     notifyListeners();
@@ -243,8 +252,8 @@ class AuthService extends ChangeNotifier {
   }
 
   Map<String, String> _clientPlatformField() {
-    if (!kIsWeb) return const {};
-    return const {'clientPlatform': 'web'};
+    if (kIsWeb) return const {'clientPlatform': 'web'};
+    return const {'clientPlatform': 'mobile'};
   }
 
   Future<void> _saveSession(
@@ -292,7 +301,13 @@ class AuthService extends ChangeNotifier {
     if (response.body.isEmpty) return null;
     try {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      return decoded['message']?.toString();
+      final message = decoded['message'];
+      if (message is String) return message;
+      if (message is Map) {
+        final nested = message['message'];
+        if (nested is String) return nested;
+      }
+      return message?.toString();
     } catch (_) {
       return null;
     }

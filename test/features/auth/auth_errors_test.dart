@@ -29,6 +29,13 @@ void main() {
       contains('sesión en la nube expiró'),
     );
     expect(
+      AuthErrors.fromHttpFailure(
+        statusCode: 401,
+        apiMessage: 'Invalid credentials',
+      ),
+      contains('Correo o contraseña incorrectos'),
+    );
+    expect(
       AuthErrors.message(
         AuthSessionExpiredException(AuthErrors.sessionExpiredMessage()),
         registering: false,
