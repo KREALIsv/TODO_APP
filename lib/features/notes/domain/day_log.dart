@@ -112,7 +112,8 @@ List<DayEntry> synthesizeEntriesFromNotes({
       outcome = note.completed ? DayOutcome.completed : DayOutcome.open;
       outcomeAt = note.completed ? (note.completedAt ?? created) : null;
       via = DayVia.due;
-    } else if (TaskDayQuery.isInboxCaptureOn(note, day)) {
+    } else if (dateOnly(day) == dateOnly(created) &&
+        TaskDayQuery.isInboxCaptureOn(note, day)) {
       outcome = note.completed ? DayOutcome.completed : DayOutcome.open;
       outcomeAt = note.completed ? (note.completedAt ?? created) : null;
       via = DayVia.manual;

@@ -28,8 +28,45 @@ abstract final class DayViewQuery {
     DayEntry? entry,
   }) {
     if (item.type != NoteType.task) return false;
-    if (entry != null && hasAuditableEntry(entry)) return true;
-    return TaskDayQuery.belongsToDay(item, day, now: now);
+    final reference = now ?? DateTime.now();
+
+    if (entry != null && hasAuditableEntry(entry)) {
+      if (entry.outcome == DayOutcome.open) {
+        if (TaskDayQuery.isScheduledOn(item, day)) return true;
+        if (entry.via == DayVia.migratedIn || entry.via == DayVia.scheduledIn) {
+          return true;
+        }
+        if (TaskDayQuery.isInboxCaptureOn(item, day) &&
+            dateOnly(day) == dateOnly(reference)) {
+          return true;
+        }
+        return false;
+      }
+      return true;
+    }
+    return TaskDayQuery.belongsToDay(item, day, now: reference);
+  }
+
+  /// Normal list row (checkbox, black title) vs dimmed audit replay row.
+  static bool isLiveDayRow(
+    NoteItem item,
+    DateTime day, {
+    DayEntry? entry,
+  }) {
+    if (item.type != NoteType.task) return true;
+    if (entry?.outcome == DayOutcome.open) return true;
+    if (entry == null) return true;
+    return TaskDayQuery.isScheduledOn(item, day);
+  }
+
+  static bool showOutcomeMetaForDayRow(
+    NoteItem item,
+    DateTime day, {
+    DayEntry? entry,
+  }) {
+    if (entry == null) return false;
+    if (isLiveDayRow(item, day, entry: entry)) return false;
+    return entry.outcome != DayOutcome.completed;
   }
 
   /// Checkbox / strikethrough for a task when browsing [day].

@@ -484,6 +484,30 @@ void main() {
     );
   });
 
+  test('applyTaskWhen moving to Hoy closes previous due day as migrated',
+      () async {
+    final origin = dateOnly(DateTime(2026, 7, 31));
+    final today = DateTime(2026, 8, 4, 12);
+    await repo.add(
+      buildItem(id: 'task', type: NoteType.task).copyWith(dueAt: origin),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: origin,
+      via: DayVia.due,
+    );
+
+    await repo.applyTaskWhen('task', todayOn: true);
+
+    expect(
+      dayEntries.findForNoteDay('task', origin)?.outcome,
+      DayOutcome.migrated,
+    );
+    final todayEntry = dayEntries.findForNoteDay('task', dateOnly(today));
+    expect(todayEntry?.outcome, DayOutcome.open);
+    expect(todayEntry?.via, DayVia.migratedIn);
+  });
+
   test('cancelTaskOnDay on viewed day does not clear due on another day',
       () async {
     final day2 = dateOnly(DateTime(2026, 8, 2));
