@@ -86,7 +86,6 @@ class NoteCard extends StatelessWidget {
           entry: dayEntry,
           now: now,
         );
-    // Past / audit rows: [DayOutcomeStyle] already maps open → neutral40.
     final titleColor = isTask && !useLiveRow && dayEntry != null
         ? DayOutcomeStyle.titleColor(dayEntry!.outcome)
         : (isCompleted ? AppColors.neutral60 : AppColors.black);
@@ -237,9 +236,7 @@ class NoteCard extends StatelessWidget {
                         style: textTheme.labelSmall,
                       ),
                     ],
-                    if (isTask &&
-                        item.hasChecklist &&
-                        item.checklistItems.isNotEmpty) ...[
+                    if (isTask && item.hasChecklist && item.checklistItems.isNotEmpty) ...[
                       Text(' · ', style: textTheme.labelSmall),
                       Icon(
                         Icons.check_box_outlined,
