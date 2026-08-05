@@ -96,8 +96,9 @@ class NoteCard extends StatelessWidget {
         : isCompleted;
     final mutedAudit = isTask && !useLiveRow;
     final attachmentCount = _attachments.countFor(item.id);
+    final metaColor = mutedAudit ? AppColors.neutral40 : null;
 
-    final body = Padding(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,28 +176,25 @@ class NoteCard extends StatelessWidget {
                 ],
                 if (item.tags.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  Opacity(
-                    opacity: mutedAudit ? 0.65 : 1,
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        ...item.tags.take(3).map(
-                              (tag) => TagPill(
-                                label: tag,
-                                colors: _tagsRepo.colorFor(tag),
-                                compact: true,
-                              ),
-                            ),
-                        if (item.tags.length > 3)
-                          Text(
-                            '+${item.tags.length - 3}',
-                            style: textTheme.labelSmall?.copyWith(
-                              color: AppColors.neutral60,
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      ...item.tags.take(3).map(
+                            (tag) => TagPill(
+                              label: tag,
+                              colors: _tagsRepo.colorFor(tag),
+                              compact: true,
                             ),
                           ),
-                      ],
-                    ),
+                      if (item.tags.length > 3)
+                        Text(
+                          '+${item.tags.length - 3}',
+                          style: textTheme.labelSmall?.copyWith(
+                            color: AppColors.neutral60,
+                          ),
+                        ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: 6),
@@ -212,26 +210,32 @@ class NoteCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       isTask ? 'Tarea' : 'Nota',
-                      style: textTheme.labelSmall,
+                      style: textTheme.labelSmall?.copyWith(color: metaColor),
                     ),
                     const SizedBox(width: 8),
-                    Text('· ', style: textTheme.labelSmall),
+                    Text(
+                      '· ',
+                      style: textTheme.labelSmall?.copyWith(color: metaColor),
+                    ),
                     if (item.isArchived)
                       Text(
                         formatRelativeTime(
                           item.archivedAt ?? item.updatedAt,
                         ),
-                        style: textTheme.labelSmall,
+                        style: textTheme.labelSmall?.copyWith(color: metaColor),
                       )
                     else if (isTask)
                       Flexible(child: TaskDateMeta(item: item))
                     else
                       Text(
                         formatRelativeTime(item.updatedAt),
-                        style: textTheme.labelSmall,
+                        style: textTheme.labelSmall?.copyWith(color: metaColor),
                       ),
                     if (attachmentCount > 0) ...[
-                      Text(' · ', style: textTheme.labelSmall),
+                      Text(
+                        ' · ',
+                        style: textTheme.labelSmall?.copyWith(color: metaColor),
+                      ),
                       Icon(
                         Icons.attach_file,
                         size: 12,
@@ -240,11 +244,16 @@ class NoteCard extends StatelessWidget {
                       const SizedBox(width: 2),
                       Text(
                         '$attachmentCount',
-                        style: textTheme.labelSmall,
+                        style: textTheme.labelSmall?.copyWith(color: metaColor),
                       ),
                     ],
-                    if (isTask && item.hasChecklist && item.checklistItems.isNotEmpty) ...[
-                      Text(' · ', style: textTheme.labelSmall),
+                    if (isTask &&
+                        item.hasChecklist &&
+                        item.checklistItems.isNotEmpty) ...[
+                      Text(
+                        ' · ',
+                        style: textTheme.labelSmall?.copyWith(color: metaColor),
+                      ),
                       Icon(
                         Icons.check_box_outlined,
                         size: 12,
@@ -253,7 +262,7 @@ class NoteCard extends StatelessWidget {
                       const SizedBox(width: 2),
                       Text(
                         '${item.checklistCompletedCount}/${item.checklistItems.length}',
-                        style: textTheme.labelSmall,
+                        style: textTheme.labelSmall?.copyWith(color: metaColor),
                       ),
                     ],
                   ],
@@ -264,15 +273,6 @@ class NoteCard extends StatelessWidget {
         ],
       ),
     );
-
-    // Past-day unfinished commitments: whole card reads quieter.
-    final unfinishedPast = mutedAudit &&
-        !isCompleted &&
-        (dayEntry == null || dayEntry!.outcome == DayOutcome.open);
-    if (unfinishedPast) {
-      return Opacity(opacity: 0.72, child: body);
-    }
-    return body;
   }
 
   Widget? _buildCover(BuildContext context, {required bool completed}) {
