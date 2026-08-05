@@ -13,11 +13,17 @@ import 'features/notes/data/day_entries_repository.dart';
 import 'features/notes/data/notes_repository.dart';
 import 'features/notes/data/tags_repository.dart';
 import 'features/notes/data/task_reminders_service.dart';
+import 'features/notes/presentation/muted_preview_screen.dart';
 import 'features/settings/data/settings_repository.dart';
 import 'features/sync/data/device_identity.dart';
 import 'features/sync/data/local_tab_sync_service.dart';
 import 'features/sync/data/sync_service.dart';
 import 'global/widgets/app_boot_splash.dart';
+
+bool get _showMutedPreview {
+  if (!kIsWeb) return false;
+  return Uri.base.queryParameters['mutedPreview'] == '1';
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -86,7 +92,10 @@ class _BootstrapAppState extends State<_BootstrapApp> {
 
   @override
   Widget build(BuildContext context) {
-    if (_ready) return const TodosApp();
+    if (_ready) {
+      if (_showMutedPreview) return const MutedPreviewScreen();
+      return const TodosApp();
+    }
 
     return MaterialApp(
       title: 'WODO',
