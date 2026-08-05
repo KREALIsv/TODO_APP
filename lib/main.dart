@@ -13,7 +13,6 @@ import 'features/notes/data/day_entries_repository.dart';
 import 'features/notes/data/notes_repository.dart';
 import 'features/notes/data/tags_repository.dart';
 import 'features/notes/data/task_reminders_service.dart';
-import 'features/notes/data/demo_past_day_seed.dart';
 import 'features/settings/data/settings_repository.dart';
 import 'features/sync/data/device_identity.dart';
 import 'features/sync/data/local_tab_sync_service.dart';
@@ -57,7 +56,6 @@ class _BootstrapAppState extends State<_BootstrapApp> {
         AuthSessionRepository.instance.init(),
         DeviceIdentity.instance.init(),
       ]);
-      await DemoPastDaySeed.seedIfRequested();
       if (!mounted) return;
       setState(() => _ready = true);
       WidgetsBinding.instance.addPostFrameCallback((_) {
