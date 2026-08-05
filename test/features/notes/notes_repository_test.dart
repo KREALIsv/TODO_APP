@@ -486,8 +486,8 @@ void main() {
 
   test('applyTaskWhen moving to Hoy closes previous due day as migrated',
       () async {
-    final origin = dateOnly(DateTime(2026, 7, 31));
-    final today = DateTime(2026, 8, 4, 12);
+    final today = DateTime.now();
+    final origin = dateOnly(today.subtract(const Duration(days: 4)));
     await repo.add(
       buildItem(id: 'task', type: NoteType.task).copyWith(dueAt: origin),
     );

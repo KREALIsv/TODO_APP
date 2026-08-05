@@ -57,7 +57,8 @@ class NoteCard extends StatelessWidget {
   Widget _buildBody(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final isTask = item.type == NoteType.task;
-    final referenceDay = viewDay ?? DateTime.now();
+    final now = DateTime.now();
+    final referenceDay = viewDay ?? now;
     final isCompleted = isTask &&
         DayViewQuery.isDisplayedCompleted(
           item,
@@ -69,16 +70,22 @@ class NoteCard extends StatelessWidget {
           item: item,
           day: referenceDay,
           entry: dayEntry,
-          now: DateTime.now(),
+          now: now,
         );
     final showOutcomeMeta = isTask &&
         DayViewQuery.showOutcomeMetaForDayRow(
           item,
           referenceDay,
           entry: dayEntry,
+          now: now,
         );
     final useLiveRow = !isTask ||
-        DayViewQuery.isLiveDayRow(item, referenceDay, entry: dayEntry);
+        DayViewQuery.isLiveDayRow(
+          item,
+          referenceDay,
+          entry: dayEntry,
+          now: now,
+        );
     final titleColor = isTask && !useLiveRow && dayEntry != null
         ? DayOutcomeStyle.titleColor(dayEntry!.outcome)
         : (isCompleted ? AppColors.neutral60 : AppColors.black);
