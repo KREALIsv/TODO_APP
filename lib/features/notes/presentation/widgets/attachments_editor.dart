@@ -64,7 +64,11 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
       if (!mounted) return;
       widget.onAttachmentAdded?.call(created.id);
       if (widget.coverAttachmentId == null) {
-        widget.onCoverChanged(created.id);
+        await applyCoverAttachmentChange(
+          noteId: widget.noteId,
+          coverAttachmentId: created.id,
+          onCoverChanged: widget.onCoverChanged,
+        );
       }
     } on StateError catch (e) {
       if (!mounted) return;
@@ -277,7 +281,11 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  widget.onCoverChanged(isCover ? null : item.id);
+                  applyCoverAttachmentChange(
+                    noteId: widget.noteId,
+                    coverAttachmentId: isCover ? null : item.id,
+                    onCoverChanged: widget.onCoverChanged,
+                  );
                 },
               ),
               ListTile(
