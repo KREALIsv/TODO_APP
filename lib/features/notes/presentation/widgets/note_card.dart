@@ -311,7 +311,7 @@ class NoteCard extends StatelessWidget {
           borderRadius: flat ? BorderRadius.zero : ThemeTokens.borderRadius,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [if (cover != null) cover, _buildBody(context)],
+            children: [?cover, _buildBody(context)],
           ),
         );
 
