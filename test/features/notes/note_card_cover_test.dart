@@ -1,6 +1,5 @@
 import 'dart:io';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,23 +9,15 @@ import 'package:todos_app/features/notes/domain/note_item.dart';
 import 'package:todos_app/features/notes/presentation/widgets/note_card.dart';
 import 'package:todos_app/global/widgets/app_loading.dart';
 
-Future<Uint8List> _pngBytes(int width, int height) async {
-  final recorder = ui.PictureRecorder();
-  final canvas = ui.Canvas(recorder);
-  canvas.drawRect(
-    ui.Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
-    ui.Paint()..color = const ui.Color(0xFF8BC34A),
-  );
-  final picture = recorder.endRecording();
-  final image = await picture.toImage(width, height);
-  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-  image.dispose();
-  return bytes!.buffer.asUint8List();
-}
+final _onePixelPng = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+);
 
 void main() {
   late Directory tempDir;
   late AttachmentsRepository attachments;
+  late Box<Map> metaBox;
+  late Box<dynamic> blobBox;
 
   setUp(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -34,10 +25,9 @@ void main() {
     Hive.init(tempDir.path);
     final stamp = DateTime.now().microsecondsSinceEpoch;
     attachments = AttachmentsRepository.instance;
-    await attachments.initWithBoxes(
-      meta: await Hive.openBox<Map>('att_meta_$stamp'),
-      blobs: await Hive.openBox<dynamic>('att_blob_$stamp'),
-    );
+    metaBox = await Hive.openBox<Map>('att_meta_$stamp');
+    blobBox = await Hive.openBox<dynamic>('att_blob_$stamp');
+    await attachments.initWithBoxes(meta: metaBox, blobs: blobBox);
     await attachments.clear();
   });
 
@@ -63,17 +53,35 @@ void main() {
     );
   }
 
+  Future<String> _addCoverMeta({
+    required int imageWidth,
+    required int imageHeight,
+  }) async {
+    const id = 'cover-1';
+    await blobBox.put(id, _onePixelPng);
+    await metaBox.put(id, {
+      'id': id,
+      'noteId': 'n1',
+      'fileName': 'cover.png',
+      'mimeType': 'image/png',
+      'byteSize': _onePixelPng.lengthInBytes,
+      'createdAt': DateTime(2026, 8, 8, 12).toIso8601String(),
+      'sortOrder': 0,
+      'width': imageWidth,
+      'height': imageHeight,
+    });
+    return id;
+  }
+
   Future<AppMemoryImage> _pumpCover(
     WidgetTester tester, {
     required int imageWidth,
     required int imageHeight,
     required double cardWidth,
   }) async {
-    final image = await attachments.addImage(
-      noteId: 'n1',
-      bytes: await _pngBytes(imageWidth, imageHeight),
-      fileName: 'cover.png',
-      mimeType: 'image/png',
+    final coverId = await _addCoverMeta(
+      imageWidth: imageWidth,
+      imageHeight: imageHeight,
     );
 
     await tester.pumpWidget(
@@ -83,7 +91,7 @@ void main() {
             child: SizedBox(
               width: cardWidth,
               child: NoteCard(
-                item: _noteWithCover(image.id),
+                item: _noteWithCover(coverId),
                 attachmentsRepository: attachments,
                 onTap: () {},
               ),
