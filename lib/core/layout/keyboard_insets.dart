@@ -1,23 +1,22 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'adaptive_breakpoints.dart';
-
 /// Bottom inset for modal sheets that must clear the software keyboard.
 ///
-/// On compact mobile web, [index.html] uses
-/// `interactive-widget=resizes-content`, so the layout viewport already shrinks
-/// when the keyboard opens. Applying [MediaQuery.viewInsets] padding there
-/// would shift sheet content twice and make text fields drift with the
-/// keyboard.
+/// Prefer Flutter's [MediaQuery.viewInsets]:
+/// - With `interactive-widget=resizes-content` (see `web/index.html`), when the
+///   layout viewport already shrank for the keyboard, [viewInsetBottom] is
+///   typically `0` — no extra padding.
+/// - When the keyboard overlays instead (common on Android Chrome / some iOS
+///   browsers), [viewInsetBottom] carries the height we must pad so fields
+///   like the compose description stay visible.
+///
+/// [layoutWidth] is retained for call-site compatibility / future heuristics.
 double sheetKeyboardBottomInsetFor({
   required bool isWeb,
   required double layoutWidth,
   required double viewInsetBottom,
 }) {
-  if (isWeb && layoutWidth < AdaptiveBreakpoints.compact) {
-    return 0;
-  }
   return viewInsetBottom;
 }
 
