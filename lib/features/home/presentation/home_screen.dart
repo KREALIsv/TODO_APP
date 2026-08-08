@@ -516,6 +516,12 @@ class _HomeScreenState extends State<HomeScreen> {
           filter: _effectiveFilter,
           searchQuery: searchQuery,
         );
+    final usePlanWithBacklog = NotesQuery.usePlanDayWithBacklogLayout(
+      filter: _effectiveFilter,
+      searchQuery: searchQuery,
+      day: contextDay,
+      now: _now,
+    );
     final filtered = NotesQuery.apply(
       items: all,
       filter: _effectiveFilter,
@@ -539,6 +545,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     final groups =
         useGrouped ? TaskGroupsQuery.from(filtered, now: _now) : null;
+    final planBacklog = usePlanWithBacklog
+        ? TaskGroupsQuery.from(filtered, now: _now).undated
+        : const <NoteItem>[];
     final browsePastDay = !isToday && searchQuery.trim().isEmpty;
     final listItems = browsePastDay ? ofDay : filtered;
     final auditDay = !isToday ? contextDay : null;
@@ -592,8 +601,27 @@ class _HomeScreenState extends State<HomeScreen> {
             });
           },
         )
+      else if (usePlanWithBacklog &&
+          (ofDay.isNotEmpty || planBacklog.isNotEmpty))
+        ...buildPlanDayWithBacklogSlivers(
+          dayTitle: formatDayMonth(contextDay),
+          ofDay: ofDay,
+          backlog: planBacklog,
+          onOpen: (item) => _openEditor(context, item: item),
+          repository: _repo,
+          textTheme: textTheme,
+          expansion: _groupedExpansion,
+          selectedNoteId: widget.selectedNoteId,
+          actionDay: contextDay,
+          onToggleSection: (section) {
+            setState(() {
+              _groupedExpansion = _groupedExpansion.toggle(section);
+            });
+          },
+        )
       else if (filtered.isEmpty ||
           (useGrouped && groups != null && groups.isEmpty) ||
+          (usePlanWithBacklog && ofDay.isEmpty && planBacklog.isEmpty) ||
           (!useSectioned && listItems.isEmpty))
         _buildEmptyState(context, emptyMessage, textTheme)
       else if (useSectioned) ...() {

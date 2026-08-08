@@ -16,12 +16,27 @@ class NotesQuery {
     return filter == NotesFilter.all && searchQuery.trim().isEmpty;
   }
 
-  /// Grouped Hoy / Próximas / Sin fecha when chip Tareas is active and no search.
+  /// Grouped Hoy / Próximas / Backlog when chip Tareas is active and no search.
   static bool useGroupedTasksLayout({
     required NotesFilter filter,
     required String searchQuery,
   }) {
     return filter == NotesFilter.tasks && searchQuery.trim().isEmpty;
+  }
+
+  /// Future-day plan under chip Tareas: that day's tasks + Backlog pool.
+  ///
+  /// Past days stay day-audit only (no Backlog mixed into the replay).
+  static bool usePlanDayWithBacklogLayout({
+    required NotesFilter filter,
+    required String searchQuery,
+    required DateTime day,
+    DateTime? now,
+  }) {
+    if (!useGroupedTasksLayout(filter: filter, searchQuery: searchQuery)) {
+      return false;
+    }
+    return dateOnly(day).isAfter(dateOnly(now ?? DateTime.now()));
   }
 
   static List<NoteItem> apply({
