@@ -49,7 +49,8 @@ class NoteComposeSheet extends StatefulWidget {
   State<NoteComposeSheet> createState() => _NoteComposeSheetState();
 }
 
-class _NoteComposeSheetState extends State<NoteComposeSheet> {
+class _NoteComposeSheetState extends State<NoteComposeSheet>
+    with WidgetsBindingObserver {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
   final _titleFocus = FocusNode();
@@ -64,11 +65,16 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.initialIsTask) {
       _isTask = true;
     }
-    _titleFocus.addListener(() => _ensureFieldVisible(_titleFieldKey));
-    _bodyFocus.addListener(() => _ensureFieldVisible(_bodyFieldKey));
+    _titleFocus.addListener(() {
+      if (_titleFocus.hasFocus) _ensureFieldVisible(_titleFieldKey);
+    });
+    _bodyFocus.addListener(() {
+      if (_bodyFocus.hasFocus) _ensureFieldVisible(_bodyFieldKey);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _titleFocus.requestFocus();
     });
@@ -76,6 +82,7 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _titleController.dispose();
     _bodyController.dispose();
     _titleFocus.dispose();
@@ -83,14 +90,25 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
     super.dispose();
   }
 
+  @override
+  void didChangeMetrics() {
+    // Keyboard open/close: keep the focused field above the IME.
+    if (_bodyFocus.hasFocus) {
+      _ensureFieldVisible(_bodyFieldKey);
+    } else if (_titleFocus.hasFocus) {
+      _ensureFieldVisible(_titleFieldKey);
+    }
+  }
+
   void _ensureFieldVisible(GlobalKey fieldKey) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final context = fieldKey.currentContext;
-      if (!mounted || context == null) return;
+      if (!mounted) return;
+      final fieldContext = fieldKey.currentContext;
+      if (fieldContext == null) return;
       Scrollable.ensureVisible(
-        context,
-        alignment: 0.2,
-        duration: const Duration(milliseconds: 180),
+        fieldContext,
+        alignment: 0.15,
+        duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
       );
     });
@@ -159,7 +177,11 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final bottomInset = sheetKeyboardBottomInset(context);
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.92;
+    final maxHeight = sheetMaxHeight(
+      context,
+      maxHeightFraction: 0.92,
+      minHeight: 240,
+    );
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 120),
@@ -173,7 +195,8 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
           children: [
             Flexible(
               child: SingleChildScrollView(
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -190,7 +213,7 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
                       focusNode: _titleFocus,
                       textCapitalization: TextCapitalization.sentences,
                       textInputAction: TextInputAction.next,
-                      scrollPadding: const EdgeInsets.only(bottom: 120),
+                      scrollPadding: const EdgeInsets.only(bottom: 160),
                       onSubmitted: (_) => _bodyFocus.requestFocus(),
                       decoration: const InputDecoration(
                         hintText: 'Escribe un título',
@@ -204,7 +227,7 @@ class _NoteComposeSheetState extends State<NoteComposeSheet> {
                       textCapitalization: TextCapitalization.sentences,
                       minLines: 3,
                       maxLines: 6,
-                      scrollPadding: const EdgeInsets.only(bottom: 120),
+                      scrollPadding: const EdgeInsets.only(bottom: 160),
                       decoration: const InputDecoration(
                         hintText: 'Añade detalles (opcional)',
                         alignLabelWithHint: true,
