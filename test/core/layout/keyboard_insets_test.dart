@@ -45,4 +45,35 @@ void main() {
       320,
     );
   });
+
+  test('sheetMaxHeightFor shrinks when keyboard overlays viewport', () {
+    expect(
+      sheetMaxHeightFor(
+        viewHeight: 800,
+        viewInsetBottom: 320,
+        maxHeightFraction: 0.92,
+        minHeight: 240,
+      ),
+      480,
+    );
+  });
+
+  test('sheetMaxHeightFor uses fraction cap when keyboard is closed', () {
+    expect(
+      sheetMaxHeightFor(
+        viewHeight: 800,
+        viewInsetBottom: 0,
+        maxHeightFraction: 0.92,
+        minHeight: 240,
+      ),
+      736,
+    );
+  });
+
+  test('sheetVisibleHeightFor subtracts keyboard inset', () {
+    expect(
+      sheetVisibleHeightFor(viewHeight: 800, viewInsetBottom: 320),
+      480,
+    );
+  });
 }

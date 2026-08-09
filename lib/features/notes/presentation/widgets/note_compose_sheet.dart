@@ -177,10 +177,11 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final bottomInset = sheetKeyboardBottomInset(context);
-    final viewHeight = MediaQuery.sizeOf(context).height;
-    // Keep the sheet inside the visible area above the keyboard.
-    final maxHeight =
-        (viewHeight - bottomInset).clamp(240.0, viewHeight * 0.92);
+    final maxHeight = sheetMaxHeight(
+      context,
+      maxHeightFraction: 0.92,
+      minHeight: 240,
+    );
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 120),

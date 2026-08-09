@@ -27,3 +27,59 @@ double sheetKeyboardBottomInset(BuildContext context) {
     viewInsetBottom: MediaQuery.viewInsetsOf(context).bottom,
   );
 }
+
+/// Layout height still visible above the software keyboard.
+double sheetVisibleHeightFor({
+  required double viewHeight,
+  required double viewInsetBottom,
+}) {
+  return viewHeight - viewInsetBottom;
+}
+
+/// Max height for a scroll-controlled bottom sheet above the keyboard.
+///
+/// Uses the visible viewport (`viewHeight - keyboard inset`), capped at
+/// [maxHeightFraction] of the full [viewHeight]. Optional [minHeight] keeps
+/// small sheets usable on short viewports.
+double sheetMaxHeightFor({
+  required double viewHeight,
+  required double viewInsetBottom,
+  double maxHeightFraction = 0.92,
+  double minHeight = 0,
+}) {
+  final visibleHeight = sheetVisibleHeightFor(
+    viewHeight: viewHeight,
+    viewInsetBottom: viewInsetBottom,
+  );
+  final cap = viewHeight * maxHeightFraction;
+  final maxHeight = visibleHeight > cap ? cap : visibleHeight;
+  if (minHeight <= 0) return maxHeight;
+  return maxHeight.clamp(minHeight, cap);
+}
+
+double sheetMaxHeight(
+  BuildContext context, {
+  double maxHeightFraction = 0.92,
+  double minHeight = 0,
+}) {
+  final viewHeight = MediaQuery.sizeOf(context).height;
+  return sheetMaxHeightFor(
+    viewHeight: viewHeight,
+    viewInsetBottom: sheetKeyboardBottomInset(context),
+    maxHeightFraction: maxHeightFraction,
+    minHeight: minHeight,
+  );
+}
+
+/// Height for fixed-ratio sheets (e.g. tags picker) above the keyboard.
+double sheetFixedHeight(
+  BuildContext context, {
+  required double heightFraction,
+}) {
+  final viewHeight = MediaQuery.sizeOf(context).height;
+  final visibleHeight = sheetVisibleHeightFor(
+    viewHeight: viewHeight,
+    viewInsetBottom: sheetKeyboardBottomInset(context),
+  );
+  return visibleHeight * heightFraction;
+}
