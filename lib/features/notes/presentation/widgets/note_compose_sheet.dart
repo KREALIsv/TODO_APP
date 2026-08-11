@@ -58,9 +58,16 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
   final _titleFieldKey = GlobalKey();
   final _bodyFieldKey = GlobalKey();
   static const _uuid = Uuid();
+  static const _titleAutofocusDelay = Duration(milliseconds: 350);
   bool _isTask = false;
+  double? _baselineViewHeight;
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
+
+  void _onBodyFocusChanged() {
+    _onFocusChanged();
+    if (_bodyFocus.hasFocus) _ensureFieldVisible(_bodyFieldKey);
+  }
 
   @override
   void initState() {
@@ -69,20 +76,24 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
     if (widget.initialIsTask) {
       _isTask = true;
     }
-    // Only auto-scroll the description: the title sits at the top of the
-    // sheet. ensureVisible/scrollPadding on the title + iOS Safari's native
-    // focus scroll double-shifts content and hides the inputs.
-    _bodyFocus.addListener(() {
-      if (_bodyFocus.hasFocus) _ensureFieldVisible(_bodyFieldKey);
-    });
+    _titleFocus.addListener(_onFocusChanged);
+    _bodyFocus.addListener(_onBodyFocusChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _titleFocus.requestFocus();
+      _captureBaselineViewHeight();
+      // Wait for the sheet slide-in + first layout before focusing. Races
+      // between autofocus, IME metrics, and padding caused overshoot on iOS
+      // and Android when the title was focused immediately.
+      Future<void>.delayed(_titleAutofocusDelay, () {
+        if (mounted) _titleFocus.requestFocus();
+      });
     });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _titleFocus.removeListener(_onFocusChanged);
+    _bodyFocus.removeListener(_onBodyFocusChanged);
     _titleController.dispose();
     _bodyController.dispose();
     _titleFocus.dispose();
@@ -90,14 +101,32 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
     super.dispose();
   }
 
+  void _onFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _captureBaselineViewHeight() {
+    if (!mounted) return;
+    final height = MediaQuery.sizeOf(context).height;
+    final inset = MediaQuery.viewInsetsOf(context).bottom;
+    if (inset == 0) {
+      _baselineViewHeight = height;
+    }
+  }
+
   @override
   void didChangeMetrics() {
-    // Keyboard open/close: keep the description above the IME when focused.
-    // Skip the title — it's already at the top; scrolling it causes iOS
-    // Safari to overshoot and leave empty space above the keyboard.
+    _captureBaselineViewHeight();
     if (_bodyFocus.hasFocus) {
       _ensureFieldVisible(_bodyFieldKey);
     }
+    if (mounted) setState(() {});
+  }
+
+  double? _focusedFieldBottomGlobal() {
+    if (_bodyFocus.hasFocus) return globalFieldBottom(_bodyFieldKey);
+    if (_titleFocus.hasFocus) return globalFieldBottom(_titleFieldKey);
+    return null;
   }
 
   void _ensureFieldVisible(GlobalKey fieldKey) {
@@ -176,11 +205,18 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final bottomInset = sheetKeyboardBottomInset(context);
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final bottomInset = sheetKeyboardBottomInset(
+      context,
+      baselineViewHeight: _baselineViewHeight,
+      focusedFieldBottomGlobal: _focusedFieldBottomGlobal(),
+    );
     final maxHeight = sheetMaxHeight(
       context,
       maxHeightFraction: 0.92,
-      minHeight: 240,
+      minHeight: isLandscape ? 180 : 240,
+      baselineViewHeight: _baselineViewHeight,
     );
 
     // Pad above an overlaying IME and size the sheet to its content.
@@ -230,8 +266,8 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
               controller: _bodyController,
               focusNode: _bodyFocus,
               textCapitalization: TextCapitalization.sentences,
-              minLines: 3,
-              maxLines: 6,
+              minLines: isLandscape ? 2 : 3,
+              maxLines: isLandscape ? 4 : 6,
               scrollPadding: const EdgeInsets.only(bottom: 120),
               decoration: const InputDecoration(
                 hintText: 'Añade detalles (opcional)',

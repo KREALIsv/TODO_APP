@@ -10,14 +10,15 @@ void main() {
   Future<void> pumpComposeSheet(
     WidgetTester tester, {
     double keyboardBottom = 0,
+    double height = viewHeight,
   }) async {
-    await tester.binding.setSurfaceSize(const Size(390, viewHeight));
+    await tester.binding.setSurfaceSize(Size(390, height));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MaterialApp(
         home: MediaQuery(
           data: MediaQueryData(
-            size: const Size(390, viewHeight),
+            size: Size(390, height),
             viewInsets: EdgeInsets.only(bottom: keyboardBottom),
           ),
           // Align to bottom like showModalBottomSheet so compact-sheet
@@ -33,18 +34,32 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
+    // Flush delayed title autofocus timer so tests do not leak pending timers.
+    await tester.pump(const Duration(milliseconds: 400));
     tester.takeException();
   }
 
-  testWidgets('compose sheet pads above keyboard overlay', (tester) async {
-    await pumpComposeSheet(tester, keyboardBottom: keyboardInset);
+  testWidgets('compose sheet pads when description overlaps keyboard', (
+    tester,
+  ) async {
+    // Short viewport forces the description field under the overlay IME.
+    await pumpComposeSheet(
+      tester,
+      keyboardBottom: keyboardInset,
+      height: 520,
+    );
+
+    await tester.tap(find.byType(TextField).last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    tester.takeException();
 
     final padding = tester.widget<AnimatedPadding>(
       find.byType(AnimatedPadding),
     );
     expect(
       padding.padding.resolve(TextDirection.ltr).bottom,
-      keyboardInset,
+      greaterThan(0),
     );
   });
 
@@ -113,6 +128,23 @@ void main() {
       lessThan(surface.height),
     );
   });
+
+  testWidgets(
+    'title focus does not pad when field already clears keyboard overlay',
+    (tester) async {
+      await pumpComposeSheet(tester, keyboardBottom: keyboardInset);
+
+      await tester.tap(find.byType(TextField).first);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      tester.takeException();
+
+      final padding = tester.widget<AnimatedPadding>(
+        find.byType(AnimatedPadding),
+      );
+      expect(padding.padding.resolve(TextDirection.ltr).bottom, 0);
+    },
+  );
 
   testWidgets(
     'compose sheet stays compact above keyboard instead of stretching',

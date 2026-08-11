@@ -8,6 +8,7 @@ void main() {
       sheetKeyboardBottomInsetFor(
         isWeb: true,
         layoutWidth: 390,
+        viewHeight: 800,
         viewInsetBottom: 320,
         platform: TargetPlatform.android,
       ),
@@ -15,12 +16,41 @@ void main() {
     );
   });
 
-  test('sheetKeyboardBottomInsetFor zeros Apple web to avoid double-shift', () {
+  test('viewportShrunkForKeyboard detects resize-mode keyboard', () {
+    expect(
+      viewportShrunkForKeyboard(
+        viewHeight: 480,
+        viewInsetBottom: 0,
+        baselineViewHeight: 800,
+      ),
+      isTrue,
+    );
+    expect(
+      viewportShrunkForKeyboard(
+        viewHeight: 500,
+        viewInsetBottom: 280,
+        baselineViewHeight: 800,
+      ),
+      isTrue,
+    );
+    expect(
+      viewportShrunkForKeyboard(
+        viewHeight: 780,
+        viewInsetBottom: 320,
+        baselineViewHeight: 800,
+      ),
+      isFalse,
+    );
+  });
+
+  test('sheetKeyboardBottomInsetFor skips inset when viewport resized', () {
     expect(
       sheetKeyboardBottomInsetFor(
         isWeb: true,
         layoutWidth: 390,
-        viewInsetBottom: 320,
+        viewHeight: 480,
+        viewInsetBottom: 0,
+        baselineViewHeight: 800,
         platform: TargetPlatform.iOS,
       ),
       0,
@@ -29,10 +59,42 @@ void main() {
       sheetKeyboardBottomInsetFor(
         isWeb: true,
         layoutWidth: 390,
-        viewInsetBottom: 320,
-        platform: TargetPlatform.macOS,
+        viewHeight: 500,
+        viewInsetBottom: 280,
+        baselineViewHeight: 800,
+        platform: TargetPlatform.iOS,
       ),
       0,
+    );
+  });
+
+  test('focusAwareSheetKeyboardInset skips pad when field clears keyboard', () {
+    expect(
+      focusAwareSheetKeyboardInset(
+        viewInsetBottom: 320,
+        viewHeight: 800,
+        focusedFieldBottomGlobal: 400,
+      ),
+      0,
+    );
+  });
+
+  test('focusAwareSheetKeyboardInset pads when field overlaps keyboard', () {
+    expect(
+      focusAwareSheetKeyboardInset(
+        viewInsetBottom: 320,
+        viewHeight: 800,
+        focusedFieldBottomGlobal: 550,
+      ),
+      82,
+    );
+    expect(
+      focusAwareSheetKeyboardInset(
+        viewInsetBottom: 320,
+        viewHeight: 800,
+        focusedFieldBottomGlobal: 900,
+      ),
+      320,
     );
   });
 
@@ -41,6 +103,7 @@ void main() {
       sheetKeyboardBottomInsetFor(
         isWeb: true,
         layoutWidth: 390,
+        viewHeight: 800,
         viewInsetBottom: 0,
         platform: TargetPlatform.android,
       ),
@@ -53,6 +116,7 @@ void main() {
       sheetKeyboardBottomInsetFor(
         isWeb: true,
         layoutWidth: 1280,
+        viewHeight: 800,
         viewInsetBottom: 320,
         platform: TargetPlatform.android,
       ),
@@ -65,6 +129,7 @@ void main() {
       sheetKeyboardBottomInsetFor(
         isWeb: false,
         layoutWidth: 390,
+        viewHeight: 800,
         viewInsetBottom: 320,
         platform: TargetPlatform.iOS,
       ),
