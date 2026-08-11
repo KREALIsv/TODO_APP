@@ -14,6 +14,29 @@ void main() {
     expect(formatAttachmentAddedAt(value), '21/07/2026 · 15:08');
   });
 
+  test('attachmentCoverHeight follows image aspect inside card bounds', () {
+    expect(
+      attachmentCoverHeight(cardWidth: 240, imageWidth: 120, imageHeight: 60),
+      120,
+    );
+    expect(
+      attachmentCoverHeight(cardWidth: 240, imageWidth: 100, imageHeight: 200),
+      320,
+    );
+    expect(
+      attachmentCoverHeight(cardWidth: 240, imageWidth: 1200, imageHeight: 100),
+      96,
+    );
+    expect(
+      attachmentCoverHeight(
+        cardWidth: 240,
+        imageWidth: null,
+        imageHeight: null,
+      ),
+      128,
+    );
+  });
+
   test('attachmentStripThumbSize narrows portrait frames', () {
     final portrait = attachmentStripThumbSize(
       imageWidth: 40,
