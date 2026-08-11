@@ -69,9 +69,9 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
     if (widget.initialIsTask) {
       _isTask = true;
     }
-    _titleFocus.addListener(() {
-      if (_titleFocus.hasFocus) _ensureFieldVisible(_titleFieldKey);
-    });
+    // Only auto-scroll the description: the title sits at the top of the
+    // sheet. ensureVisible/scrollPadding on the title + iOS Safari's native
+    // focus scroll double-shifts content and hides the inputs.
     _bodyFocus.addListener(() {
       if (_bodyFocus.hasFocus) _ensureFieldVisible(_bodyFieldKey);
     });
@@ -92,11 +92,11 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
 
   @override
   void didChangeMetrics() {
-    // Keyboard open/close: keep the focused field above the IME.
+    // Keyboard open/close: keep the description above the IME when focused.
+    // Skip the title — it's already at the top; scrolling it causes iOS
+    // Safari to overshoot and leave empty space above the keyboard.
     if (_bodyFocus.hasFocus) {
       _ensureFieldVisible(_bodyFieldKey);
-    } else if (_titleFocus.hasFocus) {
-      _ensureFieldVisible(_titleFieldKey);
     }
   }
 
@@ -213,7 +213,9 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
                       focusNode: _titleFocus,
                       textCapitalization: TextCapitalization.sentences,
                       textInputAction: TextInputAction.next,
-                      scrollPadding: const EdgeInsets.only(bottom: 160),
+                      // Keep small: large scrollPadding on the top field makes
+                      // Flutter/Safari scroll the sheet past the title on iOS.
+                      scrollPadding: const EdgeInsets.only(bottom: 24),
                       onSubmitted: (_) => _bodyFocus.requestFocus(),
                       decoration: const InputDecoration(
                         hintText: 'Escribe un título',
@@ -227,7 +229,7 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
                       textCapitalization: TextCapitalization.sentences,
                       minLines: 3,
                       maxLines: 6,
-                      scrollPadding: const EdgeInsets.only(bottom: 160),
+                      scrollPadding: const EdgeInsets.only(bottom: 120),
                       decoration: const InputDecoration(
                         hintText: 'Añade detalles (opcional)',
                         alignLabelWithHint: true,

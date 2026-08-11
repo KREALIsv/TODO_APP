@@ -7,17 +7,30 @@ import 'package:flutter/material.dart';
 /// - With `interactive-widget=resizes-content` (see `web/index.html`), when the
 ///   layout viewport already shrank for the keyboard, [viewInsetBottom] is
 ///   typically `0` — no extra padding.
-/// - When the keyboard overlays instead (common on Android Chrome / some iOS
-///   browsers), [viewInsetBottom] carries the height we must pad so fields
-///   like the compose description stay visible.
+/// - When the keyboard overlays instead (common on Android Chrome),
+///   [viewInsetBottom] carries the height we must pad so fields like the
+///   compose description stay visible.
+/// - On Apple web (iOS/iPadOS Safari and other WebKit browsers), the viewport
+///   meta already resizes content **and** Safari scrolls the focused input into
+///   view. Applying [viewInsetBottom] there double-shifts the sheet and can
+///   push the title/description off-screen (especially single-line title
+///   autofocus).
 ///
 /// [layoutWidth] is retained for call-site compatibility / future heuristics.
 double sheetKeyboardBottomInsetFor({
   required bool isWeb,
   required double layoutWidth,
   required double viewInsetBottom,
+  TargetPlatform platform = TargetPlatform.android,
 }) {
+  if (isWeb && _isApplePlatform(platform)) {
+    return 0;
+  }
   return viewInsetBottom;
+}
+
+bool _isApplePlatform(TargetPlatform platform) {
+  return platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
 }
 
 double sheetKeyboardBottomInset(BuildContext context) {
@@ -25,6 +38,7 @@ double sheetKeyboardBottomInset(BuildContext context) {
     isWeb: kIsWeb,
     layoutWidth: MediaQuery.sizeOf(context).width,
     viewInsetBottom: MediaQuery.viewInsetsOf(context).bottom,
+    platform: defaultTargetPlatform,
   );
 }
 
@@ -33,14 +47,15 @@ double sheetVisibleHeightFor({
   required double viewHeight,
   required double viewInsetBottom,
 }) {
-  return viewHeight - viewInsetBottom;
+  return (viewHeight - viewInsetBottom).clamp(0.0, viewHeight);
 }
 
 /// Max height for a scroll-controlled bottom sheet above the keyboard.
 ///
 /// Uses the visible viewport (`viewHeight - keyboard inset`), capped at
 /// [maxHeightFraction] of the full [viewHeight]. Optional [minHeight] keeps
-/// small sheets usable on short viewports.
+/// small sheets usable on short viewports, but never exceeds the visible
+/// height (forcing taller than the keyboard-safe area causes overflow).
 double sheetMaxHeightFor({
   required double viewHeight,
   required double viewInsetBottom,
@@ -53,7 +68,7 @@ double sheetMaxHeightFor({
   );
   final cap = viewHeight * maxHeightFraction;
   final maxHeight = visibleHeight > cap ? cap : visibleHeight;
-  if (minHeight <= 0) return maxHeight;
+  if (minHeight <= 0 || maxHeight < minHeight) return maxHeight;
   return maxHeight.clamp(minHeight, cap);
 }
 

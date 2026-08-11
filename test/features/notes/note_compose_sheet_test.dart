@@ -11,6 +11,8 @@ void main() {
     WidgetTester tester, {
     double keyboardBottom = 0,
   }) async {
+    await tester.binding.setSurfaceSize(const Size(390, viewHeight));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MaterialApp(
         home: MediaQuery(
@@ -18,7 +20,9 @@ void main() {
             size: const Size(390, viewHeight),
             viewInsets: EdgeInsets.only(bottom: keyboardBottom),
           ),
-          child: NoteComposeSheet(initialIsTask: true),
+          child: const Material(
+            child: NoteComposeSheet(initialIsTask: true),
+          ),
         ),
       ),
     );
@@ -77,5 +81,31 @@ void main() {
 
     expect(find.byType(TextField).last, findsOneWidget);
     expect(find.text('Guardar'), findsOneWidget);
+  });
+
+  testWidgets('title focus keeps header and title on screen with keyboard', (
+    tester,
+  ) async {
+    await pumpComposeSheet(tester, keyboardBottom: keyboardInset);
+
+    final titleField = find.byType(TextField).first;
+    await tester.tap(titleField);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    tester.takeException();
+
+    expect(find.text('Nueva tarea'), findsOneWidget);
+    expect(titleField, findsOneWidget);
+    expect(find.text('Guardar'), findsOneWidget);
+    expect(find.text('Cancelar'), findsOneWidget);
+
+    // Title must remain in the laid-out surface (not scrolled off-screen).
+    final titleBox = tester.renderObject<RenderBox>(titleField);
+    final surface = tester.binding.renderViews.first.size;
+    expect(titleBox.localToGlobal(Offset.zero).dy, greaterThanOrEqualTo(0));
+    expect(
+      titleBox.localToGlobal(Offset.zero).dy,
+      lessThan(surface.height),
+    );
   });
 }
