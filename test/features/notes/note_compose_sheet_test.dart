@@ -11,14 +11,15 @@ void main() {
     WidgetTester tester, {
     double keyboardBottom = 0,
     double height = viewHeight,
+    double width = 390,
   }) async {
-    await tester.binding.setSurfaceSize(Size(390, height));
+    await tester.binding.setSurfaceSize(Size(width, height));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MaterialApp(
         home: MediaQuery(
           data: MediaQueryData(
-            size: Size(390, height),
+            size: Size(width, height),
             viewInsets: EdgeInsets.only(bottom: keyboardBottom),
           ),
           // Align to bottom like showModalBottomSheet so compact-sheet
@@ -175,6 +176,62 @@ void main() {
       // not pinned to the top of the viewport.
       final titleY = tester.getTopLeft(find.byType(TextField).first).dy;
       expect(titleY, greaterThan(viewHeight * 0.15));
+    },
+  );
+
+  testWidgets(
+    'description then title keeps title above keyboard in landscape',
+    (tester) async {
+      // Short landscape viewport + overlay IME (Android Chrome-style).
+      const landscapeHeight = 390.0;
+      const landscapeWidth = 800.0;
+      const landscapeKeyboard = 200.0;
+      await pumpComposeSheet(
+        tester,
+        keyboardBottom: landscapeKeyboard,
+        height: landscapeHeight,
+        width: landscapeWidth,
+      );
+
+      final description = find.byType(TextField).last;
+      final title = find.byType(TextField).first;
+
+      // Focus via FocusNode to mimic switching fields after description edit
+      // (avoid ensureVisible, which can mask the pad drop).
+      tester.widget<TextField>(description).focusNode!.requestFocus();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 350));
+      tester.takeException();
+
+      final descriptionPad = tester
+          .widget<AnimatedPadding>(find.byType(AnimatedPadding))
+          .padding
+          .resolve(TextDirection.ltr)
+          .bottom;
+      expect(descriptionPad, greaterThan(0));
+
+      tester.widget<TextField>(title).focusNode!.requestFocus();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      tester.takeException();
+
+      final titlePad = tester
+          .widget<AnimatedPadding>(find.byType(AnimatedPadding))
+          .padding
+          .resolve(TextDirection.ltr)
+          .bottom;
+
+      final titleBox = tester.renderObject<RenderBox>(title);
+      final titleBottom =
+          titleBox.localToGlobal(Offset(0, titleBox.size.height)).dy;
+      const keyboardTop = landscapeHeight - landscapeKeyboard;
+
+      // Without current-pad projection, title focus would drop the description
+      // lift and park the title under the IME (titleBottom >> keyboardTop).
+      expect(titlePad, greaterThan(0));
+      expect(titleBottom, lessThanOrEqualTo(keyboardTop));
+      expect(find.text('Nueva tarea'), findsOneWidget);
+      expect(title, findsOneWidget);
     },
   );
 }

@@ -59,10 +59,23 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
   final _bodyFieldKey = GlobalKey();
   static const _uuid = Uuid();
   static const _titleAutofocusDelay = Duration(milliseconds: 350);
+  static const _paddingSettleDelay = Duration(milliseconds: 130);
   bool _isTask = false;
   double? _baselineViewHeight;
+  /// Last focus-aware bottom pad (for unpadded field projection).
+  double _lastBottomInset = 0;
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
+
+  void _onTitleFocusChanged() {
+    _onFocusChanged();
+    // Only scroll when the title was pushed off-screen (e.g. after body
+    // ensureVisible). Avoid eager ensureVisible — it shrinks measured
+    // overlap and can zero the pad while the sheet is still lifted.
+    if (_titleFocus.hasFocus) {
+      _ensureFieldVisible(_titleFieldKey, onlyIfObscured: true);
+    }
+  }
 
   void _onBodyFocusChanged() {
     _onFocusChanged();
@@ -76,7 +89,7 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
     if (widget.initialIsTask) {
       _isTask = true;
     }
-    _titleFocus.addListener(_onFocusChanged);
+    _titleFocus.addListener(_onTitleFocusChanged);
     _bodyFocus.addListener(_onBodyFocusChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _captureBaselineViewHeight();
@@ -92,7 +105,7 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _titleFocus.removeListener(_onFocusChanged);
+    _titleFocus.removeListener(_onTitleFocusChanged);
     _bodyFocus.removeListener(_onBodyFocusChanged);
     _titleController.dispose();
     _bodyController.dispose();
@@ -102,7 +115,16 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
   }
 
   void _onFocusChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    // Remeasure after layout and after AnimatedPadding settles so a
+    // description → title switch does not keep a stale "already clear" read.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+    Future<void>.delayed(_paddingSettleDelay, () {
+      if (mounted) setState(() {});
+    });
   }
 
   void _captureBaselineViewHeight() {
@@ -119,6 +141,8 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
     _captureBaselineViewHeight();
     if (_bodyFocus.hasFocus) {
       _ensureFieldVisible(_bodyFieldKey);
+    } else if (_titleFocus.hasFocus) {
+      _ensureFieldVisible(_titleFieldKey, onlyIfObscured: true);
     }
     if (mounted) setState(() {});
   }
@@ -129,14 +153,30 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
     return null;
   }
 
-  void _ensureFieldVisible(GlobalKey fieldKey) {
+  void _ensureFieldVisible(
+    GlobalKey fieldKey, {
+    bool onlyIfObscured = false,
+  }) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final fieldContext = fieldKey.currentContext;
       if (fieldContext == null) return;
+      if (onlyIfObscured) {
+        final bottom = globalFieldBottom(fieldKey);
+        final box = fieldContext.findRenderObject();
+        if (bottom == null || box is! RenderBox || !box.hasSize) return;
+        final top = box.localToGlobal(Offset.zero).dy;
+        final media = MediaQuery.of(this.context);
+        final keyboardTop =
+            media.size.height - media.viewInsets.bottom - 12;
+        if (top >= 0 && bottom <= keyboardTop) return;
+      }
+      // Title sits near the top of the sheet — keep alignment low so iOS
+      // does not overscroll the header off-screen.
+      final alignment = identical(fieldKey, _titleFieldKey) ? 0.0 : 0.15;
       Scrollable.ensureVisible(
         fieldContext,
-        alignment: 0.15,
+        alignment: alignment,
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
       );
@@ -207,11 +247,15 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
     final textTheme = Theme.of(context).textTheme;
     final isLandscape =
         MediaQuery.orientationOf(context) == Orientation.landscape;
+    final previousBottomInset = _lastBottomInset;
     final bottomInset = sheetKeyboardBottomInset(
       context,
       baselineViewHeight: _baselineViewHeight,
       focusedFieldBottomGlobal: _focusedFieldBottomGlobal(),
+      // Field global Y already includes this lift — project to unpadded space.
+      currentBottomPad: previousBottomInset,
     );
+    _lastBottomInset = bottomInset;
     final maxHeight = sheetMaxHeight(
       context,
       maxHeightFraction: 0.92,
