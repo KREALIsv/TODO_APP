@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+import 'dart:ui' show instantiateImageCodec;
+
 import 'package:flutter/material.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
@@ -10,6 +13,7 @@ import '../../data/notes_repository.dart';
 import '../../data/tags_repository.dart';
 import '../../domain/day_entry.dart';
 import '../../domain/day_view_query.dart';
+import '../../domain/note_attachment.dart';
 import '../../domain/note_item.dart';
 import '../../domain/task_dates.dart';
 import 'attachment_format.dart';
@@ -53,7 +57,6 @@ class NoteCard extends StatelessWidget {
       attachmentsRepository ?? AttachmentsRepository.instance;
 
   static const double coverHeight = 128;
-  static const double maxCoverHeight = 320;
 
   Widget _buildBody(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -266,30 +269,10 @@ class NoteCard extends StatelessWidget {
 
     return Opacity(
       opacity: completed ? 0.55 : 1,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final cardWidth = constraints.maxWidth.isFinite
-              ? constraints.maxWidth
-              : MediaQuery.sizeOf(context).width;
-          final height = attachmentCoverHeight(
-            cardWidth: cardWidth,
-            imageWidth: cover?.width,
-            imageHeight: cover?.height,
-            fallbackHeight: coverHeight,
-            maxHeight: maxCoverHeight,
-          );
-
-          return SizedBox(
-            height: height,
-            width: double.infinity,
-            child: AppMemoryImage(
-              bytes: bytes,
-              fit: BoxFit.contain,
-              width: cardWidth,
-              height: height,
-            ),
-          );
-        },
+      child: _NoteCardCover(
+        bytes: bytes,
+        attachment: cover,
+        fallbackHeight: coverHeight,
       ),
     );
   }
@@ -323,6 +306,107 @@ class NoteCard extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 8),
           clipBehavior: Clip.antiAlias,
           child: content,
+        );
+      },
+    );
+  }
+}
+
+/// Card cover that sizes to the image aspect and recovers dimensions from
+/// bytes when metadata is missing (avoids the short fallback + squash look).
+class _NoteCardCover extends StatefulWidget {
+  const _NoteCardCover({
+    required this.bytes,
+    required this.attachment,
+    required this.fallbackHeight,
+  });
+
+  final Uint8List bytes;
+  final NoteAttachment? attachment;
+  final double fallbackHeight;
+
+  @override
+  State<_NoteCardCover> createState() => _NoteCardCoverState();
+}
+
+class _NoteCardCoverState extends State<_NoteCardCover> {
+  int? _width;
+  int? _height;
+
+  @override
+  void initState() {
+    super.initState();
+    _width = _positive(widget.attachment?.width);
+    _height = _positive(widget.attachment?.height);
+    if (_width == null || _height == null) {
+      _peekSize();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _NoteCardCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.bytes, widget.bytes) ||
+        oldWidget.attachment?.id != widget.attachment?.id) {
+      _width = _positive(widget.attachment?.width);
+      _height = _positive(widget.attachment?.height);
+      if (_width == null || _height == null) {
+        _peekSize();
+      }
+    }
+  }
+
+  int? _positive(int? value) =>
+      value != null && value > 0 ? value : null;
+
+  Future<void> _peekSize() async {
+    try {
+      final codec = await instantiateImageCodec(widget.bytes);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final w = image.width;
+      final h = image.height;
+      image.dispose();
+      if (!mounted) return;
+      if (w > 0 && h > 0) {
+        setState(() {
+          _width = w;
+          _height = h;
+        });
+      }
+    } catch (_) {
+      // Keep fallback height when bytes cannot be probed.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final maxHeight = (MediaQuery.sizeOf(context).height * 0.55)
+            .clamp(320.0, 560.0)
+            .toDouble();
+        final height = attachmentCoverHeight(
+          cardWidth: cardWidth,
+          imageWidth: _width,
+          imageHeight: _height,
+          fallbackHeight: widget.fallbackHeight,
+          maxHeight: maxHeight,
+        );
+
+        return SizedBox(
+          height: height,
+          width: double.infinity,
+          child: AppMemoryImage(
+            bytes: widget.bytes,
+            fit: BoxFit.contain,
+            width: cardWidth,
+            height: height,
+            alignment: Alignment.center,
+          ),
         );
       },
     );

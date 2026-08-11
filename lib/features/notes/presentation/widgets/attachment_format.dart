@@ -22,13 +22,14 @@ String formatAttachmentByteSize(int bytes) {
 ///
 /// The card width is fixed by the list/grid layout, so the cover follows the
 /// image aspect ratio and clamps only to keep very wide/tall images usable.
+/// Portrait covers may grow up to [maxHeight] (default allows ~4:5 on phone).
 double attachmentCoverHeight({
   required double cardWidth,
   int? imageWidth,
   int? imageHeight,
   double fallbackHeight = 128,
   double minHeight = 96,
-  double maxHeight = 320,
+  double maxHeight = 520,
 }) {
   if (cardWidth <= 0 ||
       imageWidth == null ||
