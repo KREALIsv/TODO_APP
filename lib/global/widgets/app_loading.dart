@@ -100,10 +100,20 @@ class AppMemoryImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dpr = MediaQuery.devicePixelRatioOf(context);
-    final cacheWidth =
-        width != null ? (width! * dpr).round().clamp(1, 4096) : null;
-    final cacheHeight =
-        height != null ? (height! * dpr).round().clamp(1, 4096) : null;
+    // Only one cache dimension — passing both forces a decode to that exact
+    // pixel size and squashes portrait/landscape covers in note cards.
+    final int? cacheWidth;
+    final int? cacheHeight;
+    if (width != null) {
+      cacheWidth = (width! * dpr).round().clamp(1, 4096);
+      cacheHeight = null;
+    } else if (height != null) {
+      cacheWidth = null;
+      cacheHeight = (height! * dpr).round().clamp(1, 4096);
+    } else {
+      cacheWidth = null;
+      cacheHeight = null;
+    }
 
     return ColoredBox(
       color: placeholderColor ?? AppSurface.card(context),

@@ -26,7 +26,7 @@ void main() {
     }
   });
 
-  testWidgets('SyncStatusBanner shows compact overlay while syncing', (
+  testWidgets('SyncStatusBanner shows dismissible floating chip while syncing', (
     tester,
   ) async {
     final sync = _FakeSyncService();
@@ -36,7 +36,9 @@ void main() {
         home: SyncStatusBanner(
           syncService: sync,
           notesRepository: NotesRepository.instance,
-          child: const Scaffold(body: Text('Lista visible')),
+          child: const Scaffold(
+            body: Center(child: Text('Lista visible')),
+          ),
         ),
       ),
     );
@@ -50,6 +52,31 @@ void main() {
 
     expect(find.text('Actualizando datos…'), findsOneWidget);
     expect(find.text('Lista visible'), findsOneWidget);
+    expect(find.byTooltip('Cerrar'), findsOneWidget);
+
+    // Floating chip — content below remains visible (not a full-bleed bar).
+    final chipTop = tester.getTopLeft(find.text('Actualizando datos…')).dy;
+    expect(chipTop, greaterThan(0));
+
+    await tester.tap(find.byTooltip('Cerrar'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('Actualizando datos…'), findsNothing);
+    expect(find.text('Lista visible'), findsOneWidget);
+
+    // Stays dismissed for the same sync session.
+    sync.setState(SyncState.syncing);
+    await tester.pump();
+    expect(find.text('Actualizando datos…'), findsNothing);
+
+    // Reappears on a later sync after idle.
+    sync.setState(SyncState.idle);
+    await tester.pump();
+    sync.setState(SyncState.syncing);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Actualizando datos…'), findsOneWidget);
 
     sync.setState(SyncState.idle);
     await tester.pump();
