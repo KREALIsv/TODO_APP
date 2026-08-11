@@ -98,6 +98,57 @@ void main() {
     );
   });
 
+  test(
+    'focusAwareSheetKeyboardInset projects through current pad on focus switch',
+    () {
+      // Landscape-ish overlay: description lift already applied (pad=72),
+      // title global bottom looks clear, but unpadded it still overlaps.
+      const viewHeight = 390.0;
+      const viewInsetBottom = 200.0;
+      const currentPad = 72.0;
+      const titleBottomWhileLifted = 170.0;
+
+      expect(
+        focusAwareSheetKeyboardInset(
+          viewInsetBottom: viewInsetBottom,
+          viewHeight: viewHeight,
+          focusedFieldBottomGlobal: titleBottomWhileLifted,
+        ),
+        0,
+        reason: 'without current pad, title looks clear (stale geometry)',
+      );
+
+      final nextPad = focusAwareSheetKeyboardInset(
+        viewInsetBottom: viewInsetBottom,
+        viewHeight: viewHeight,
+        focusedFieldBottomGlobal: titleBottomWhileLifted,
+        currentBottomPad: currentPad,
+      );
+      expect(nextPad, greaterThan(0));
+      expect(nextPad, lessThanOrEqualTo(viewInsetBottom));
+      // Unpadded title bottom = 170 + 72 = 242; keyboardTop = 190; +12 clearance.
+      expect(nextPad, 64);
+    },
+  );
+
+  test(
+    'sheetKeyboardBottomInsetFor keeps pad when current lift hides overlap',
+    () {
+      expect(
+        sheetKeyboardBottomInsetFor(
+          isWeb: true,
+          layoutWidth: 800,
+          viewHeight: 390,
+          viewInsetBottom: 200,
+          focusedFieldBottomGlobal: 170,
+          currentBottomPad: 72,
+          platform: TargetPlatform.android,
+        ),
+        64,
+      );
+    },
+  );
+
   test('sheetKeyboardBottomInsetFor is zero when viewport already resized', () {
     expect(
       sheetKeyboardBottomInsetFor(
