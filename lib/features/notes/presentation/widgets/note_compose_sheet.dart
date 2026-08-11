@@ -295,13 +295,16 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
               controller: _titleController,
               focusNode: _titleFocus,
               textCapitalization: TextCapitalization.sentences,
-              textInputAction: TextInputAction.next,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              minLines: 1,
+              maxLines: 8,
               // Keep small: large scrollPadding on the top field makes
               // Flutter/Safari scroll the sheet past the title on iOS.
               scrollPadding: const EdgeInsets.only(bottom: 24),
-              onSubmitted: (_) => _bodyFocus.requestFocus(),
               decoration: const InputDecoration(
                 hintText: 'Escribe un título',
+                alignLabelWithHint: true,
               ),
             ),
             const SizedBox(height: 16),
