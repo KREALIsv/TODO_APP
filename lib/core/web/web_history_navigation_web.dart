@@ -10,6 +10,12 @@ import 'package:web/web.dart' hide Navigator;
 abstract final class WebHistoryNavigation {
   static GlobalKey<NavigatorState>? _navigatorKey;
   static bool _isPopStateEvent = false;
+
+  /// When true, the next [popstate] only consumes a history entry that was
+  /// already matched by a Flutter-initiated [Navigator.pop] (AppBar back).
+  /// Without this, [history.back] would pop the Navigator a second time
+  /// (e.g. attachment viewer → skips editor → list).
+  static bool _ignoreNextPopState = false;
   static bool _installed = false;
 
   static void install(GlobalKey<NavigatorState> navigatorKey) {
@@ -28,10 +34,16 @@ abstract final class WebHistoryNavigation {
   static void dispose() {
     _installed = false;
     _navigatorKey = null;
+    _ignoreNextPopState = false;
     window.onpopstate = null;
   }
 
   static void _handlePopState() {
+    if (_ignoreNextPopState) {
+      _ignoreNextPopState = false;
+      return;
+    }
+
     _isPopStateEvent = true;
     final navigator = _navigatorKey?.currentState;
     if (navigator != null && navigator.canPop()) {
@@ -41,6 +53,12 @@ abstract final class WebHistoryNavigation {
       window.history.pushState(null, '', window.location.href);
     }
     Future<void>.microtask(() => _isPopStateEvent = false);
+  }
+
+  /// Sync browser history after a Flutter-owned pop without popping again.
+  static void syncBrowserHistoryAfterFlutterPop() {
+    _ignoreNextPopState = true;
+    window.history.back();
   }
 }
 
@@ -58,6 +76,6 @@ class WebHistoryNavigatorObserver extends NavigatorObserver {
     if (WebHistoryNavigation._isPopStateEvent) return;
     if (route is! PageRoute<dynamic>) return;
     // AppBar / programmatic pop: align browser history without a second pop.
-    window.history.back();
+    WebHistoryNavigation.syncBrowserHistoryAfterFlutterPop();
   }
 }

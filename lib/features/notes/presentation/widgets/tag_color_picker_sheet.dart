@@ -295,7 +295,7 @@ Future<TagColorPickerResult?> showTagColorPickerSheet(
     showDragHandle: true,
     builder: (context) {
       final bottomInset = sheetKeyboardBottomInset(context);
-      final maxHeight = MediaQuery.sizeOf(context).height * 0.9;
+      final maxHeight = sheetMaxHeight(context, maxHeightFraction: 0.9);
       return Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
         child: ConstrainedBox(

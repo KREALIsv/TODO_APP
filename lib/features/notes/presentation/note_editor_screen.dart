@@ -4,13 +4,18 @@ import 'package:uuid/uuid.dart';
 import '../../../global/widgets/app_alerts.dart';
 import '../../shell/presentation/desktop_column_header.dart';
 import '../data/attachments_repository.dart';
+import '../data/day_entries_repository.dart';
 import '../data/notes_repository.dart';
 import '../data/tags_repository.dart';
 import '../domain/checklist_item.dart';
+import '../domain/date_only.dart';
+import '../domain/day_log.dart';
+import '../domain/day_view_query.dart';
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
 import '../domain/task_groups.dart';
 import '../domain/task_when_save_hint.dart';
+import 'widgets/resolve_remove_from_day.dart';
 import 'widgets/attachments_editor.dart';
 import 'widgets/checklist_editor.dart';
 import 'widgets/note_task_type_switch.dart';
@@ -27,6 +32,7 @@ class NoteEditorScreen extends StatefulWidget {
     this.repository,
     this.tagsRepository,
     this.embedded = false,
+    this.contextDay,
     this.onClose,
     this.onSaved,
   });
@@ -36,6 +42,9 @@ class NoteEditorScreen extends StatefulWidget {
   final NotesRepository? repository;
   final TagsRepository? tagsRepository;
   final bool embedded;
+
+  /// Home day selector when opened from a specific calendar day.
+  final DateTime? contextDay;
   final VoidCallback? onClose;
   final ValueChanged<String>? onSaved;
 
@@ -69,6 +78,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   AttachmentsRepository get _attachments => AttachmentsRepository.instance;
 
   bool get _isEditing => widget.item != null;
+
+  bool get _showRemoveFromDay {
+    final existing = widget.item;
+    if (existing == null || existing.type != NoteType.task) return false;
+    final day = widget.contextDay;
+    if (day == null) return _todayOn || _dueAt != null;
+    final entry =
+        DayEntriesRepository.instance.findForNoteDay(existing.id, day);
+    return DayViewQuery.canRemoveFromDay(existing, day, entry: entry);
+  }
 
   String get _appBarTitle {
     final isTask = _type == NoteType.task;
@@ -144,7 +163,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final existing = widget.item;
     if (existing == null || existing.type != NoteType.task) return;
 
-    await _repo.cancelTaskOnDay(existing.id);
+    final fromDay = await resolveRemoveFromDay(
+      context,
+      item: existing,
+      preferredDay: widget.contextDay,
+    );
+    if (fromDay == null || !mounted) return;
+
+    await _repo.cancelTaskOnDay(existing.id, fromDay: fromDay);
     if (!mounted) return;
 
     final updated = _repo.getById(existing.id);
@@ -185,7 +211,30 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     DateTime? completedAt;
     if (isTask && _completed) {
-      completedAt = existing?.completedAt ?? now;
+      if (existing?.completedAt != null) {
+        completedAt = existing!.completedAt;
+      } else {
+        final draft = existing ??
+            NoteItem(
+              id: _noteId,
+              type: _type,
+              title: title,
+              body: body,
+              pinned: _pinned,
+              completed: _completed,
+              createdAt: now,
+              updatedAt: now,
+              dueAt: _dueAt,
+              dueHasTime: _dueHasTime,
+              todayAt: _todayOn ? now : null,
+            );
+        final day = commitmentDayFor(
+          draft,
+          now,
+          onDay: widget.contextDay,
+        );
+        completedAt = completionOutcomeAt(day, now);
+      }
     }
 
     final NoteItem toSave;
@@ -451,13 +500,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           const Divider(height: 1),
           const SizedBox(height: 8),
           TaskDayHistorySection(noteId: _noteId),
-          if (_todayOn || _dueAt != null) ...[
+          if (_showRemoveFromDay) ...[
             const SizedBox(height: 16),
             Align(
               alignment: Alignment.centerLeft,
               child: OutlinedButton(
                 onPressed: _removeFromDay,
-                child: const Text('Quitar del día'),
+                child: Text(
+                  widget.contextDay == null
+                      ? 'Quitar del día'
+                      : 'Quitar del ${formatDayMonth(widget.contextDay!)}',
+                ),
               ),
             ),
           ],

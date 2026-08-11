@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../features/auth/data/auth_service.dart';
 import '../../features/auth/domain/auth_errors.dart';
+import '../../features/auth/presentation/auth_flow.dart';
+import '../../features/auth/presentation/auth_screen.dart';
 import 'app_alerts.dart';
 
 /// Shows a one-time dialog when [AuthService] ends the session after auth failure.
@@ -38,13 +40,27 @@ class _SessionExpiryListenerState extends State<SessionExpiryListener> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (AuthScreen.isVisible) return;
+
       final navContext = widget.navigatorKey.currentContext;
       if (navContext == null || !navContext.mounted) return;
-      AppAlerts.show(
+
+      AppAlerts.showWithAction(
         navContext,
         title: AuthErrors.sessionExpiredTitle,
         message: message,
         type: AppAlertType.warning,
+        actionLabel: 'Iniciar sesión',
+        dismissLabel: 'Ahora no',
+        onAction: () {
+          AuthFlow.openLogin(
+            navContext,
+            contextTitle: 'Volver a sincronizar',
+            contextMessage:
+                'Inicia sesión con la misma cuenta que usas en la web '
+                'para traer tus notas y tareas.',
+          );
+        },
       );
     });
   }

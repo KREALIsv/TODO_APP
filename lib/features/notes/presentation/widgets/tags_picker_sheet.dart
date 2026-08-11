@@ -263,10 +263,11 @@ class _TagsPickerSheetState extends State<_TagsPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = sheetKeyboardBottomInset(context);
-    final screenHeight = MediaQuery.sizeOf(context).height;
     // Buscar: 65%. Crear/editar: 80%.
-    final sheetHeight = screenHeight *
-        (_page == _TagsPickerPage.list ? 0.65 : 0.80);
+    final sheetHeight = sheetFixedHeight(
+      context,
+      heightFraction: _page == _TagsPickerPage.list ? 0.65 : 0.80,
+    );
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),

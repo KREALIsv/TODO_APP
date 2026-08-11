@@ -150,11 +150,107 @@ List<Widget> buildGroupedTasksSlivers({
   return slivers;
 }
 
+/// Future-day plan under chip Tareas: tasks for [dayTitle] + Backlog pool.
+///
+/// Reuses [GroupedTasksSection.today] for the day block and `.undated` for
+/// Backlog expansion state.
+List<Widget> buildPlanDayWithBacklogSlivers({
+  required String dayTitle,
+  required List<NoteItem> ofDay,
+  required List<NoteItem> backlog,
+  required void Function(NoteItem item) onOpen,
+  NotesRepository? repository,
+  TextTheme? textTheme,
+  GroupedTasksExpansion expansion = const GroupedTasksExpansion(),
+  void Function(GroupedTasksSection section)? onToggleSection,
+  String? selectedNoteId,
+  DateTime? actionDay,
+}) {
+  final collapsible = ofDay.isNotEmpty && backlog.isNotEmpty;
+
+  VoidCallback? toggle(GroupedTasksSection section) {
+    if (!collapsible || onToggleSection == null) return null;
+    return () => onToggleSection(section);
+  }
+
+  bool showContent(GroupedTasksSection section) {
+    if (!collapsible) return true;
+    return expansion.isExpanded(section);
+  }
+
+  final slivers = <Widget>[
+    SliverToBoxAdapter(
+      child: TaskSectionHeader(
+        title: dayTitle,
+        expanded: collapsible ? expansion.today : null,
+        onToggle: toggle(GroupedTasksSection.today),
+      ),
+    ),
+  ];
+
+  if (showContent(GroupedTasksSection.today)) {
+    if (ofDay.isEmpty) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              backlog.isEmpty
+                  ? 'Nada planificado'
+                  : 'Nada planificado · elige algo del Backlog',
+              style: textTheme?.bodyMedium?.copyWith(
+                color: AppColors.neutral60,
+              ),
+            ),
+          ),
+        ),
+      );
+    } else {
+      slivers.add(
+        _taskListSliver(
+          items: ofDay,
+          onOpen: onOpen,
+          repository: repository,
+          selectedNoteId: selectedNoteId,
+          actionDay: actionDay,
+        ),
+      );
+    }
+  }
+
+  if (backlog.isNotEmpty) {
+    slivers.add(
+      SliverToBoxAdapter(
+        child: TaskSectionHeader(
+          title: 'Backlog',
+          expanded: collapsible ? expansion.undated : null,
+          onToggle: toggle(GroupedTasksSection.undated),
+        ),
+      ),
+    );
+    if (showContent(GroupedTasksSection.undated)) {
+      slivers.add(
+        _taskListSliver(
+          items: backlog,
+          onOpen: onOpen,
+          repository: repository,
+          selectedNoteId: selectedNoteId,
+          actionDay: actionDay,
+        ),
+      );
+    }
+  }
+
+  slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 88)));
+  return slivers;
+}
+
 Widget _taskListSliver({
   required List<NoteItem> items,
   required void Function(NoteItem item) onOpen,
   NotesRepository? repository,
   String? selectedNoteId,
+  DateTime? actionDay,
 }) {
   return SliverPadding(
     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -166,6 +262,7 @@ Widget _taskListSliver({
           item: item,
           repository: repository,
           selected: selectedNoteId == item.id,
+          actionDay: actionDay,
           onTap: () => onOpen(item),
         );
       },

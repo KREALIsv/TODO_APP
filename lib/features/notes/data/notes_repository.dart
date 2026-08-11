@@ -262,15 +262,21 @@ class NotesRepository {
       }
 
       if (previous.completed != next.completed) {
-        final day = commitmentDayFor(next, now);
         if (next.completed) {
+          final day = next.completedAt != null
+              ? dateOnly(next.completedAt!)
+              : commitmentDayFor(next, now);
+          final outcomeAt = completionOutcomeAt(day, next.completedAt ?? now);
           await _dayEntries.markCompleted(
             noteId: next.id,
             day: day,
-            outcomeAt: next.completedAt ?? now,
+            outcomeAt: outcomeAt,
           );
         } else {
-          await _dayEntries.reopen(noteId: next.id, day: day);
+          final reopenDay = previous.completedAt != null
+              ? dateOnly(previous.completedAt!)
+              : commitmentDayFor(previous, now);
+          await _dayEntries.reopen(noteId: next.id, day: reopenDay);
         }
       }
     }, 'saveTaskFromEditor');
@@ -299,25 +305,43 @@ class NotesRepository {
     );
   }
 
-  Future<void> toggleCompleted(String id) async {
+  Future<void> toggleCompleted(String id, {DateTime? onDay}) async {
     final current = getById(id);
     if (current == null || current.type != NoteType.task) return;
     final now = DateTime.now();
     final nextCompleted = !current.completed;
-    final day = commitmentDayFor(current, now);
+    if (nextCompleted) {
+      final day = commitmentDayFor(current, now, onDay: onDay);
+      final outcomeAt = completionOutcomeAt(day, now);
+      await update(
+        current.copyWith(
+          completed: true,
+          completedAt: outcomeAt,
+          updatedAt: now,
+        ),
+      );
+      await _syncDayEntry(() async {
+        await _dayEntries.markCompleted(
+          noteId: id,
+          day: day,
+          outcomeAt: outcomeAt,
+        );
+      }, 'toggleCompleted');
+      return;
+    }
+
+    final reopenDay = current.completedAt != null
+        ? dateOnly(current.completedAt!)
+        : commitmentDayFor(current, now, onDay: onDay);
     await update(
       current.copyWith(
-        completed: nextCompleted,
-        completedAt: nextCompleted ? now : null,
+        completed: false,
+        completedAt: null,
         updatedAt: now,
       ),
     );
     await _syncDayEntry(() async {
-      if (nextCompleted) {
-        await _dayEntries.markCompleted(noteId: id, day: day, outcomeAt: now);
-      } else {
-        await _dayEntries.reopen(noteId: id, day: day);
-      }
+      await _dayEntries.reopen(noteId: id, day: reopenDay);
     }, 'toggleCompleted');
   }
 
@@ -417,9 +441,26 @@ class NotesRepository {
         previousToday != null ? dateOnly(previousToday) : null;
 
     if (todayOn && nextTodayAt != null) {
+      final todayDay = dateOnly(nextTodayAt);
+      if (previousDue != null && previousDue != todayDay) {
+        await _dayEntries.applyMigrationPatches(
+          noteId: noteId,
+          patches: migrateTo(previous, previousDue, todayDay, now),
+          now: now,
+        );
+        return;
+      }
+      if (previousTodayDay != null && previousTodayDay != todayDay) {
+        await _dayEntries.applyMigrationPatches(
+          noteId: noteId,
+          patches: migrateTo(previous, previousTodayDay, todayDay, now),
+          now: now,
+        );
+        return;
+      }
       await _dayEntries.ensurePlanned(
         noteId: noteId,
-        day: dateOnly(nextTodayAt),
+        day: todayDay,
         via: DayVia.todaySwitch,
         now: now,
       );
