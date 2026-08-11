@@ -58,9 +58,16 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
   final _titleFieldKey = GlobalKey();
   final _bodyFieldKey = GlobalKey();
   static const _uuid = Uuid();
+  static const _titleAutofocusDelay = Duration(milliseconds: 350);
   bool _isTask = false;
+  double? _baselineViewHeight;
 
   NotesRepository get _repo => widget.repository ?? NotesRepository.instance;
+
+  void _onBodyFocusChanged() {
+    _onFocusChanged();
+    if (_bodyFocus.hasFocus) _ensureFieldVisible(_bodyFieldKey);
+  }
 
   @override
   void initState() {
@@ -69,20 +76,24 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
     if (widget.initialIsTask) {
       _isTask = true;
     }
-    _titleFocus.addListener(() {
-      if (_titleFocus.hasFocus) _ensureFieldVisible(_titleFieldKey);
-    });
-    _bodyFocus.addListener(() {
-      if (_bodyFocus.hasFocus) _ensureFieldVisible(_bodyFieldKey);
-    });
+    _titleFocus.addListener(_onFocusChanged);
+    _bodyFocus.addListener(_onBodyFocusChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _titleFocus.requestFocus();
+      _captureBaselineViewHeight();
+      // Wait for the sheet slide-in + first layout before focusing. Races
+      // between autofocus, IME metrics, and padding caused overshoot on iOS
+      // and Android when the title was focused immediately.
+      Future<void>.delayed(_titleAutofocusDelay, () {
+        if (mounted) _titleFocus.requestFocus();
+      });
     });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _titleFocus.removeListener(_onFocusChanged);
+    _bodyFocus.removeListener(_onBodyFocusChanged);
     _titleController.dispose();
     _bodyController.dispose();
     _titleFocus.dispose();
@@ -90,14 +101,32 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
     super.dispose();
   }
 
+  void _onFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _captureBaselineViewHeight() {
+    if (!mounted) return;
+    final height = MediaQuery.sizeOf(context).height;
+    final inset = MediaQuery.viewInsetsOf(context).bottom;
+    if (inset == 0) {
+      _baselineViewHeight = height;
+    }
+  }
+
   @override
   void didChangeMetrics() {
-    // Keyboard open/close: keep the focused field above the IME.
+    _captureBaselineViewHeight();
     if (_bodyFocus.hasFocus) {
       _ensureFieldVisible(_bodyFieldKey);
-    } else if (_titleFocus.hasFocus) {
-      _ensureFieldVisible(_titleFieldKey);
     }
+    if (mounted) setState(() {});
+  }
+
+  double? _focusedFieldBottomGlobal() {
+    if (_bodyFocus.hasFocus) return globalFieldBottom(_bodyFieldKey);
+    if (_titleFocus.hasFocus) return globalFieldBottom(_titleFieldKey);
+    return null;
   }
 
   void _ensureFieldVisible(GlobalKey fieldKey) {
@@ -176,96 +205,97 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final bottomInset = sheetKeyboardBottomInset(context);
+    final isLandscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    final bottomInset = sheetKeyboardBottomInset(
+      context,
+      baselineViewHeight: _baselineViewHeight,
+      focusedFieldBottomGlobal: _focusedFieldBottomGlobal(),
+    );
     final maxHeight = sheetMaxHeight(
       context,
       maxHeightFraction: 0.92,
-      minHeight: 240,
+      minHeight: isLandscape ? 180 : 240,
+      baselineViewHeight: _baselineViewHeight,
     );
 
+    // Pad above an overlaying IME and size the sheet to its content.
+    // ListView.shrinkWrap keeps the sheet compact — a non-shrink-wrapped
+    // scroll view stretches to fill the safe area, parking the title at the
+    // top of the screen with a large empty gap (Android "rises even though
+    // the keyboard isn't covering the title", and iOS overshoot).
     return AnimatedPadding(
       duration: const Duration(milliseconds: 120),
       curve: Curves.easeOut,
       padding: EdgeInsets.only(bottom: bottomInset),
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: maxHeight),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: ListView(
+          shrinkWrap: true,
+          physics: const ClampingScrollPhysics(),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            16 + MediaQuery.paddingOf(context).bottom,
+          ),
           children: [
-            Flexible(
-              child: SingleChildScrollView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      _isTask ? 'Nueva tarea' : 'Nueva nota',
-                      style: textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      key: _titleFieldKey,
-                      controller: _titleController,
-                      focusNode: _titleFocus,
-                      textCapitalization: TextCapitalization.sentences,
-                      textInputAction: TextInputAction.next,
-                      scrollPadding: const EdgeInsets.only(bottom: 160),
-                      onSubmitted: (_) => _bodyFocus.requestFocus(),
-                      decoration: const InputDecoration(
-                        hintText: 'Escribe un título',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      key: _bodyFieldKey,
-                      controller: _bodyController,
-                      focusNode: _bodyFocus,
-                      textCapitalization: TextCapitalization.sentences,
-                      minLines: 3,
-                      maxLines: 6,
-                      scrollPadding: const EdgeInsets.only(bottom: 160),
-                      decoration: const InputDecoration(
-                        hintText: 'Añade detalles (opcional)',
-                        alignLabelWithHint: true,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    NoteTaskTypeSwitch(
-                      value: _isTask,
-                      onChanged: (value) => setState(() => _isTask = value),
-                    ),
-                  ],
-                ),
+            Text(
+              _isTask ? 'Nueva tarea' : 'Nueva nota',
+              style: textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              key: _titleFieldKey,
+              controller: _titleController,
+              focusNode: _titleFocus,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.next,
+              // Keep small: large scrollPadding on the top field makes
+              // Flutter/Safari scroll the sheet past the title on iOS.
+              scrollPadding: const EdgeInsets.only(bottom: 24),
+              onSubmitted: (_) => _bodyFocus.requestFocus(),
+              decoration: const InputDecoration(
+                hintText: 'Escribe un título',
               ),
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                16 + MediaQuery.paddingOf(context).bottom,
+            const SizedBox(height: 16),
+            TextField(
+              key: _bodyFieldKey,
+              controller: _bodyController,
+              focusNode: _bodyFocus,
+              textCapitalization: TextCapitalization.sentences,
+              minLines: isLandscape ? 2 : 3,
+              maxLines: isLandscape ? 4 : 6,
+              scrollPadding: const EdgeInsets.only(bottom: 120),
+              decoration: const InputDecoration(
+                hintText: 'Añade detalles (opcional)',
+                alignLabelWithHint: true,
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancelar'),
-                    ),
+            ),
+            const SizedBox(height: 12),
+            NoteTaskTypeSwitch(
+              value: _isTask,
+              onChanged: (value) => setState(() => _isTask = value),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar'),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _save,
-                      child: const Text('Guardar'),
-                    ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _save,
+                    child: const Text('Guardar'),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ],
         ),
