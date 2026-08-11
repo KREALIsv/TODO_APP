@@ -26,6 +26,10 @@ bool viewportShrunkForKeyboard({
 /// - When the keyboard overlays (common on Android Chrome), uses
 ///   [viewInsetBottom], optionally reduced via [focusedFieldBottomGlobal] so
 ///   fields already above the IME do not lift the whole sheet.
+///
+/// Pass [currentBottomPad] when the sheet is already lifted by an
+/// [AnimatedPadding] (or similar). Global field geometry includes that pad, so
+/// the helper projects back to unpadded space before deciding the next inset.
 double sheetKeyboardBottomInsetFor({
   required bool isWeb,
   required double layoutWidth,
@@ -33,6 +37,7 @@ double sheetKeyboardBottomInsetFor({
   required double viewInsetBottom,
   double? baselineViewHeight,
   double? focusedFieldBottomGlobal,
+  double currentBottomPad = 0,
   TargetPlatform platform = TargetPlatform.android,
   double clearance = 12,
 }) {
@@ -48,6 +53,7 @@ double sheetKeyboardBottomInsetFor({
     viewInsetBottom: viewInsetBottom,
     viewHeight: viewHeight,
     focusedFieldBottomGlobal: focusedFieldBottomGlobal,
+    currentBottomPad: currentBottomPad,
     clearance: clearance,
   );
 }
@@ -57,20 +63,28 @@ double sheetKeyboardBottomInsetFor({
 /// When the focused field is already above the keyboard, returns `0` instead of
 /// lifting the whole sheet (fixes title-focus over-elevation on Android).
 /// When [focusedFieldBottomGlobal] is null, returns the full [viewInsetBottom].
+///
+/// [currentBottomPad] is the sheet's currently applied bottom pad. Field global
+/// Y already includes that lift, so we add it back to evaluate the unpadded
+/// position — otherwise switching description → title drops the pad and hides
+/// the title under the keyboard (common on Android landscape).
 double focusAwareSheetKeyboardInset({
   required double viewInsetBottom,
   required double viewHeight,
   double? focusedFieldBottomGlobal,
+  double currentBottomPad = 0,
   double clearance = 12,
 }) {
   if (viewInsetBottom <= 0) return 0;
   if (focusedFieldBottomGlobal == null) return viewInsetBottom;
 
+  final unpaddedFieldBottom =
+      focusedFieldBottomGlobal + currentBottomPad.clamp(0.0, double.infinity);
   final keyboardTop = viewHeight - viewInsetBottom;
-  if (focusedFieldBottomGlobal <= keyboardTop - clearance) {
+  if (unpaddedFieldBottom <= keyboardTop - clearance) {
     return 0;
   }
-  final overlap = focusedFieldBottomGlobal + clearance - keyboardTop;
+  final overlap = unpaddedFieldBottom + clearance - keyboardTop;
   return overlap.clamp(0.0, viewInsetBottom);
 }
 
@@ -78,6 +92,7 @@ double sheetKeyboardBottomInset(
   BuildContext context, {
   double? baselineViewHeight,
   double? focusedFieldBottomGlobal,
+  double currentBottomPad = 0,
 }) {
   final media = MediaQuery.of(context);
   return sheetKeyboardBottomInsetFor(
@@ -87,6 +102,7 @@ double sheetKeyboardBottomInset(
     viewInsetBottom: media.viewInsets.bottom,
     baselineViewHeight: baselineViewHeight,
     focusedFieldBottomGlobal: focusedFieldBottomGlobal,
+    currentBottomPad: currentBottomPad,
     platform: defaultTargetPlatform,
   );
 }
