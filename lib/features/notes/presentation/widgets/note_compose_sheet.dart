@@ -183,91 +183,83 @@ class _NoteComposeSheetState extends State<NoteComposeSheet>
       minHeight: 240,
     );
 
+    // Pad above an overlaying IME and size the sheet to its content.
+    // ListView.shrinkWrap keeps the sheet compact — a non-shrink-wrapped
+    // scroll view stretches to fill the safe area, parking the title at the
+    // top of the screen with a large empty gap (Android "rises even though
+    // the keyboard isn't covering the title", and iOS overshoot).
     return AnimatedPadding(
       duration: const Duration(milliseconds: 120),
       curve: Curves.easeOut,
       padding: EdgeInsets.only(bottom: bottomInset),
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: maxHeight),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: ListView(
+          shrinkWrap: true,
+          physics: const ClampingScrollPhysics(),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            16 + MediaQuery.paddingOf(context).bottom,
+          ),
           children: [
-            Flexible(
-              child: SingleChildScrollView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      _isTask ? 'Nueva tarea' : 'Nueva nota',
-                      style: textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      key: _titleFieldKey,
-                      controller: _titleController,
-                      focusNode: _titleFocus,
-                      textCapitalization: TextCapitalization.sentences,
-                      textInputAction: TextInputAction.next,
-                      // Keep small: large scrollPadding on the top field makes
-                      // Flutter/Safari scroll the sheet past the title on iOS.
-                      scrollPadding: const EdgeInsets.only(bottom: 24),
-                      onSubmitted: (_) => _bodyFocus.requestFocus(),
-                      decoration: const InputDecoration(
-                        hintText: 'Escribe un título',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      key: _bodyFieldKey,
-                      controller: _bodyController,
-                      focusNode: _bodyFocus,
-                      textCapitalization: TextCapitalization.sentences,
-                      minLines: 3,
-                      maxLines: 6,
-                      scrollPadding: const EdgeInsets.only(bottom: 120),
-                      decoration: const InputDecoration(
-                        hintText: 'Añade detalles (opcional)',
-                        alignLabelWithHint: true,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    NoteTaskTypeSwitch(
-                      value: _isTask,
-                      onChanged: (value) => setState(() => _isTask = value),
-                    ),
-                  ],
-                ),
+            Text(
+              _isTask ? 'Nueva tarea' : 'Nueva nota',
+              style: textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              key: _titleFieldKey,
+              controller: _titleController,
+              focusNode: _titleFocus,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.next,
+              // Keep small: large scrollPadding on the top field makes
+              // Flutter/Safari scroll the sheet past the title on iOS.
+              scrollPadding: const EdgeInsets.only(bottom: 24),
+              onSubmitted: (_) => _bodyFocus.requestFocus(),
+              decoration: const InputDecoration(
+                hintText: 'Escribe un título',
               ),
             ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                16 + MediaQuery.paddingOf(context).bottom,
+            const SizedBox(height: 16),
+            TextField(
+              key: _bodyFieldKey,
+              controller: _bodyController,
+              focusNode: _bodyFocus,
+              textCapitalization: TextCapitalization.sentences,
+              minLines: 3,
+              maxLines: 6,
+              scrollPadding: const EdgeInsets.only(bottom: 120),
+              decoration: const InputDecoration(
+                hintText: 'Añade detalles (opcional)',
+                alignLabelWithHint: true,
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancelar'),
-                    ),
+            ),
+            const SizedBox(height: 12),
+            NoteTaskTypeSwitch(
+              value: _isTask,
+              onChanged: (value) => setState(() => _isTask = value),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar'),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _save,
-                      child: const Text('Guardar'),
-                    ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _save,
+                    child: const Text('Guardar'),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ],
         ),

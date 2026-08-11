@@ -20,8 +20,13 @@ void main() {
             size: const Size(390, viewHeight),
             viewInsets: EdgeInsets.only(bottom: keyboardBottom),
           ),
+          // Align to bottom like showModalBottomSheet so compact-sheet
+          // geometry matches production (sheet sits above the keyboard).
           child: const Material(
-            child: NoteComposeSheet(initialIsTask: true),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: NoteComposeSheet(initialIsTask: true),
+            ),
           ),
         ),
       ),
@@ -108,4 +113,36 @@ void main() {
       lessThan(surface.height),
     );
   });
+
+  testWidgets(
+    'compose sheet stays compact above keyboard instead of stretching',
+    (tester) async {
+      await pumpComposeSheet(tester, keyboardBottom: keyboardInset);
+
+      final maxHeight = sheetMaxHeightFor(
+        viewHeight: viewHeight,
+        viewInsetBottom: keyboardInset,
+        maxHeightFraction: 0.92,
+        minHeight: 240,
+      );
+
+      final scrollView = find.descendant(
+        of: find.byType(AnimatedPadding),
+        matching: find.byType(ListView),
+      );
+      final sheetHeight =
+          tester.renderObject<RenderBox>(scrollView).size.height;
+
+      // shrinkWrap intrinsic height — must not fill the whole safe area,
+      // which would park the title at the top with a large empty gap.
+      expect(sheetHeight, lessThan(maxHeight));
+      expect(find.text('Nueva tarea'), findsOneWidget);
+      expect(find.text('Guardar'), findsOneWidget);
+
+      // Title should sit in the lower half (compact sheet above keyboard),
+      // not pinned to the top of the viewport.
+      final titleY = tester.getTopLeft(find.byType(TextField).first).dy;
+      expect(titleY, greaterThan(viewHeight * 0.15));
+    },
+  );
 }
