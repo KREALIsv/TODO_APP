@@ -9,10 +9,7 @@ void main() {
     final code = crypto.generateRecoveryCode();
     expect(code.contains('-'), isTrue);
 
-    final wrap = await crypto.wrapDekForRecovery(
-      dek: dek,
-      recoveryCode: code,
-    );
+    final wrap = await crypto.wrapDekForRecovery(dek: dek, recoveryCode: code);
     final restored = await crypto.unwrapDekFromRecovery(
       recoveryCode: code.replaceAll('-', '').toLowerCase(),
       saltBase64: wrap.salt,
@@ -65,5 +62,38 @@ void main() {
     );
     expect(clear['title'], 'Privado');
     expect(clear['body'], 'contenido sensible');
+  });
+
+  test('PIN wrap roundtrips LDEK', () async {
+    final ldek = List<int>.generate(32, (i) => i + 1);
+    const pin = '2468';
+    final wrap = await crypto.wrapLdekForPin(ldek: ldek, pin: pin);
+    final restored = await crypto.unwrapLdekFromPin(
+      pin: pin,
+      saltBase64: wrap.salt,
+      payload: wrap.payload,
+    );
+    expect(restored, ldek);
+  });
+
+  test('wrong PIN does not unwrap LDEK', () async {
+    final ldek = List<int>.generate(32, (i) => 9 - (i % 10));
+    final wrap = await crypto.wrapLdekForPin(ldek: ldek, pin: '1357');
+    expect(
+      () => crypto.unwrapLdekFromPin(
+        pin: '0000',
+        saltBase64: wrap.salt,
+        payload: wrap.payload,
+      ),
+      throwsA(anything),
+    );
+  });
+
+  test('PIN must be 4 to 8 digits', () {
+    expect(CryptoService.isValidPin('123'), isFalse);
+    expect(CryptoService.isValidPin('1234'), isTrue);
+    expect(CryptoService.isValidPin('12345678'), isTrue);
+    expect(CryptoService.isValidPin('123456789'), isFalse);
+    expect(CryptoService.isValidPin('12ab'), isFalse);
   });
 }

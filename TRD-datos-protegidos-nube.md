@@ -42,11 +42,12 @@ Un mensaje de “seguridad entre plataformas” no es creíble sin E2EE o sin de
 - Encriptar en push / desencriptar en pull: `note`, `tag` (nombres); `dayEntry` según decisión de metadata (v1: outcome en blob encriptado o metadata mínima en claro — ver §4).
 - Estados de UI claros: sesión vs vault desbloqueado.
 - **Hive local cifrado** (LDEK en `flutter_secure_storage`): notas, tareas, tags y adjuntos at-rest. Sin cuenta. Logout **no** borra la LDEK.
+- **Candado de app (PIN)** opt-in en Privacidad: envuelve la LDEK (`wodo-local-pin-v1`). El PIN no es la clave de Hive ni de la nube.
 
 ### Incluido (v2 — posterior)
 
 - Adjuntos encriptados + sync de blobs.
-- PIN / biometría **local** (abrir app en el dispositivo; envuelve la LDEK, no es la clave de la nube).
+- Biometría local como atajo del PIN (no sustituye el wrap).
 - Purga / opacificación de `sync_mutations` históricas en plaintext (migración cuentas legacy).
 
 ### Fuera de alcance (v1)
@@ -63,7 +64,7 @@ Un mensaje de “seguridad entre plataformas” no es creíble sin E2EE o sin de
 | Tema | Decisión | Motivo |
 |------|----------|--------|
 | ¿Clave derivada de contraseña? | **No** para DEK | Contraseña puede cambiar; UX peor |
-| ¿PIN como clave de la nube? | **No** | Entropía baja; PIN solo para candado **local** (v2) |
+| ¿PIN como clave de la nube? | **No** | Entropía baja; PIN solo envuelve la LDEK local |
 | ¿Cómo llega la DEK a otro dispositivo? | **Vinculación QR** (Flujo A) | Poco esfuerzo; mismo patrón que WhatsApp Web |
 | ¿QR crea cuenta? | **No** | Sin cuenta → registro/login normal; QR solo **vincula** |
 | ¿Login = datos en la nube? | **No** si `encryptionEnabled` | Evita “inicié sesión y no sincroniza” |
@@ -381,7 +382,8 @@ No sustituye E2EE pero complementa:
 | **P2 — E2EE enable** | ✅ Activar protección + recovery (pantalla/copiar) + encrypt push/pull + DEK vía ECDH en pairing + unlock por recovery wrap |
 | **P3 — Hardening** | ✅ Purga plaintext legacy, refresh token hash, descarga `.txt` recovery, `SECURITY.md` (adjuntos sync → v2) |
 | **P4 — Correo transaccional** | ✅ Resend unificado: `welcome`, `password_reset`, opcional `vault_recovery` (relay sin persistir código; key en `/opt/wodo/.env`) |
-| **P5 — Hive local cifrado** | ✅ LDEK en secure storage; migración one-shot plaintext → `HiveAesCipher`; independiente de DEK/logout; PIN/biometría queda en v2 |
+| **P5 — Hive local cifrado** | ✅ LDEK en secure storage; migración one-shot plaintext → `HiveAesCipher`; independiente de DEK/logout |
+| **P6 — Candado de app** | ✅ Opt-in “Bloquear esta app”; PIN 4–8 dígitos envuelve LDEK; pantalla de desbloqueo; auto-lock al ir a segundo plano. Biometría = v2 |
 
 ---
 
@@ -399,6 +401,8 @@ No sustituye E2EE pero complementa:
 10. Activar protección no permite continuar sin acknowledgment del código de recuperación.
 11. Tras el primer arranque, cajas de contenido (`notes`, `day_entries`, `tags`, `attachments`, `attachment_blobs`) no se pueden leer sin la LDEK.
 12. Cerrar sesión deja las notas locales legibles en el mismo dispositivo (LDEK no se borra).
+13. Con “Bloquear esta app”, al matar el proceso la LDEK no queda en disco; hace falta el PIN para abrir las cajas de contenido.
+14. PIN incorrecto no abre notas. “Olvidé el PIN” borra el contenido local de este dispositivo (cuenta/backup siguen siendo el camino de recuperación).
 
 ---
 
@@ -410,7 +414,7 @@ No sustituye E2EE pero complementa:
 | 2 | **DEK en web** | **Opción B:** persistir DEK mientras la sesión web está activa. **Cerrar sesión** o revocar dispositivo → borrar DEK local; volver a vincular (QR) o recovery. |
 | 3 | **Límite de dispositivos** | **Sin límite** fijo. Lista gestionable en Ajustes; el usuario puede **revocar** cualquier dispositivo que no reconozca. |
 | 4 | **Nombres en lista** | **Automático** (plataforma / navegador) + **última sincronización** + **nombre editable** por el usuario (ej. “Mi laptop trabajo”). |
-| 5 | **LDEK local** | Independiente de la DEK de nube. Se genera en el dispositivo, vive en secure storage, cifra Hive. Logout **no** la borra. PIN/biometría (v2) solo desbloquea la app. |
+| 5 | **LDEK local** | Independiente de la DEK de nube. Se genera en el dispositivo, cifra Hive. Logout **no** la borra. El PIN opt-in envuelve la LDEK; no es la clave de Hive ni de la nube. |
 
 ### 14.1 Privacidad vs contenido “malo” en tareas (decisión §1)
 

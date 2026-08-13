@@ -41,6 +41,23 @@ abstract final class PrivacySecurityCopy {
       'tus notas.';
   static const exportSubtitle = 'Copia de seguridad de este dispositivo';
   static const importSubtitle = 'Reemplaza las notas de este dispositivo';
+  static const appLockTitle = 'Bloquear esta app';
+  static const appLockOffSubtitle =
+      'Pide un PIN al abrir WODO en este dispositivo';
+  static const appLockOnSubtitle = 'PIN activo en este dispositivo';
+  static const appLockSetupSubtitle =
+      'El PIN envuelve la clave de este dispositivo. No es la clave de la nube '
+      'ni se sincroniza. Si lo olvidas, las notas locales de este equipo no '
+      'se podrán leer.';
+  static const appLockUnlockSubtitle =
+      'Introduce el PIN de este dispositivo para ver tus notas.';
+  static const appLockForgotMessage =
+      'Si olvidas el PIN, las notas de este dispositivo no se podrán leer. '
+      'Puedes borrarlas y empezar de cero aquí. Si tienes cuenta o un backup, '
+      'podrás recuperarlas después.';
+  static const appLockChangePinTitle = 'Cambiar PIN';
+  static const appLockChangePinSubtitle =
+      'El PIN envuelve la clave de este dispositivo';
 }
 
 class PrivacySecurityStatus {
@@ -77,10 +94,10 @@ class PrivacySecurityStatus {
         title: 'Local',
         body: localOn
             ? 'Usas WODO en este dispositivo, sin cuenta. Tus notas se '
-                'guardan cifradas aquí. Exporta un backup si quieres una '
-                'copia de seguridad.'
+                  'guardan cifradas aquí. Exporta un backup si quieres una '
+                  'copia de seguridad.'
             : 'Usas WODO en este dispositivo, sin cuenta. Exporta un backup '
-                'si quieres una copia de seguridad.',
+                  'si quieres una copia de seguridad.',
         hubSubtitle: PrivacySecurityCopy.sectionCaption,
         hubTrailing: 'Local',
         icon: Icons.shield_outlined,
@@ -92,7 +109,8 @@ class PrivacySecurityStatus {
       return PrivacySecurityStatus(
         phase: PrivacySecurityPhase.syncUnprotected,
         title: 'Sync sin protección',
-        body: 'Tus datos se sincronizan entre dispositivos. WODO puede leer '
+        body:
+            'Tus datos se sincronizan entre dispositivos. WODO puede leer '
             'el contenido en la nube hasta que actives la protección.',
         hubSubtitle: PrivacySecurityCopy.sectionCaption,
         hubTrailing: 'Opcional',
@@ -109,9 +127,9 @@ class PrivacySecurityStatus {
         title: 'Pendiente de vincular',
         body: revoked
             ? 'Este dispositivo fue desvinculado. Vuelve a vincularlo con QR '
-                'o usa tu código de recuperación.'
+                  'o usa tu código de recuperación.'
             : 'Tu cuenta está protegida, pero este equipo aún no tiene la '
-                'clave. Vincúlalo con QR o usa el código de recuperación.',
+                  'clave. Vincúlalo con QR o usa el código de recuperación.',
         hubSubtitle: PrivacySecurityCopy.sectionCaption,
         hubTrailing: 'Pendiente',
         icon: Icons.link_rounded,
@@ -122,7 +140,8 @@ class PrivacySecurityStatus {
     return PrivacySecurityStatus(
       phase: PrivacySecurityPhase.protected,
       title: 'Protegido',
-      body: 'Tus notas se cifran en este dispositivo antes de subir a la '
+      body:
+          'Tus notas se cifran en este dispositivo antes de subir a la '
           'nube. Ni WODO puede leerlas.',
       hubSubtitle: PrivacySecurityCopy.sectionCaption,
       hubTrailing: 'Activa',
@@ -134,9 +153,13 @@ class PrivacySecurityStatus {
 
 /// Backward-compatible helpers used by older call sites / tests.
 String privacySecuritySettingsSummary({required bool authenticated}) {
-  return PrivacySecurityStatus.resolve(authenticated: authenticated).hubSubtitle;
+  return PrivacySecurityStatus.resolve(
+    authenticated: authenticated,
+  ).hubSubtitle;
 }
 
 String? privacySecuritySettingsTrailing({required bool authenticated}) {
-  return PrivacySecurityStatus.resolve(authenticated: authenticated).hubTrailing;
+  return PrivacySecurityStatus.resolve(
+    authenticated: authenticated,
+  ).hubTrailing;
 }

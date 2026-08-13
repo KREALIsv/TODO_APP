@@ -65,15 +65,14 @@ void main() {
   testWidgets('privacy screen shows login prompt when logged out', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      const MaterialApp(home: PrivacySecurityScreen()),
-    );
+    await tester.pumpWidget(const MaterialApp(home: PrivacySecurityScreen()));
     await tester.pumpAndSettle();
 
     expect(find.text('Local'), findsWidgets);
     expect(find.text(AccountSyncCopy.loginTitle), findsOneWidget);
     expect(find.text('Almacenamiento local'), findsOneWidget);
     expect(find.text('Sin cifrar'), findsOneWidget);
+    expect(find.text(PrivacySecurityCopy.appLockTitle), findsOneWidget);
   });
 
   testWidgets('privacy screen shows local encryption when LDEK is ready', (
@@ -82,16 +81,14 @@ void main() {
     await LocalStorageService.instance.debugReset();
     await LocalStorageService.instance.init(store: MemorySecureKeyStore());
 
-    await tester.pumpWidget(
-      const MaterialApp(home: PrivacySecurityScreen()),
-    );
+    await tester.pumpWidget(const MaterialApp(home: PrivacySecurityScreen()));
     await tester.pumpAndSettle();
 
     expect(find.text('Cifrado'), findsOneWidget);
-    expect(
-      find.textContaining('Cerrar sesión no los borra'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Cerrar sesión no los borra'), findsOneWidget);
+    expect(find.text(PrivacySecurityCopy.appLockTitle), findsOneWidget);
+    expect(find.text(PrivacySecurityCopy.appLockOffSubtitle), findsOneWidget);
+    expect(find.byType(Switch), findsOneWidget);
     expect(
       privacySecuritySettingsSummary(authenticated: false),
       PrivacySecurityCopy.sectionCaption,
@@ -116,9 +113,7 @@ void main() {
     );
     VaultService.instance.debugOverrideCloudState(markVaultReady: true);
 
-    await tester.pumpWidget(
-      const MaterialApp(home: PrivacySecurityScreen()),
-    );
+    await tester.pumpWidget(const MaterialApp(home: PrivacySecurityScreen()));
     await tester.pumpAndSettle();
 
     expect(find.text('Regenerar código de recuperación'), findsOneWidget);

@@ -14,7 +14,9 @@ class CryptoService {
   static const algorithmName = 'AES-256-GCM';
   static const _recoveryInfo = 'wodo-recovery-dek-v1';
   static const _pairingInfo = 'wodo-pairing-dek-v1';
+  static const _pinWrapInfo = 'wodo-local-pin-v1';
   static const _codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  static final _pinPattern = RegExp(r'^\d{4,8}$');
 
   final AesGcm _aes = AesGcm.with256bits();
   final X25519 _x25519 = X25519();
@@ -45,6 +47,40 @@ class CryptoService {
 
   String normalizeRecoveryCode(String raw) {
     return raw.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  }
+
+  static bool isValidPin(String pin) => _pinPattern.hasMatch(pin);
+
+  /// Wraps the device-local Hive key (LDEK) with a PIN. Independent of cloud DEK.
+  Future<({String salt, String payload})> wrapLdekForPin({
+    required List<int> ldek,
+    required String pin,
+  }) async {
+    _assertPin(pin);
+    final saltBytes = _randomBytes(16);
+    final key = await _derivePinKey(pin, saltBytes);
+    final envelope = await encryptBytes(
+      plaintext: Uint8List.fromList(ldek),
+      key: key,
+      aad: utf8.encode(_pinWrapInfo),
+    );
+    return (salt: base64Encode(saltBytes), payload: jsonEncode(envelope));
+  }
+
+  Future<List<int>> unwrapLdekFromPin({
+    required String pin,
+    required String saltBase64,
+    required String payload,
+  }) async {
+    _assertPin(pin);
+    final saltBytes = base64Decode(saltBase64);
+    final key = await _derivePinKey(pin, saltBytes);
+    final envelope = Map<String, dynamic>.from(jsonDecode(payload) as Map);
+    return decryptBytes(
+      envelope: envelope,
+      key: key,
+      aad: utf8.encode(_pinWrapInfo),
+    );
   }
 
   Future<({String salt, String encryptedDekRecovery})> wrapDekForRecovery({
@@ -146,7 +182,11 @@ class CryptoService {
   }) async {
     final plaintext = utf8.encode(jsonEncode(payload));
     final aad = utf8.encode('$entityType:$entityId');
-    return encryptBytes(plaintext: Uint8List.fromList(plaintext), key: dek, aad: aad);
+    return encryptBytes(
+      plaintext: Uint8List.fromList(plaintext),
+      key: dek,
+      aad: aad,
+    );
   }
 
   Future<Map<String, dynamic>> decryptPayload({
@@ -224,6 +264,20 @@ class CryptoService {
       nonce: salt,
       info: utf8.encode(_recoveryInfo),
     );
+  }
+
+  Future<SecretKey> _derivePinKey(String pin, List<int> salt) {
+    return _hkdf.deriveKey(
+      secretKey: SecretKey(utf8.encode(pin)),
+      nonce: salt,
+      info: utf8.encode(_pinWrapInfo),
+    );
+  }
+
+  void _assertPin(String pin) {
+    if (!isValidPin(pin)) {
+      throw const FormatException('El PIN debe tener entre 4 y 8 dígitos.');
+    }
   }
 
   Uint8List _randomBytes(int length) {

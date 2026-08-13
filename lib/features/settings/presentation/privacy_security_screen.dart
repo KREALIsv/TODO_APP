@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/storage/local_storage_service.dart';
 import '../../../core/theme/app_surface.dart';
+import '../../app_lock/presentation/app_lock_screens.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/auth_flow.dart';
 import '../../encryption/data/vault_service.dart';
@@ -46,7 +47,10 @@ class PrivacySecurityScreen extends StatelessWidget {
           builder: (context, _) {
             final authenticated = AuthService.instance.isAuthenticated;
             final status = PrivacySecurityStatus.resolve(accent: accent);
-            final localOn = LocalStorageService.instance.isEnabled;
+            final local = LocalStorageService.instance;
+            final localOn = local.isEnabled;
+            final lockOn = local.isAppLockEnabled;
+            final canLock = local.isSessionUnlocked || lockOn;
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
@@ -68,14 +72,51 @@ class PrivacySecurityScreen extends StatelessWidget {
                       title: 'Almacenamiento local',
                       subtitle: localOn
                           ? 'Notas, tareas y adjuntos se cifran en este '
-                              'dispositivo. Cerrar sesión no los borra.'
+                                'dispositivo. Cerrar sesión no los borra.'
                           : 'No se pudo cifrar el almacenamiento de este '
-                              'dispositivo. Tus datos siguen en modo local.',
+                                'dispositivo. Tus datos siguen en modo local.',
                       trailing: localOn ? 'Cifrado' : 'Sin cifrar',
                       accent: accent,
                       showChevron: false,
                       onTap: null,
                     ),
+                    const SettingsDivider(),
+                    SettingsRow(
+                      icon: lockOn
+                          ? Icons.lock_rounded
+                          : Icons.lock_open_rounded,
+                      title: PrivacySecurityCopy.appLockTitle,
+                      subtitle: !canLock
+                          ? 'Necesitas el cifrado local para activarlo'
+                          : lockOn
+                          ? PrivacySecurityCopy.appLockOnSubtitle
+                          : PrivacySecurityCopy.appLockOffSubtitle,
+                      accent: accent,
+                      showChevron: false,
+                      onTap: null,
+                      trailingWidget: Switch.adaptive(
+                        value: lockOn,
+                        onChanged: !canLock
+                            ? null
+                            : (value) {
+                                if (value) {
+                                  AppLockFlow.enable(context);
+                                } else {
+                                  AppLockFlow.disable(context);
+                                }
+                              },
+                      ),
+                    ),
+                    if (lockOn) ...[
+                      const SettingsDivider(),
+                      SettingsRow(
+                        icon: Icons.pin_outlined,
+                        title: PrivacySecurityCopy.appLockChangePinTitle,
+                        subtitle: PrivacySecurityCopy.appLockChangePinSubtitle,
+                        accent: accent,
+                        onTap: () => AppLockFlow.changePin(context),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -164,7 +205,8 @@ class PrivacySecurityScreen extends StatelessWidget {
           SettingsRow(
             icon: Icons.link_rounded,
             title: 'Vincula este dispositivo',
-            subtitle: 'QR desde un equipo de confianza, o código de recuperación',
+            subtitle:
+                'QR desde un equipo de confianza, o código de recuperación',
             trailing: 'Pendiente',
             accent: accent,
             onTap: () => AuthFlow.openLinkDeviceGate(context),
