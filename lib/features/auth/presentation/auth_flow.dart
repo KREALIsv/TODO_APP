@@ -37,7 +37,8 @@ abstract final class AuthFlow {
     if (signedIn != true || !context.mounted) return;
     await VaultService.instance.refreshSecurity();
     if (!context.mounted) return;
-    _showSignedInSnack(context);
+    await _showSignedInSnack(context);
+    if (!context.mounted) return;
     await _maybeOpenVaultGate(context);
   }
 
@@ -50,7 +51,8 @@ abstract final class AuthFlow {
     if (signedIn != true || !context.mounted) return;
     await VaultService.instance.refreshSecurity();
     if (!context.mounted) return;
-    _showSignedInSnack(context);
+    await _showSignedInSnack(context);
+    if (!context.mounted) return;
     await _maybeOpenVaultGate(context);
   }
 
@@ -78,7 +80,7 @@ abstract final class AuthFlow {
     );
   }
 
-  static void _showSignedInSnack(BuildContext context) {
+  static Future<void> _showSignedInSnack(BuildContext context) async {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
