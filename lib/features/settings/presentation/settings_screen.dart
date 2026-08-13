@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/storage/local_storage_service.dart';
 import '../../../core/theme/app_surface.dart';
 import '../../../global/constants/config.dart';
 import '../../../global/themes/app_colors.dart';
@@ -243,6 +244,7 @@ class SettingsScreen extends StatelessWidget {
         SyncService.instance,
         DeviceIdentity.instance,
         VaultService.instance,
+        LocalStorageService.instance,
       ]),
       builder: (context, _) {
         final bg = _settings.listBackground;

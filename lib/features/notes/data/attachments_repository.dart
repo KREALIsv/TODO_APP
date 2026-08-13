@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/storage/local_storage_service.dart';
 import '../domain/note_attachment.dart';
 
 /// Local image attachments for notes/tasks.
@@ -28,8 +29,9 @@ class AttachmentsRepository {
   late Box<dynamic> _blobs;
 
   Future<void> init() async {
-    _meta = await Hive.openBox<Map>(metaBoxName);
-    _blobs = await Hive.openBox<dynamic>(blobBoxName);
+    final storage = LocalStorageService.instance;
+    _meta = await storage.openBox<Map>(metaBoxName);
+    _blobs = await storage.openBox<dynamic>(blobBoxName);
   }
 
   @visibleForTesting

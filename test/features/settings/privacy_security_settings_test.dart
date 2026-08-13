@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
+import 'package:todos_app/core/storage/local_storage_service.dart';
+import 'package:todos_app/core/storage/secure_key_store.dart';
 import 'package:todos_app/features/auth/data/auth_session_repository.dart';
 import 'package:todos_app/features/encryption/data/vault_service.dart';
 import 'package:todos_app/features/notes/data/notes_repository.dart';
@@ -35,7 +37,7 @@ void main() {
   test('privacy summary when logged out', () {
     expect(
       privacySecuritySettingsSummary(authenticated: false),
-      'Inicia sesión para activar',
+      'Inicia sesión para sincronizar',
     );
     expect(privacySecuritySettingsTrailing(authenticated: false), isNull);
   });
@@ -54,7 +56,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Privacidad y seguridad'), findsWidgets);
-    expect(find.textContaining('Inicia sesión para activar'), findsOneWidget);
+    expect(find.textContaining('Inicia sesión para sincronizar'), findsOneWidget);
   });
 
   testWidgets('privacy screen shows login prompt when logged out', (
@@ -67,6 +69,32 @@ void main() {
 
     expect(find.text('Modo local'), findsOneWidget);
     expect(find.text('Iniciar sesión'), findsOneWidget);
+    expect(find.text('Almacenamiento local'), findsOneWidget);
+    expect(find.text('Sin cifrar'), findsOneWidget);
+  });
+
+  testWidgets('privacy screen shows local encryption when LDEK is ready', (
+    tester,
+  ) async {
+    await LocalStorageService.instance.debugReset();
+    await LocalStorageService.instance.init(store: MemorySecureKeyStore());
+
+    await tester.pumpWidget(
+      const MaterialApp(home: PrivacySecurityScreen()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cifrado'), findsOneWidget);
+    expect(
+      find.textContaining('Cerrar sesión no los borra'),
+      findsOneWidget,
+    );
+    expect(
+      privacySecuritySettingsSummary(authenticated: false),
+      'Cifrado en este dispositivo',
+    );
+
+    await LocalStorageService.instance.debugReset();
   });
 
   testWidgets('privacy screen offers recovery regeneration when vault ready', (

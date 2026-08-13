@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/storage/local_storage_service.dart';
 import '../../../core/theme/app_surface.dart';
 import '../../../global/themes/app_colors.dart';
 import '../../auth/data/auth_service.dart';
@@ -37,6 +38,7 @@ class PrivacySecurityScreen extends StatelessWidget {
           listenable: Listenable.merge([
             AuthService.instance,
             VaultService.instance,
+            LocalStorageService.instance,
           ]),
           builder: (context, _) {
             final authenticated = AuthService.instance.isAuthenticated;
@@ -48,6 +50,33 @@ class PrivacySecurityScreen extends StatelessWidget {
                   textTheme: textTheme,
                   accent: accent,
                   authenticated: authenticated,
+                ),
+                const SizedBox(height: 20),
+                SettingsSectionLabel(
+                  label: 'Este dispositivo',
+                  textTheme: textTheme,
+                  accent: accent,
+                ),
+                SettingsCard(
+                  children: [
+                    SettingsRow(
+                      icon: LocalStorageService.instance.isEnabled
+                          ? Icons.phonelink_lock_rounded
+                          : Icons.sd_storage_outlined,
+                      title: 'Almacenamiento local',
+                      subtitle: LocalStorageService.instance.isEnabled
+                          ? 'Notas, tareas y adjuntos se cifran en este '
+                              'dispositivo. Cerrar sesión no los borra.'
+                          : 'No se pudo cifrar el almacenamiento de este '
+                              'dispositivo. Tus datos siguen en modo local.',
+                      trailing: LocalStorageService.instance.isEnabled
+                          ? 'Cifrado'
+                          : 'Sin cifrar',
+                      accent: accent,
+                      showChevron: false,
+                      onTap: null,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 20),
                 if (!authenticated) ...[
@@ -218,8 +247,12 @@ class _PrivacyStatusCard extends StatelessWidget {
     if (!authenticated) {
       return (
         'Modo local',
-        'Inicia sesión para activar protección E2EE y gestionar '
-            'dispositivos vinculados.',
+        LocalStorageService.instance.isEnabled
+            ? 'Tus notas se guardan cifradas en este dispositivo. '
+                'Inicia sesión si quieres sincronizar o proteger la nube '
+                'con E2EE.'
+            : 'Puedes usar WODO sin cuenta. Inicia sesión para sincronizar '
+                'o activar protección E2EE en la nube.',
         Icons.shield_outlined,
         AppColors.neutral60,
       );
@@ -265,7 +298,11 @@ class _PrivacyStatusCard extends StatelessWidget {
 String privacySecuritySettingsSummary({
   required bool authenticated,
 }) {
-  if (!authenticated) return 'Inicia sesión para activar';
+  if (!authenticated) {
+    return LocalStorageService.instance.isEnabled
+        ? 'Cifrado en este dispositivo'
+        : 'Inicia sesión para sincronizar';
+  }
 
   final vault = VaultService.instance;
   if (!vault.accountEncryptionEnabled) {

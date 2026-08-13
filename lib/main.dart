@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import 'app/app.dart';
+import 'core/storage/local_storage_service.dart';
 import 'core/theme/theme.dart';
 import 'core/web/boot_ready.dart';
 import 'features/auth/data/auth_session_repository.dart';
@@ -48,6 +49,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     try {
       HiveLogger.level = HiveLoggerLevel.warn;
       await Hive.initFlutter();
+      await LocalStorageService.instance.init();
       await Future.wait([
         NotesRepository.instance.init(),
         DayEntriesRepository.instance.init(),

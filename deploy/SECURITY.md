@@ -6,9 +6,11 @@ Documento breve alineado con `TRD-datos-protegidos-nube.md`. Complementa TLS + a
 
 | Activo | Dónde |
 |--------|--------|
-| Notas / tareas / etiquetas | Hive local; `sync_mutations.payload` en API; proyecciones `notes`/`tags` |
+| Notas / tareas / etiquetas | Hive local cifrado (LDEK); `sync_mutations.payload` en API; proyecciones `notes`/`tags` |
+| Adjuntos locales | Hive `attachments` + `attachment_blobs` (cifrados at-rest) |
 | Credenciales | `users.password_hash` (bcrypt); JWT access + refresh |
-| DEK (clave de datos) | Solo en cliente (secure storage / memoria); wraps en servidor |
+| DEK (clave de datos en la nube) | Solo en cliente (secure storage / memoria); wraps en servidor |
+| LDEK (clave Hive local) | Solo en cliente (`wodo.local.ldek.v1` en secure storage). Independiente de DEK |
 | Código de recuperación | Solo usuario; wrap `encrypted_dek_recovery` en servidor (no el código) |
 
 ## Amenazas y mitigaciones
@@ -17,17 +19,20 @@ Documento breve alineado con `TRD-datos-protegidos-nube.md`. Complementa TLS + a
 |---------|------------|
 | Servidor / ops lee contenido | E2EE opt-in: payloads AES-256-GCM; proyección plaintext desactivada |
 | Mutaciones plaintext legacy tras activar E2EE | Purga al activar (+ cleanup idempotente): borra mutaciones no opacas; vacía espejos |
+| Lectura de Hive en disco / backup del dispositivo | LDEK + `HiveAesCipher` (AES-256-CBC) en cajas de contenido |
 | Robo de DB de sesiones | `sessions.refresh_token_hash` = SHA-256 del refresh JWT (no plaintext) |
 | Dispositivo perdido / revocado | Lista de dispositivos + revoke (`vault_state=revoked`); re-vincular o recovery |
 | Pairing interceptado | TTL 3 min; poll token secreto; DEK vía ECDH (servidor solo retransmite ciphertext) |
 | Fuerza bruta recovery / mail | Rate limit Nest + cuota Resend por flujo |
 | Soporte humano “recupera mis notas” | Imposible sin DEK/recovery (límite E2EE; mensaje de producto) |
+| Logout borra datos locales | No: LDEK y Hive se conservan; solo se borra JWT + DEK de nube |
 
 ## Fuera de alcance (hoy)
 
-- Adjuntos: solo locales (Hive); sync de blobs encriptados = v2
-- Hive local encriptado / PIN de app = v2
+- Adjuntos: sync de blobs encriptados = v2 (local ya va cifrado at-rest)
+- PIN / biometría de app (envolver LDEK) = v2
 - Hash de grants efímeros de pairing (TTL corto; cleared on consume)
+- Export JSON sigue en claro (el usuario elige compartir un backup)
 
 ## Checklist operativo
 

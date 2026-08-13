@@ -22,7 +22,7 @@ La **autenticación** (email + contraseña, JWT) queda separada de la **protecci
 | Transporte | HTTPS (TLS) |
 | Auth | JWT + bcrypt |
 | Contenido en servidor | **Texto plano** en `sync_mutations.payload`, `notes.content`, `tags.name`, etc. |
-| Hive local | Sin encriptación de box |
+| Hive local | Cifrado at-rest (LDEK en secure storage; independiente de DEK de nube) |
 | Multi-dispositivo | Pull/push de mutaciones con payload legible |
 
 Un mensaje de “seguridad entre plataformas” no es creíble sin E2EE o sin dejar claro que el servidor puede leer el contenido.
@@ -41,12 +41,12 @@ Un mensaje de “seguridad entre plataformas” no es creíble sin E2EE o sin de
 - **Revocar dispositivos** desde Ajustes (lista de dispositivos vinculados).
 - Encriptar en push / desencriptar en pull: `note`, `tag` (nombres); `dayEntry` según decisión de metadata (v1: outcome en blob encriptado o metadata mínima en claro — ver §4).
 - Estados de UI claros: sesión vs vault desbloqueado.
+- **Hive local cifrado** (LDEK en `flutter_secure_storage`): notas, tareas, tags y adjuntos at-rest. Sin cuenta. Logout **no** borra la LDEK.
 
 ### Incluido (v2 — posterior)
 
 - Adjuntos encriptados + sync de blobs.
-- Hive local encriptado (candado de app).
-- PIN / biometría **local** (abrir app en el dispositivo, no clave de la nube).
+- PIN / biometría **local** (abrir app en el dispositivo; envuelve la LDEK, no es la clave de la nube).
 - Purga / opacificación de `sync_mutations` históricas en plaintext (migración cuentas legacy).
 
 ### Fuera de alcance (v1)
@@ -381,6 +381,7 @@ No sustituye E2EE pero complementa:
 | **P2 — E2EE enable** | ✅ Activar protección + recovery (pantalla/copiar) + encrypt push/pull + DEK vía ECDH en pairing + unlock por recovery wrap |
 | **P3 — Hardening** | ✅ Purga plaintext legacy, refresh token hash, descarga `.txt` recovery, `SECURITY.md` (adjuntos sync → v2) |
 | **P4 — Correo transaccional** | ✅ Resend unificado: `welcome`, `password_reset`, opcional `vault_recovery` (relay sin persistir código; key en `/opt/wodo/.env`) |
+| **P5 — Hive local cifrado** | ✅ LDEK en secure storage; migración one-shot plaintext → `HiveAesCipher`; independiente de DEK/logout; PIN/biometría queda en v2 |
 
 ---
 
@@ -396,6 +397,8 @@ No sustituye E2EE pero complementa:
 8. Recovery code restaura acceso sin trusted device (incl. web tras borrar caché).
 9. Cuenta sin protección: sync y UI como antes.
 10. Activar protección no permite continuar sin acknowledgment del código de recuperación.
+11. Tras el primer arranque, cajas de contenido (`notes`, `day_entries`, `tags`, `attachments`, `attachment_blobs`) no se pueden leer sin la LDEK.
+12. Cerrar sesión deja las notas locales legibles en el mismo dispositivo (LDEK no se borra).
 
 ---
 
@@ -407,6 +410,7 @@ No sustituye E2EE pero complementa:
 | 2 | **DEK en web** | **Opción B:** persistir DEK mientras la sesión web está activa. **Cerrar sesión** o revocar dispositivo → borrar DEK local; volver a vincular (QR) o recovery. |
 | 3 | **Límite de dispositivos** | **Sin límite** fijo. Lista gestionable en Ajustes; el usuario puede **revocar** cualquier dispositivo que no reconozca. |
 | 4 | **Nombres en lista** | **Automático** (plataforma / navegador) + **última sincronización** + **nombre editable** por el usuario (ej. “Mi laptop trabajo”). |
+| 5 | **LDEK local** | Independiente de la DEK de nube. Se genera en el dispositivo, vive en secure storage, cifra Hive. Logout **no** la borra. PIN/biometría (v2) solo desbloquea la app. |
 
 ### 14.1 Privacidad vs contenido “malo” en tareas (decisión §1)
 
