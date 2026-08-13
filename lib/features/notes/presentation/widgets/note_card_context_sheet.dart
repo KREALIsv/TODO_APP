@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../../../../global/themes/app_colors.dart';
+import '../../data/day_entries_repository.dart';
 import '../../data/notes_repository.dart';
 import '../../domain/date_only.dart';
+import '../../domain/day_view_query.dart';
 import '../../domain/note_item.dart';
 import '../../domain/task_dates.dart';
+import '../../domain/task_when_save_hint.dart';
+import 'resolve_remove_from_day.dart';
 import 'task_day_history_section.dart';
 import 'task_when_field.dart';
+import 'task_when_save_hint_banner.dart';
 
 /// Actions returned by [showNoteCardContextSheet] (when-chips apply in-place).
 enum NoteCardContextAction { pin, duplicate, archive, restore, delete }
@@ -56,11 +61,21 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
   late DateTime? _dueAt;
   late bool _dueHasTime;
   late int? _reminderMinutesBefore;
+  String? _changeHint;
 
   NoteItem get _item => widget.item;
   NotesRepository get _repo => widget.repository;
   bool get _isTask => _item.type == NoteType.task;
   bool get _showDayActions => _isTask && !_item.isArchived;
+  bool get _hasDayCommitment => _todayOn || _dueAt != null;
+
+  bool get _showRemoveFromDay {
+    if (!_showDayActions) return false;
+    final day = widget.actionDay;
+    if (day == null) return _hasDayCommitment;
+    final entry = DayEntriesRepository.instance.findForNoteDay(_item.id, day);
+    return DayViewQuery.canRemoveFromDay(_item, day, entry: entry);
+  }
 
   @override
   void initState() {
@@ -77,6 +92,8 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
     bool dueHasTime = false,
     int? reminderMinutesBefore,
   }) async {
+    final previousTodayOn = _todayOn;
+    final previousDueAt = _dueAt;
     setState(() {
       _todayOn = todayOn;
       _dueAt = dueAt;
@@ -90,6 +107,17 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
       dueHasTime: dueHasTime,
       reminderMinutesBefore: reminderMinutesBefore,
     );
+    if (!mounted) return;
+    setState(() {
+      _changeHint = taskWhenChangeHint(
+        previous: _item.copyWith(
+          todayAt: previousTodayOn ? (_item.todayAt ?? DateTime.now()) : null,
+          dueAt: previousDueAt,
+        ),
+        nextTodayOn: todayOn,
+        nextDueAt: dueAt,
+      );
+    });
   }
 
   Future<void> _applyDayAction(Future<void> Function() action) async {
@@ -153,6 +181,11 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
             onChanged: _onWhenChanged,
           ),
         ),
+        if (_changeHint != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: TaskWhenSaveHintBanner(message: _changeHint!),
+          ),
         const Divider(height: 1),
         TaskDayHistorySection(
           noteId: _item.id,
@@ -165,41 +198,11 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
         ),
         const Divider(height: 1),
         _actionTile(
-          icon: Icons.chevron_right,
-          label: 'Migrar a mañana',
-          onTap: () => _applyDayAction(
-            () => _repo.migrateTaskToDay(
-              _item.id,
-              dateOnly(DateTime.now()).add(const Duration(days: 1)),
-              fromDay: widget.actionDay,
-            ),
-          ),
-        ),
-        _actionTile(
           icon: Icons.event_outlined,
-          label: 'Agendar…',
+          label: 'Agendar otro día',
           onTap: _scheduleTask,
         ),
-        _actionTile(
-          icon: Icons.inbox_outlined,
-          label: 'Enviar a Backlog',
-          onTap: () => _applyDayAction(
-            () => _repo.sendTaskToBacklog(
-              _item.id,
-              fromDay: widget.actionDay,
-            ),
-          ),
-        ),
-        _actionTile(
-          icon: Icons.remove_circle_outline,
-          label: 'Descartar del día',
-          onTap: () => _applyDayAction(
-            () => _repo.cancelTaskOnDay(
-              _item.id,
-              fromDay: widget.actionDay,
-            ),
-          ),
-        ),
+        if (_showRemoveFromDay) _removeFromDayButton(),
         const Divider(height: 1),
       ],
       _actionTile(
@@ -225,6 +228,31 @@ class _NoteCardContextSheetState extends State<NoteCardContextSheet> {
           action: NoteCardContextAction.restore,
         ),
     ];
+  }
+
+  /// Drops the task's calendar commitment for the action / viewed day.
+  Widget _removeFromDayButton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: OutlinedButton(
+        onPressed: () async {
+          final fromDay = await resolveRemoveFromDay(
+            context,
+            item: _item,
+            preferredDay: widget.actionDay,
+          );
+          if (fromDay == null) return;
+          await _applyDayAction(
+            () => _repo.cancelTaskOnDay(_item.id, fromDay: fromDay),
+          );
+        },
+        child: Text(
+          widget.actionDay == null
+              ? 'Quitar del día'
+              : 'Quitar del ${formatDayMonth(widget.actionDay!)}',
+        ),
+      ),
+    );
   }
 
   Widget _deleteButton() {

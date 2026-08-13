@@ -244,5 +244,94 @@ void main() {
       final ofDay = NotesQuery.ofDayFrom(items, today, now: today);
       expect(ofDay.map((e) => e.id).toList(), ['new-task']);
     });
+
+    test('ofDayFrom excludes tasks captured today but scheduled for tomorrow', () {
+      final today = DateTime(2026, 8, 2, 15);
+      final tomorrow = DateTime(2026, 8, 3);
+      final items = [
+        NoteItem(
+          id: 'tomorrow-task',
+          type: NoteType.task,
+          title: 'Reunión chepe',
+          body: '',
+          pinned: false,
+          completed: false,
+          createdAt: today,
+          updatedAt: today,
+          dueAt: tomorrow,
+        ),
+      ];
+
+      expect(
+        NotesQuery.ofDayFrom(items, today, now: today).map((e) => e.id).toList(),
+        isEmpty,
+      );
+      expect(
+        NotesQuery.ofDayFrom(items, tomorrow, now: today)
+            .map((e) => e.id)
+            .toList(),
+        ['tomorrow-task'],
+      );
+    });
+  });
+
+  group('NotesQuery Tareas layouts', () {
+    final now = DateTime(2026, 8, 7, 12);
+
+    test('grouped layout only for Tareas without search', () {
+      expect(
+        NotesQuery.useGroupedTasksLayout(
+          filter: NotesFilter.tasks,
+          searchQuery: '',
+        ),
+        isTrue,
+      );
+      expect(
+        NotesQuery.useGroupedTasksLayout(
+          filter: NotesFilter.all,
+          searchQuery: '',
+        ),
+        isFalse,
+      );
+    });
+
+    test('plan+backlog layout for future days under Tareas', () {
+      expect(
+        NotesQuery.usePlanDayWithBacklogLayout(
+          filter: NotesFilter.tasks,
+          searchQuery: '',
+          day: DateTime(2026, 8, 8),
+          now: now,
+        ),
+        isTrue,
+      );
+      expect(
+        NotesQuery.usePlanDayWithBacklogLayout(
+          filter: NotesFilter.tasks,
+          searchQuery: '',
+          day: DateTime(2026, 8, 7),
+          now: now,
+        ),
+        isFalse,
+      );
+      expect(
+        NotesQuery.usePlanDayWithBacklogLayout(
+          filter: NotesFilter.tasks,
+          searchQuery: '',
+          day: DateTime(2026, 8, 6),
+          now: now,
+        ),
+        isFalse,
+      );
+      expect(
+        NotesQuery.usePlanDayWithBacklogLayout(
+          filter: NotesFilter.all,
+          searchQuery: '',
+          day: DateTime(2026, 8, 8),
+          now: now,
+        ),
+        isFalse,
+      );
+    });
   });
 }

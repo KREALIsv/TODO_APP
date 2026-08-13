@@ -1,21 +1,51 @@
 import 'date_only.dart';
 import 'day_entry.dart';
 import 'note_item.dart';
+import 'task_day_query.dart';
 import 'task_dates.dart';
 
 /// Filters [all] to entries whose [DayEntry.day] matches [day] (dateOnly).
+///
+/// When several rows exist for the same note on one day, keeps the latest event
+/// (for Diario — one row per task per day).
 List<DayEntry> entriesForDay(List<DayEntry> all, DateTime day) {
   final key = dateOnly(day);
-  return all.where((e) => dateOnly(e.day) == key).toList(growable: false);
+  final byNote = <String, DayEntry>{};
+
+  for (final entry in all) {
+    if (dateOnly(entry.day) != key) continue;
+    final existing = byNote[entry.noteId];
+    if (existing == null || _isNewerDayEvent(entry, existing)) {
+      byNote[entry.noteId] = entry;
+    }
+  }
+
+  return byNote.values.toList(growable: false);
 }
 
-/// All day log rows for a task, newest calendar day first.
+bool _isNewerDayEvent(DayEntry candidate, DayEntry incumbent) {
+  if (candidate.outcome == DayOutcome.open &&
+      incumbent.outcome != DayOutcome.open) {
+    return true;
+  }
+  if (incumbent.outcome == DayOutcome.open &&
+      candidate.outcome != DayOutcome.open) {
+    return false;
+  }
+  final candidateAt = candidate.outcomeAt ?? candidate.createdAt;
+  final incumbentAt = incumbent.outcomeAt ?? incumbent.createdAt;
+  return candidateAt.isAfter(incumbentAt);
+}
+
+/// All day log rows for a task, newest event first (may include several per day).
 List<DayEntry> entriesForNote(List<DayEntry> all, String noteId) {
   final rows = all.where((e) => e.noteId == noteId).toList();
   rows.sort((a, b) {
-    final dayCmp = b.day.compareTo(a.day);
-    if (dayCmp != 0) return dayCmp;
-    return b.createdAt.compareTo(a.createdAt);
+    final aTime = a.outcomeAt ?? a.createdAt;
+    final bTime = b.outcomeAt ?? b.createdAt;
+    final timeCmp = bTime.compareTo(aTime);
+    if (timeCmp != 0) return timeCmp;
+    return b.day.compareTo(a.day);
   });
   return rows;
 }
@@ -82,6 +112,11 @@ List<DayEntry> synthesizeEntriesFromNotes({
       outcome = note.completed ? DayOutcome.completed : DayOutcome.open;
       outcomeAt = note.completed ? (note.completedAt ?? created) : null;
       via = DayVia.due;
+    } else if (dateOnly(day) == dateOnly(created) &&
+        TaskDayQuery.isInboxCaptureOn(note, day)) {
+      outcome = note.completed ? DayOutcome.completed : DayOutcome.open;
+      outcomeAt = note.completed ? (note.completedAt ?? created) : null;
+      via = DayVia.manual;
     }
 
     if (outcome == null) continue;
@@ -102,26 +137,37 @@ List<DayEntry> synthesizeEntriesFromNotes({
   return out;
 }
 
-/// Active commitment day for completing a task (todayAt / dueAt / today).
-DateTime commitmentDayFor(NoteItem note, DateTime now) {
-  if (note.isTodayCommitment(now)) {
-    return dateOnly(note.todayAt!);
-  }
-  if (note.dueAt != null) {
-    return dateOnly(note.dueAt!);
-  }
+/// Calendar day a completion should be attributed to.
+///
+/// Prefers an explicit [onDay] (e.g. Home day selector), then the task's
+/// commitment ([todayAt] even when stale, then [dueAt]), else [now].
+DateTime commitmentDayFor(
+  NoteItem note,
+  DateTime now, {
+  DateTime? onDay,
+}) {
+  if (onDay != null) return dateOnly(onDay);
+  if (note.todayAt != null) return dateOnly(note.todayAt!);
+  if (note.dueAt != null) return dateOnly(note.dueAt!);
   return dateOnly(now);
+}
+
+/// Timestamp stored on [NoteItem.completedAt] / [DayEntry.outcomeAt].
+///
+/// Past days anchor to end-of-day so audit views stay on the intended calendar
+/// day; today keeps the real clock time.
+DateTime completionOutcomeAt(DateTime day, DateTime now) {
+  final key = dateOnly(day);
+  if (key == dateOnly(now)) return now;
+  return DateTime(day.year, day.month, day.day, 23, 59, 59);
 }
 
 /// Tasks planned for a future (or any) calendar [day] via dueAt / todayAt.
 List<NoteItem> planNotesForDay(List<NoteItem> notes, DateTime day) {
-  final key = dateOnly(day);
   final out = <NoteItem>[];
   for (final note in notes) {
     if (note.type != NoteType.task || note.isArchived) continue;
-    final dueMatch = note.dueAt != null && dateOnly(note.dueAt!) == key;
-    final todayMatch = note.todayAt != null && dateOnly(note.todayAt!) == key;
-    if (dueMatch || todayMatch) out.add(note);
+    if (TaskDayQuery.isScheduledOn(note, day)) out.add(note);
   }
   out.sort((a, b) {
     if (a.pinned != b.pinned) return a.pinned ? -1 : 1;

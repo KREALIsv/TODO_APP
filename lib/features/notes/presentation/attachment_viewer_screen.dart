@@ -83,10 +83,14 @@ class _AttachmentViewerScreenState extends State<AttachmentViewerScreen> {
     if (nav.canPop()) nav.pop();
   }
 
-  void _toggleCover(NoteAttachment current) {
+  Future<void> _toggleCover(NoteAttachment current) async {
     final next = current.id == _coverId ? null : current.id;
     setState(() => _coverId = next);
-    widget.onCoverChanged(next);
+    await applyCoverAttachmentChange(
+      noteId: widget.noteId,
+      coverAttachmentId: next,
+      onCoverChanged: widget.onCoverChanged,
+    );
   }
 
   Future<void> _download(NoteAttachment item) async {

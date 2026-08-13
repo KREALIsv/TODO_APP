@@ -71,9 +71,9 @@ void main() {
 
   test('entriesForDay filters by dateOnly ignoring time', () {
     final all = [
-      buildEntry(id: 'a', day: DateTime(2026, 7, 19, 8)),
-      buildEntry(id: 'b', day: DateTime(2026, 7, 20, 23)),
-      buildEntry(id: 'c', day: DateTime(2026, 7, 20, 1)),
+      buildEntry(id: 'a', noteId: 'n1', day: DateTime(2026, 7, 19, 8)),
+      buildEntry(id: 'b', noteId: 'n2', day: DateTime(2026, 7, 20, 23)),
+      buildEntry(id: 'c', noteId: 'n3', day: DateTime(2026, 7, 20, 1)),
     ];
     final day = entriesForDay(all, DateTime(2026, 7, 20, 15));
     expect(day.map((e) => e.id), ['b', 'c']);

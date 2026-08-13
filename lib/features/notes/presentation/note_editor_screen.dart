@@ -4,17 +4,25 @@ import 'package:uuid/uuid.dart';
 import '../../../global/widgets/app_alerts.dart';
 import '../../shell/presentation/desktop_column_header.dart';
 import '../data/attachments_repository.dart';
+import '../data/day_entries_repository.dart';
 import '../data/notes_repository.dart';
 import '../data/tags_repository.dart';
 import '../domain/checklist_item.dart';
+import '../domain/date_only.dart';
+import '../domain/day_log.dart';
+import '../domain/day_view_query.dart';
 import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
 import '../domain/task_groups.dart';
+import '../domain/task_when_save_hint.dart';
+import 'widgets/resolve_remove_from_day.dart';
 import 'widgets/attachments_editor.dart';
 import 'widgets/checklist_editor.dart';
 import 'widgets/note_task_type_switch.dart';
 import 'widgets/tags_editor.dart';
+import 'widgets/task_day_history_section.dart';
 import 'widgets/task_when_field.dart';
+import 'widgets/task_when_save_hint_banner.dart';
 
 class NoteEditorScreen extends StatefulWidget {
   const NoteEditorScreen({
@@ -24,6 +32,7 @@ class NoteEditorScreen extends StatefulWidget {
     this.repository,
     this.tagsRepository,
     this.embedded = false,
+    this.contextDay,
     this.onClose,
     this.onSaved,
   });
@@ -33,6 +42,9 @@ class NoteEditorScreen extends StatefulWidget {
   final NotesRepository? repository;
   final TagsRepository? tagsRepository;
   final bool embedded;
+
+  /// Home day selector when opened from a specific calendar day.
+  final DateTime? contextDay;
   final VoidCallback? onClose;
   final ValueChanged<String>? onSaved;
 
@@ -66,6 +78,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   AttachmentsRepository get _attachments => AttachmentsRepository.instance;
 
   bool get _isEditing => widget.item != null;
+
+  bool get _showRemoveFromDay {
+    final existing = widget.item;
+    if (existing == null || existing.type != NoteType.task) return false;
+    final day = widget.contextDay;
+    if (day == null) return _todayOn || _dueAt != null;
+    final entry =
+        DayEntriesRepository.instance.findForNoteDay(existing.id, day);
+    return DayViewQuery.canRemoveFromDay(existing, day, entry: entry);
+  }
 
   String get _appBarTitle {
     final isTask = _type == NoteType.task;
@@ -137,6 +159,29 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     return '$prefix · ${progress.done}/${progress.total} done';
   }
 
+  Future<void> _removeFromDay() async {
+    final existing = widget.item;
+    if (existing == null || existing.type != NoteType.task) return;
+
+    final fromDay = await resolveRemoveFromDay(
+      context,
+      item: existing,
+      preferredDay: widget.contextDay,
+    );
+    if (fromDay == null || !mounted) return;
+
+    await _repo.cancelTaskOnDay(existing.id, fromDay: fromDay);
+    if (!mounted) return;
+
+    final updated = _repo.getById(existing.id);
+    setState(() {
+      _todayOn = updated?.isTodayCommitment() ?? false;
+      _dueAt = updated?.dueAt;
+      _dueHasTime = updated?.dueHasTime ?? false;
+      _reminderMinutesBefore = updated?.reminderMinutesBefore;
+    });
+  }
+
   Future<void> _save() async {
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
@@ -166,7 +211,30 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     DateTime? completedAt;
     if (isTask && _completed) {
-      completedAt = existing?.completedAt ?? now;
+      if (existing?.completedAt != null) {
+        completedAt = existing!.completedAt;
+      } else {
+        final draft = existing ??
+            NoteItem(
+              id: _noteId,
+              type: _type,
+              title: title,
+              body: body,
+              pinned: _pinned,
+              completed: _completed,
+              createdAt: now,
+              updatedAt: now,
+              dueAt: _dueAt,
+              dueHasTime: _dueHasTime,
+              todayAt: _todayOn ? now : null,
+            );
+        final day = commitmentDayFor(
+          draft,
+          now,
+          onDay: widget.contextDay,
+        );
+        completedAt = completionOutcomeAt(day, now);
+      }
     }
 
     final NoteItem toSave;
@@ -215,7 +283,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         checklistTitle: checklistTitle,
         checklistItems: checklistItems,
       );
-      await _repo.update(toSave);
+      await _repo.saveTaskFromEditor(previous: existing, next: toSave);
     }
 
     _discardUnsavedAttachments = false;
@@ -321,9 +389,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           controller: _titleController,
           focusNode: _titleFocus,
           textCapitalization: TextCapitalization.sentences,
+          keyboardType: TextInputType.multiline,
+          textInputAction: TextInputAction.newline,
+          minLines: 1,
+          maxLines: 8,
           scrollPadding: const EdgeInsets.only(bottom: 120),
           decoration: const InputDecoration(
             hintText: 'Escribe un título',
+            alignLabelWithHint: true,
           ),
         ),
         const SizedBox(height: 16),
@@ -360,6 +433,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               });
             },
           ),
+          if (_isEditing && widget.item != null)
+            Builder(
+              builder: (context) {
+                final hint = taskWhenSaveHint(
+                  previous: widget.item!,
+                  nextTodayOn: _todayOn,
+                  nextDueAt: _dueAt,
+                );
+                if (hint == null) return const SizedBox.shrink();
+                return TaskWhenSaveHintBanner(message: hint);
+              },
+            ),
         ],
         const SizedBox(height: 24),
         TagsEditor(
@@ -410,6 +495,26 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             });
           },
         ),
+        if (isTask && _isEditing) ...[
+          const SizedBox(height: 24),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+          TaskDayHistorySection(noteId: _noteId),
+          if (_showRemoveFromDay) ...[
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton(
+                onPressed: _removeFromDay,
+                child: Text(
+                  widget.contextDay == null
+                      ? 'Quitar del día'
+                      : 'Quitar del ${formatDayMonth(widget.contextDay!)}',
+                ),
+              ),
+            ),
+          ],
+        ],
       ],
     );
   }

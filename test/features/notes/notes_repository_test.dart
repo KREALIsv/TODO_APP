@@ -202,6 +202,53 @@ void main() {
     expect(opened.via, DayVia.scheduledIn);
   });
 
+  test('rescheduling back and forth preserves both moves in history', () async {
+    final aug3 = dateOnly(DateTime(2026, 8, 3));
+    final aug19 = dateOnly(DateTime(2026, 8, 19));
+    await repo.add(
+      buildItem(
+        id: 'task',
+        type: NoteType.task,
+      ).copyWith(dueAt: aug3),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: aug3,
+      via: DayVia.due,
+    );
+
+    await repo.applyTaskWhen(
+      'task',
+      todayOn: false,
+      dueAt: aug19,
+      dueHasTime: false,
+    );
+    await repo.applyTaskWhen(
+      'task',
+      todayOn: false,
+      dueAt: aug3,
+      dueHasTime: false,
+    );
+
+    final history = dayEntries.entriesForNote('task');
+    expect(
+      history.where((e) => e.outcome == DayOutcome.scheduled).length,
+      2,
+    );
+    final aug3Events =
+        history.where((e) => dateOnly(e.day) == aug3).toList(growable: false);
+    expect(
+      aug3Events.any(
+        (e) =>
+            e.outcome == DayOutcome.scheduled &&
+            e.targetDay != null &&
+            dateOnly(e.targetDay!) == aug19,
+      ),
+      isTrue,
+    );
+    expect(aug3Events.any((e) => e.outcome == DayOutcome.open), isTrue);
+  });
+
   test('applyTaskWhen matches exclusive Hoy / Mañana semantics', () async {
     await repo.add(buildItem(id: 't', type: NoteType.task));
 
@@ -239,6 +286,65 @@ void main() {
     expect(dayEntries.findForNoteDay('t', today)?.targetDay, tomorrow);
   });
 
+  test('saveTaskFromEditor closes origin and opens destination when due moves',
+      () async {
+    final origin = dateOnly(DateTime.now().subtract(const Duration(days: 4)));
+    final destination =
+        dateOnly(DateTime.now().subtract(const Duration(days: 1)));
+    final original = buildItem(
+      id: 'task',
+      type: NoteType.task,
+    ).copyWith(dueAt: origin);
+    await repo.add(original);
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: origin,
+      via: DayVia.due,
+    );
+
+    final edited = original.copyWith(
+      dueAt: destination,
+      todayAt: null,
+      updatedAt: DateTime.now(),
+    );
+    await repo.saveTaskFromEditor(previous: original, next: edited);
+
+    final closed = dayEntries.findForNoteDay('task', origin)!;
+    expect(closed.outcome, DayOutcome.scheduled);
+    expect(closed.targetDay, destination);
+    final opened = dayEntries.findForNoteDay('task', destination)!;
+    expect(opened.outcome, DayOutcome.open);
+    expect(opened.via, DayVia.scheduledIn);
+  });
+
+  test('saveTaskFromEditor marks completion on commitment day', () async {
+    final due = dateOnly(DateTime.now().subtract(const Duration(days: 1)));
+    final original = buildItem(
+      id: 'task',
+      type: NoteType.task,
+    ).copyWith(dueAt: due);
+    await repo.add(original);
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: due,
+      via: DayVia.due,
+    );
+
+    final now = DateTime.now();
+    final outcomeAt = DateTime(due.year, due.month, due.day, 23, 59, 59);
+    final edited = original.copyWith(
+      completed: true,
+      completedAt: outcomeAt,
+      updatedAt: now,
+    );
+    await repo.saveTaskFromEditor(previous: original, next: edited);
+
+    final entry = dayEntries.findForNoteDay('task', due)!;
+    expect(entry.outcome, DayOutcome.completed);
+    expect(entry.outcomeAt, outcomeAt);
+    expect(dayEntries.findForNoteDay('task', dateOnly(now)), isNull);
+  });
+
   test('toggleCompleted marks DayEntry completed and reopen restores open',
       () async {
     await repo.add(buildItem(id: 'task', type: NoteType.task));
@@ -254,6 +360,34 @@ void main() {
     await repo.toggleCompleted('task');
     expect(dayEntries.findForNoteDay('task', day)?.outcome, DayOutcome.open);
     expect(repo.getById('task')?.completedAt, isNull);
+  });
+
+  test('toggleCompleted attributes completion to commitment day, not today',
+      () async {
+    final yesterday = dateOnly(DateTime(2026, 8, 2));
+    final today = DateTime(2026, 8, 3, 12);
+    await repo.add(
+      buildItem(id: 'task', type: NoteType.task).copyWith(
+        createdAt: yesterday,
+        dueAt: yesterday,
+      ),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: yesterday,
+      via: DayVia.due,
+      now: yesterday,
+    );
+
+    await repo.toggleCompleted('task', onDay: yesterday);
+
+    final task = repo.getById('task')!;
+    expect(dateOnly(task.completedAt!), yesterday);
+    expect(
+      dayEntries.findForNoteDay('task', yesterday)?.outcome,
+      DayOutcome.completed,
+    );
+    expect(dayEntries.findForNoteDay('task', dateOnly(today)), isNull);
   });
 
   test('migrateTaskToDay creates an open destination and closes origin',
@@ -347,6 +481,60 @@ void main() {
     expect(
       dayEntries.findForNoteDay('task', origin)?.outcome,
       DayOutcome.cancelled,
+    );
+  });
+
+  test('applyTaskWhen moving to Hoy closes previous due day as migrated',
+      () async {
+    final today = DateTime.now();
+    final origin = dateOnly(today.subtract(const Duration(days: 4)));
+    await repo.add(
+      buildItem(id: 'task', type: NoteType.task).copyWith(dueAt: origin),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: origin,
+      via: DayVia.due,
+    );
+
+    await repo.applyTaskWhen('task', todayOn: true);
+
+    expect(
+      dayEntries.findForNoteDay('task', origin)?.outcome,
+      DayOutcome.migrated,
+    );
+    final todayEntry = dayEntries.findForNoteDay('task', dateOnly(today));
+    expect(todayEntry?.outcome, DayOutcome.open);
+    expect(todayEntry?.via, DayVia.migratedIn);
+  });
+
+  test('cancelTaskOnDay on viewed day does not clear due on another day',
+      () async {
+    final day2 = dateOnly(DateTime(2026, 8, 2));
+    final day3 = dateOnly(DateTime(2026, 8, 3));
+    await repo.add(
+      buildItem(id: 'task', type: NoteType.task).copyWith(
+        createdAt: day2,
+        dueAt: day3,
+      ),
+    );
+    await dayEntries.ensurePlanned(
+      noteId: 'task',
+      day: day2,
+      via: DayVia.manual,
+      now: day2,
+    );
+
+    await repo.cancelTaskOnDay('task', fromDay: day2);
+
+    expect(repo.getById('task')?.dueAt, day3);
+    expect(
+      dayEntries.findForNoteDay('task', day2)?.outcome,
+      DayOutcome.cancelled,
+    );
+    expect(
+      dayEntries.findForNoteDay('task', day3)?.outcome,
+      DayOutcome.open,
     );
   });
 

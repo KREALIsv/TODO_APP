@@ -31,7 +31,7 @@ void main() {
     }
   });
 
-  test('upsert is idempotent for (noteId, day)', () async {
+  test('upsert stores rows by id and allows history on the same day', () async {
     final day = DateTime(2026, 7, 20, 10);
     final first = await repo.upsert(
       DayEntry(
@@ -55,9 +55,9 @@ void main() {
       ),
     );
 
-    expect(second.id, first.id);
-    expect(second.createdAt, first.createdAt);
-    expect(second.outcome, DayOutcome.completed);
+    expect(second.id, 'b');
+    expect(first.id, 'a');
+    expect(repo.getAll().length, 2);
     expect(repo.entriesForDay(day).length, 1);
   });
 

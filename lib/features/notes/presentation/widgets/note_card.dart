@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+import 'dart:ui' show instantiateImageCodec;
+
 import 'package:flutter/material.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
@@ -8,8 +11,13 @@ import '../../../../global/widgets/app_loading.dart';
 import '../../data/attachments_repository.dart';
 import '../../data/notes_repository.dart';
 import '../../data/tags_repository.dart';
+import '../../domain/day_entry.dart';
+import '../../domain/day_view_query.dart';
+import '../../domain/note_attachment.dart';
 import '../../domain/note_item.dart';
 import '../../domain/task_dates.dart';
+import 'attachment_format.dart';
+import 'day_outcome_meta.dart';
 import 'relative_time.dart';
 import 'tag_pill.dart';
 import 'task_date_meta.dart';
@@ -24,6 +32,8 @@ class NoteCard extends StatelessWidget {
     this.tagsRepository,
     this.attachmentsRepository,
     this.flat = false,
+    this.viewDay,
+    this.dayEntry,
   });
 
   final NoteItem item;
@@ -37,9 +47,12 @@ class NoteCard extends StatelessWidget {
   /// (e.g. swipe actions inside the same rounded silhouette).
   final bool flat;
 
+  /// Calendar day being browsed; drives per-day audit display when set.
+  final DateTime? viewDay;
+  final DayEntry? dayEntry;
+
   NotesRepository get _repo => repository ?? NotesRepository.instance;
-  TagsRepository get _tagsRepo =>
-      tagsRepository ?? TagsRepository.instance;
+  TagsRepository get _tagsRepo => tagsRepository ?? TagsRepository.instance;
   AttachmentsRepository get _attachments =>
       attachmentsRepository ?? AttachmentsRepository.instance;
 
@@ -48,7 +61,41 @@ class NoteCard extends StatelessWidget {
   Widget _buildBody(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final isTask = item.type == NoteType.task;
-    final isCompleted = isTask && item.completed;
+    final now = DateTime.now();
+    final referenceDay = viewDay ?? now;
+    final isCompleted =
+        isTask &&
+        DayViewQuery.isDisplayedCompleted(item, referenceDay, entry: dayEntry);
+    final canToggleCompletion =
+        isTask &&
+        DayViewQuery.canToggleCompletionOnDay(
+          item: item,
+          day: referenceDay,
+          entry: dayEntry,
+          now: now,
+        );
+    final showOutcomeMeta =
+        isTask &&
+        DayViewQuery.showOutcomeMetaForDayRow(
+          item,
+          referenceDay,
+          entry: dayEntry,
+          now: now,
+        );
+    final useLiveRow =
+        !isTask ||
+        DayViewQuery.isLiveDayRow(
+          item,
+          referenceDay,
+          entry: dayEntry,
+          now: now,
+        );
+    final titleColor = isTask && !useLiveRow && dayEntry != null
+        ? DayOutcomeStyle.titleColor(dayEntry!.outcome)
+        : (isCompleted ? AppColors.neutral60 : AppColors.black);
+    final titleStruck = isTask && !useLiveRow && dayEntry != null
+        ? DayOutcomeStyle.isStruck(dayEntry!.outcome)
+        : isCompleted;
     final attachmentCount = _attachments.countFor(item.id);
 
     return Padding(
@@ -63,10 +110,10 @@ class NoteCard extends StatelessWidget {
                 width: 24,
                 height: 24,
                 child: Checkbox(
-                  value: item.completed,
-                  onChanged: item.isArchived
-                      ? null
-                      : (_) => _repo.toggleCompleted(item.id),
+                  value: isCompleted,
+                  onChanged: canToggleCompletion
+                      ? (_) => _repo.toggleCompleted(item.id, onDay: viewDay)
+                      : null,
                 ),
               ),
             )
@@ -89,12 +136,10 @@ class NoteCard extends StatelessWidget {
                       child: Text(
                         item.displayTitle,
                         style: textTheme.labelLarge?.copyWith(
-                          decoration: isCompleted
+                          decoration: titleStruck
                               ? TextDecoration.lineThrough
                               : null,
-                          color: isCompleted
-                              ? AppColors.neutral60
-                              : AppColors.black,
+                          color: titleColor,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -111,14 +156,16 @@ class NoteCard extends StatelessWidget {
                       ),
                   ],
                 ),
+                if (showOutcomeMeta) DayOutcomeMeta(entry: dayEntry!),
                 if (item.body.trim().isNotEmpty &&
                     item.title.trim().isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
                     item.body.trim(),
                     style: textTheme.bodySmall?.copyWith(
-                      decoration:
-                          isCompleted ? TextDecoration.lineThrough : null,
+                      decoration: titleStruck
+                          ? TextDecoration.lineThrough
+                          : null,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -130,7 +177,9 @@ class NoteCard extends StatelessWidget {
                     spacing: 6,
                     runSpacing: 4,
                     children: [
-                      ...item.tags.take(3).map(
+                      ...item.tags
+                          .take(3)
+                          .map(
                             (tag) => TagPill(
                               label: tag,
                               colors: _tagsRepo.colorFor(tag),
@@ -166,9 +215,7 @@ class NoteCard extends StatelessWidget {
                     Text('· ', style: textTheme.labelSmall),
                     if (item.isArchived)
                       Text(
-                        formatRelativeTime(
-                          item.archivedAt ?? item.updatedAt,
-                        ),
+                        formatRelativeTime(item.archivedAt ?? item.updatedAt),
                         style: textTheme.labelSmall,
                       )
                     else if (isTask)
@@ -186,12 +233,11 @@ class NoteCard extends StatelessWidget {
                         color: AppColors.neutral40,
                       ),
                       const SizedBox(width: 2),
-                      Text(
-                        '$attachmentCount',
-                        style: textTheme.labelSmall,
-                      ),
+                      Text('$attachmentCount', style: textTheme.labelSmall),
                     ],
-                    if (isTask && item.hasChecklist && item.checklistItems.isNotEmpty) ...[
+                    if (isTask &&
+                        item.hasChecklist &&
+                        item.checklistItems.isNotEmpty) ...[
                       Text(' · ', style: textTheme.labelSmall),
                       Icon(
                         Icons.check_box_outlined,
@@ -219,27 +265,24 @@ class NoteCard extends StatelessWidget {
     if (coverId == null) return null;
     final bytes = _attachments.bytesFor(coverId);
     if (bytes == null) return null;
-
-    final width = MediaQuery.sizeOf(context).width;
+    final cover = _attachments.getById(coverId);
 
     return Opacity(
       opacity: completed ? 0.55 : 1,
-      child: SizedBox(
-        height: coverHeight,
-        width: double.infinity,
-        child: AppMemoryImage(
-          bytes: bytes,
-          fit: BoxFit.cover,
-          width: width,
-          height: coverHeight,
-        ),
+      child: _NoteCardCover(
+        bytes: bytes,
+        attachment: cover,
+        fallbackHeight: coverHeight,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isCompleted = item.type == NoteType.task && item.completed;
+    final referenceDay = viewDay ?? DateTime.now();
+    final isCompleted =
+        item.type == NoteType.task &&
+        DayViewQuery.isDisplayedCompleted(item, referenceDay, entry: dayEntry);
 
     return ValueListenableBuilder<Box<Map>>(
       valueListenable: _attachments.listenable(),
@@ -251,24 +294,119 @@ class NoteCard extends StatelessWidget {
           borderRadius: flat ? BorderRadius.zero : ThemeTokens.borderRadius,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (cover != null) cover,
-              _buildBody(context),
-            ],
+            children: [?cover, _buildBody(context)],
           ),
         );
 
         if (flat) {
-          return Material(
-            color: AppSurface.card(context),
-            child: content,
-          );
+          return Material(color: AppSurface.card(context), child: content);
         }
 
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           clipBehavior: Clip.antiAlias,
           child: content,
+        );
+      },
+    );
+  }
+}
+
+/// Card cover that sizes to the image aspect and recovers dimensions from
+/// bytes when metadata is missing (avoids the short fallback + squash look).
+class _NoteCardCover extends StatefulWidget {
+  const _NoteCardCover({
+    required this.bytes,
+    required this.attachment,
+    required this.fallbackHeight,
+  });
+
+  final Uint8List bytes;
+  final NoteAttachment? attachment;
+  final double fallbackHeight;
+
+  @override
+  State<_NoteCardCover> createState() => _NoteCardCoverState();
+}
+
+class _NoteCardCoverState extends State<_NoteCardCover> {
+  int? _width;
+  int? _height;
+
+  @override
+  void initState() {
+    super.initState();
+    _width = _positive(widget.attachment?.width);
+    _height = _positive(widget.attachment?.height);
+    if (_width == null || _height == null) {
+      _peekSize();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _NoteCardCover oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.bytes, widget.bytes) ||
+        oldWidget.attachment?.id != widget.attachment?.id) {
+      _width = _positive(widget.attachment?.width);
+      _height = _positive(widget.attachment?.height);
+      if (_width == null || _height == null) {
+        _peekSize();
+      }
+    }
+  }
+
+  int? _positive(int? value) =>
+      value != null && value > 0 ? value : null;
+
+  Future<void> _peekSize() async {
+    try {
+      final codec = await instantiateImageCodec(widget.bytes);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final w = image.width;
+      final h = image.height;
+      image.dispose();
+      if (!mounted) return;
+      if (w > 0 && h > 0) {
+        setState(() {
+          _width = w;
+          _height = h;
+        });
+      }
+    } catch (_) {
+      // Keep fallback height when bytes cannot be probed.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final maxHeight = (MediaQuery.sizeOf(context).height * 0.55)
+            .clamp(320.0, 560.0)
+            .toDouble();
+        final height = attachmentCoverHeight(
+          cardWidth: cardWidth,
+          imageWidth: _width,
+          imageHeight: _height,
+          fallbackHeight: widget.fallbackHeight,
+          maxHeight: maxHeight,
+        );
+
+        return SizedBox(
+          height: height,
+          width: double.infinity,
+          child: AppMemoryImage(
+            bytes: widget.bytes,
+            fit: BoxFit.contain,
+            width: cardWidth,
+            height: height,
+            alignment: Alignment.center,
+          ),
         );
       },
     );

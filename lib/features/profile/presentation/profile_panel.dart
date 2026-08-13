@@ -5,15 +5,16 @@ import '../../../global/widgets/activity_stat_card.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/activity_stats.dart';
 import '../../notes/domain/notes_filter.dart';
+import 'profile_navigation.dart';
+
+export 'profile_navigation.dart';
 import '../../notes/presentation/widgets/activity_heatmap.dart';
+import '../../notes/presentation/widgets/activity_month_calendar.dart';
 import '../../notes/presentation/widgets/monthly_activity_bars.dart';
 import '../../settings/data/settings_repository.dart';
 import '../../settings/presentation/widgets/list_background_layer.dart';
 import '../../shell/presentation/desktop_column_header.dart';
 import 'profile_account_section.dart';
-import 'profile_navigation.dart';
-
-export 'profile_navigation.dart';
 
 enum ProfilePanelDensity {
   /// Full-width fluid layout (mobile profile screen).
@@ -33,6 +34,7 @@ class ProfilePanel extends StatelessWidget {
     this.onFilterSelected,
     this.onOpenSettings,
     this.onNavigateToDay,
+    this.selectedDay,
   });
 
   final NotesRepository? repository;
@@ -41,6 +43,7 @@ class ProfilePanel extends StatelessWidget {
   final ValueChanged<NotesFilter>? onFilterSelected;
   final VoidCallback? onOpenSettings;
   final ValueChanged<DateTime>? onNavigateToDay;
+  final DateTime? selectedDay;
 
   NotesRepository get _repo => repository ?? NotesRepository.instance;
   SettingsRepository get _settings => settings ?? SettingsRepository.instance;
@@ -92,6 +95,7 @@ class ProfilePanel extends StatelessWidget {
                     isEmpty: isEmpty,
                     showDayNumbers: _settings.showHeatmapDayNumbers,
                     density: density,
+                    selectedDay: selectedDay,
                     onNavigateToDay: onNavigateToDay,
                   ),
                   const SizedBox(height: 16),
@@ -155,6 +159,7 @@ class ProfileActivityHero extends StatelessWidget {
     required this.isEmpty,
     required this.showDayNumbers,
     required this.density,
+    this.selectedDay,
     this.onNavigateToDay,
   });
 
@@ -163,6 +168,7 @@ class ProfileActivityHero extends StatelessWidget {
   final bool isEmpty;
   final bool showDayNumbers;
   final ProfilePanelDensity density;
+  final DateTime? selectedDay;
   final ValueChanged<DateTime>? onNavigateToDay;
 
   static const _dayLabelWidth = 14.0;
@@ -175,66 +181,79 @@ class ProfileActivityHero extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isSidebar = density == ProfilePanelDensity.sidebar;
+
+          if (isSidebar) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ActivityMonthCalendar(
+                  eventCounts: eventCounts,
+                  selectedDay: selectedDay,
+                  onDaySelected: onNavigateToDay ??
+                      (day) {
+                        final messenger = ScaffoldMessenger.of(context);
+                        messenger.hideCurrentSnackBar();
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              heatmapCellTooltip(
+                                day,
+                                eventCounts[day] ?? 0,
+                              ),
+                            ),
+                            behavior: SnackBarBehavior.floating,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                ),
+                if (isEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Captura tu primera nota para empezar a ver actividad.',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: AppSurface.secondary(context),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ],
+            );
+          }
+
           final gap = ProfilePanel.heatmapGap;
           final monthLabelHeight = showDayNumbers ? 14.0 : 12.0;
 
           late final int weeks;
-          late final double? fixedCellSize;
           late final double maxCell;
 
-          if (isSidebar) {
-            // Desktop: keep GitHub-scale cells; spend extra width on more weeks.
-            final cell = showDayNumbers
-                ? ProfilePanel.sidebarCellWithNumbers
-                : ProfilePanel.sidebarCellCompact;
-            fixedCellSize = cell;
-            maxCell = cell;
-            weeks = HeatmapLayout.weeksForMinCell(
-              width: constraints.maxWidth,
-              gap: gap,
-              minCell: cell,
-              maxCellSize: cell,
-              preferredMax: ProfilePanel.sidebarWeeksMax,
-              preferredMid: ProfilePanel.sidebarWeeksMid,
-              dayLabelWidth: _dayLabelWidth,
-            );
-          } else {
-            // Mobile / full-width Perfil: stretch cells to fill the card (no right gap).
-            final minCell = showDayNumbers
-                ? ProfilePanel.minCellWithNumbers
-                : ProfilePanel.minCellCompact;
-            fixedCellSize = null;
-            maxCell = double.infinity;
-            weeks = HeatmapLayout.weeksForMinCell(
-              width: constraints.maxWidth,
-              gap: gap,
-              minCell: minCell,
-              maxCellSize: double.infinity,
-              preferredMax: ProfilePanel.mobileWeeksMax,
-              preferredMid: ProfilePanel.mobileWeeksMid,
-              dayLabelWidth: _dayLabelWidth,
-            );
-          }
+          // Mobile / full-width Perfil: stretch cells to fill the card (no right gap).
+          final minCell = showDayNumbers
+              ? ProfilePanel.minCellWithNumbers
+              : ProfilePanel.minCellCompact;
+          maxCell = double.infinity;
+          weeks = HeatmapLayout.weeksForMinCell(
+            width: constraints.maxWidth,
+            gap: gap,
+            minCell: minCell,
+            maxCellSize: double.infinity,
+            preferredMax: ProfilePanel.mobileWeeksMax,
+            preferredMid: ProfilePanel.mobileWeeksMid,
+            dayLabelWidth: _dayLabelWidth,
+          );
 
           final cells = weekCounts(counts: eventCounts, weeks: weeks);
           final rangeStart = heatmapRangeStart(weeks: weeks);
           final totalEvents = cells.fold<int>(0, (sum, count) => sum + count);
 
-          final layout = fixedCellSize != null
-              ? HeatmapLayout.forFixedCell(
-                  cellSize: fixedCellSize,
-                  weeks: weeks,
-                  gap: gap,
-                  monthLabelHeight: monthLabelHeight,
-                )
-              : HeatmapLayout.forConstraints(
-                  width: constraints.maxWidth,
-                  weeks: weeks,
-                  gap: gap,
-                  dayLabelWidth: _dayLabelWidth,
-                  maxCellSize: maxCell,
-                  monthLabelHeight: monthLabelHeight,
-                );
+          final layout = HeatmapLayout.forConstraints(
+            width: constraints.maxWidth,
+            weeks: weeks,
+            gap: gap,
+            dayLabelWidth: _dayLabelWidth,
+            maxCellSize: maxCell,
+            monthLabelHeight: monthLabelHeight,
+          );
           final height = layout?.totalHeight ??
               ActivityHeatmap.heightForWidth(
                 width: constraints.maxWidth,
@@ -244,13 +263,7 @@ class ProfileActivityHero extends StatelessWidget {
                 monthLabelHeight: monthLabelHeight,
               );
 
-          final gridNaturalWidth = fixedCellSize != null
-              ? _dayLabelWidth +
-                  HeatmapLayout.dayLabelGap +
-                  (layout?.gridWidth ?? 0)
-              : constraints.maxWidth;
-
-          Widget heatmap = SizedBox(
+          final heatmap = SizedBox(
             width: double.infinity,
             height: height,
             child: ActivityHeatmap(
@@ -262,7 +275,6 @@ class ProfileActivityHero extends StatelessWidget {
               monthLabelHeight: monthLabelHeight,
               showAllWeekdayLabels: true,
               showDayNumbers: showDayNumbers,
-              fixedCellSize: fixedCellSize,
               semanticsLabel:
                   'Actividad de las últimas $weeks semanas, $totalEvents registros',
               onCellTap: (day, count) {
@@ -283,13 +295,6 @@ class ProfileActivityHero extends StatelessWidget {
             ),
           );
 
-          if (isSidebar && gridNaturalWidth > constraints.maxWidth) {
-            heatmap = _HeatmapHorizontalScroll(
-              gridWidth: gridNaturalWidth,
-              child: heatmap,
-            );
-          }
-
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -309,49 +314,6 @@ class ProfileActivityHero extends StatelessWidget {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-/// Horizontal scrollbar for the sidebar heatmap — owns its [ScrollController]
-/// so it does not rely on [PrimaryScrollController] (invalid on web/desktop).
-class _HeatmapHorizontalScroll extends StatefulWidget {
-  const _HeatmapHorizontalScroll({
-    required this.gridWidth,
-    required this.child,
-  });
-
-  final double gridWidth;
-  final Widget child;
-
-  @override
-  State<_HeatmapHorizontalScroll> createState() =>
-      _HeatmapHorizontalScrollState();
-}
-
-class _HeatmapHorizontalScrollState extends State<_HeatmapHorizontalScroll> {
-  late final ScrollController _controller = ScrollController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scrollbar(
-      controller: _controller,
-      thumbVisibility: true,
-      child: SingleChildScrollView(
-        controller: _controller,
-        scrollDirection: Axis.horizontal,
-        primary: false,
-        child: SizedBox(
-          width: widget.gridWidth,
-          child: widget.child,
-        ),
       ),
     );
   }

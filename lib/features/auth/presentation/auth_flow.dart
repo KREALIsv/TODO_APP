@@ -25,6 +25,7 @@ abstract final class AuthFlow {
     String? contextTitle,
     String? contextMessage,
   }) async {
+    AuthService.instance.consumeSessionEndedMessage();
     final signedIn = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => AuthScreen(
@@ -88,6 +89,14 @@ abstract final class AuthFlow {
         behavior: SnackBarBehavior.floating,
       ),
     );
+
+    if (DeviceIdentity.instance.syncEnabled) {
+      try {
+        await syncNow(context);
+      } on AuthSessionExpiredException {
+        // Login just succeeded; ignore stale expiry side effects.
+      }
+    }
   }
 
   static Future<void> logout(BuildContext context) async {
@@ -257,12 +266,25 @@ abstract final class AuthFlow {
     try {
       await SyncService.instance.syncNow();
     } on AuthSessionExpiredException catch (error) {
+      // Avoid a second dialog from [SessionExpiryListener] on top of login.
+      AuthService.instance.consumeSessionEndedMessage();
       if (!context.mounted) return;
-      await AppAlerts.show(
+      await AppAlerts.showWithAction(
         context,
         title: AuthErrors.sessionExpiredTitle,
         message: error.userMessage,
         type: AppAlertType.warning,
+        actionLabel: 'Iniciar sesión',
+        dismissLabel: 'Ahora no',
+        onAction: () {
+          openLogin(
+            context,
+            contextTitle: 'Volver a sincronizar',
+            contextMessage:
+                'Inicia sesión con la misma cuenta que usas en la web '
+                'para traer tus notas y tareas.',
+          );
+        },
       );
       return;
     }

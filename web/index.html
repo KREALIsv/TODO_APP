@@ -52,7 +52,15 @@
     }
     html, body {
       margin: 0;
+      width: 100%;
       height: 100%;
+      overflow: hidden;
+      /* Pin the document so iOS Safari cannot scroll the page when the
+         software keyboard opens / focuses a single-line input. Flutter owns
+         in-app scrolling; document scroll was pushing compose fields off-screen. */
+      position: fixed;
+      inset: 0;
+      overscroll-behavior: none;
       background: var(--neutral-00);
       color: var(--black);
       font-family: "Sora", ui-sans-serif, system-ui, sans-serif;

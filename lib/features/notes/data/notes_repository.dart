@@ -236,6 +236,52 @@ class NotesRepository {
     await _syncReminder(item);
   }
 
+  /// Persists a task edited in [NoteEditorScreen] and mirrors day-entry writers
+  /// used by Migrar/Agendar/applyTaskWhen.
+  Future<void> saveTaskFromEditor({
+    required NoteItem previous,
+    required NoteItem next,
+  }) async {
+    if (next.type != NoteType.task) {
+      await update(next);
+      return;
+    }
+
+    final now = DateTime.now();
+    await update(next);
+
+    await _syncDayEntry(() async {
+      if (_taskWhenFieldsDiffer(previous, next, now)) {
+        await _syncWhenDayEntries(
+          noteId: next.id,
+          previous: previous,
+          todayOn: next.isTodayCommitment(now),
+          dueAt: next.dueAt,
+          now: now,
+        );
+      }
+
+      if (previous.completed != next.completed) {
+        if (next.completed) {
+          final day = next.completedAt != null
+              ? dateOnly(next.completedAt!)
+              : commitmentDayFor(next, now);
+          final outcomeAt = completionOutcomeAt(day, next.completedAt ?? now);
+          await _dayEntries.markCompleted(
+            noteId: next.id,
+            day: day,
+            outcomeAt: outcomeAt,
+          );
+        } else {
+          final reopenDay = previous.completedAt != null
+              ? dateOnly(previous.completedAt!)
+              : commitmentDayFor(previous, now);
+          await _dayEntries.reopen(noteId: next.id, day: reopenDay);
+        }
+      }
+    }, 'saveTaskFromEditor');
+  }
+
   Future<void> saveFromSync(NoteItem item) async {
     await _box.put(item.id, item.toMap());
     await _syncReminder(item);
@@ -259,25 +305,43 @@ class NotesRepository {
     );
   }
 
-  Future<void> toggleCompleted(String id) async {
+  Future<void> toggleCompleted(String id, {DateTime? onDay}) async {
     final current = getById(id);
     if (current == null || current.type != NoteType.task) return;
     final now = DateTime.now();
     final nextCompleted = !current.completed;
-    final day = commitmentDayFor(current, now);
+    if (nextCompleted) {
+      final day = commitmentDayFor(current, now, onDay: onDay);
+      final outcomeAt = completionOutcomeAt(day, now);
+      await update(
+        current.copyWith(
+          completed: true,
+          completedAt: outcomeAt,
+          updatedAt: now,
+        ),
+      );
+      await _syncDayEntry(() async {
+        await _dayEntries.markCompleted(
+          noteId: id,
+          day: day,
+          outcomeAt: outcomeAt,
+        );
+      }, 'toggleCompleted');
+      return;
+    }
+
+    final reopenDay = current.completedAt != null
+        ? dateOnly(current.completedAt!)
+        : commitmentDayFor(current, now, onDay: onDay);
     await update(
       current.copyWith(
-        completed: nextCompleted,
-        completedAt: nextCompleted ? now : null,
+        completed: false,
+        completedAt: null,
         updatedAt: now,
       ),
     );
     await _syncDayEntry(() async {
-      if (nextCompleted) {
-        await _dayEntries.markCompleted(noteId: id, day: day, outcomeAt: now);
-      } else {
-        await _dayEntries.reopen(noteId: id, day: day);
-      }
+      await _dayEntries.reopen(noteId: id, day: reopenDay);
     }, 'toggleCompleted');
   }
 
@@ -338,72 +402,119 @@ class NotesRepository {
         updatedAt: now,
       ),
     );
-    await _syncDayEntry(() async {
-      final previousDue =
-          current.dueAt != null ? dateOnly(current.dueAt!) : null;
-      final nextDue = dueAt != null ? dateOnly(dueAt) : null;
-      final previousTodayDay =
-          previousToday != null ? dateOnly(previousToday) : null;
+    await _syncDayEntry(
+      () => _syncWhenDayEntries(
+        noteId: id,
+        previous: current,
+        todayOn: todayOn,
+        dueAt: dueAt,
+        now: now,
+      ),
+      'applyTaskWhen',
+    );
+  }
 
-      if (todayOn && nextTodayAt != null) {
-        await _dayEntries.ensurePlanned(
-          noteId: id,
-          day: dateOnly(nextTodayAt),
-          via: DayVia.todaySwitch,
-          now: now,
-        );
-        return;
-      }
+  bool _taskWhenFieldsDiffer(NoteItem previous, NoteItem next, DateTime now) {
+    if (previous.isTodayCommitment(now) != next.isTodayCommitment(now)) {
+      return true;
+    }
+    final prevDue = previous.dueAt != null ? dateOnly(previous.dueAt!) : null;
+    final nextDue = next.dueAt != null ? dateOnly(next.dueAt!) : null;
+    return prevDue != nextDue;
+  }
 
-      if (!todayOn &&
-          previousDue != null &&
-          nextDue != null &&
-          previousDue != nextDue) {
+  Future<void> _syncWhenDayEntries({
+    required String noteId,
+    required NoteItem previous,
+    required bool todayOn,
+    required DateTime? dueAt,
+    required DateTime now,
+  }) async {
+    final previousToday = previous.todayAt;
+    final nextTodayAt = todayOn
+        ? (previous.isTodayCommitment(now) ? previous.todayAt : now)
+        : null;
+    final previousDue =
+        previous.dueAt != null ? dateOnly(previous.dueAt!) : null;
+    final nextDue = dueAt != null ? dateOnly(dueAt) : null;
+    final previousTodayDay =
+        previousToday != null ? dateOnly(previousToday) : null;
+
+    if (todayOn && nextTodayAt != null) {
+      final todayDay = dateOnly(nextTodayAt);
+      if (previousDue != null && previousDue != todayDay) {
         await _dayEntries.applyMigrationPatches(
-          noteId: id,
-          patches: scheduleTo(current, previousDue, nextDue, now),
+          noteId: noteId,
+          patches: migrateTo(previous, previousDue, todayDay, now),
           now: now,
         );
         return;
       }
-
-      if (!todayOn &&
-          previousTodayDay != null &&
-          nextDue != null &&
-          previousTodayDay != nextDue) {
+      if (previousTodayDay != null && previousTodayDay != todayDay) {
         await _dayEntries.applyMigrationPatches(
-          noteId: id,
-          patches: scheduleTo(current, previousTodayDay, nextDue, now),
+          noteId: noteId,
+          patches: migrateTo(previous, previousTodayDay, todayDay, now),
           now: now,
         );
         return;
       }
+      await _dayEntries.ensurePlanned(
+        noteId: noteId,
+        day: todayDay,
+        via: DayVia.todaySwitch,
+        now: now,
+      );
+      return;
+    }
 
-      if (!todayOn && previousTodayDay != null) {
-        await _dayEntries.markBackloggedIfOpen(
-          noteId: id,
-          day: previousTodayDay,
-          outcomeAt: now,
-        );
-      }
+    if (!todayOn &&
+        previousDue != null &&
+        nextDue != null &&
+        previousDue != nextDue) {
+      await _dayEntries.applyMigrationPatches(
+        noteId: noteId,
+        patches: scheduleTo(previous, previousDue, nextDue, now),
+        now: now,
+      );
+      return;
+    }
 
-      if (!todayOn && previousDue != null && nextDue == null) {
-        await _dayEntries.markBackloggedIfOpen(
-          noteId: id,
-          day: previousDue,
-          outcomeAt: now,
-        );
-      }
+    if (!todayOn &&
+        previousTodayDay != null &&
+        nextDue != null &&
+        previousTodayDay != nextDue) {
+      await _dayEntries.applyMigrationPatches(
+        noteId: noteId,
+        patches: scheduleTo(previous, previousTodayDay, nextDue, now),
+        now: now,
+      );
+      return;
+    }
 
-      if (!todayOn && nextDue != null) {
-        await _dayEntries.ensurePlanned(
-          noteId: id,
-          day: nextDue,
-          via: DayVia.due,
-          now: now,
-        );
-      }
-    }, 'applyTaskWhen');
+    if (!todayOn && previousTodayDay != null) {
+      await _dayEntries.markBackloggedIfOpen(
+        noteId: noteId,
+        day: previousTodayDay,
+        outcomeAt: now,
+      );
+    }
+
+    if (!todayOn && previousDue != null && nextDue == null) {
+      await _dayEntries.markBackloggedIfOpen(
+        noteId: noteId,
+        day: previousDue,
+        outcomeAt: now,
+      );
+    }
+
+    if (!todayOn && nextDue != null) {
+      await _dayEntries.ensurePlanned(
+        noteId: noteId,
+        day: nextDue,
+        via: DayVia.due,
+        now: now,
+      );
+    }
   }
 
   /// Moves a task's commitment from [fromDay] to [toDay].

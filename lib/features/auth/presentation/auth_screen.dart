@@ -17,6 +17,12 @@ class AuthScreen extends StatefulWidget {
     this.initialRegistering = false,
   });
 
+  /// Whether an [AuthScreen] route is currently on screen (used to avoid
+  /// duplicate session-expired dialogs on top of login).
+  static bool get isVisible => _visibleCount > 0;
+
+  static int _visibleCount = 0;
+
   final String? contextTitle;
   final String? contextMessage;
   final bool initialRegistering;
@@ -42,6 +48,9 @@ class _AuthScreenState extends State<AuthScreen> {
   void initState() {
     super.initState();
     _registering = widget.initialRegistering;
+    AuthScreen._visibleCount++;
+    // User is already on login; do not stack a session-expired modal.
+    _auth.consumeSessionEndedMessage();
     _password.addListener(_onPasswordChanged);
     _email.addListener(_onEmailChanged);
     final remembered = _sessions.lastLoginEmail;
@@ -144,6 +153,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
+    AuthScreen._visibleCount--;
     _password.removeListener(_onPasswordChanged);
     _email.removeListener(_onEmailChanged);
     _email.dispose();

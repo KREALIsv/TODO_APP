@@ -1,6 +1,9 @@
 import 'date_only.dart';
+import 'day_entry.dart';
+import 'day_view_query.dart';
 import 'note_item.dart';
 import 'notes_filter.dart';
+import 'task_day_query.dart';
 import 'task_dates.dart';
 
 class NotesQuery {
@@ -13,12 +16,27 @@ class NotesQuery {
     return filter == NotesFilter.all && searchQuery.trim().isEmpty;
   }
 
-  /// Grouped Hoy / Próximas / Sin fecha when chip Tareas is active and no search.
+  /// Grouped Hoy / Próximas / Backlog when chip Tareas is active and no search.
   static bool useGroupedTasksLayout({
     required NotesFilter filter,
     required String searchQuery,
   }) {
     return filter == NotesFilter.tasks && searchQuery.trim().isEmpty;
+  }
+
+  /// Future-day plan under chip Tareas: that day's tasks + Backlog pool.
+  ///
+  /// Past days stay day-audit only (no Backlog mixed into the replay).
+  static bool usePlanDayWithBacklogLayout({
+    required NotesFilter filter,
+    required String searchQuery,
+    required DateTime day,
+    DateTime? now,
+  }) {
+    if (!useGroupedTasksLayout(filter: filter, searchQuery: searchQuery)) {
+      return false;
+    }
+    return dateOnly(day).isAfter(dateOnly(now ?? DateTime.now()));
   }
 
   static List<NoteItem> apply({
@@ -44,17 +62,30 @@ class NotesQuery {
   ///
   /// Notes: created or updated that day.
   /// Tasks: todayAt / dueAt / completedAt on that day, overdue when [day] is
-  /// today, or captured (created) that day so new tasks appear in «Del día».
+  /// today, captured that day, or any stored [DayEntry] for that day (audit).
   static List<NoteItem> ofDayFrom(
     List<NoteItem> items,
     DateTime day, {
     DateTime? now,
+    Map<String, DayEntry>? dayEntriesByNoteId,
   }) {
     final reference = now ?? DateTime.now();
     return items
-        .where(
-          (item) => !item.pinned && belongsToDay(item, day, now: reference),
-        )
+        .where((item) {
+          if (item.pinned) return false;
+          if (item.type == NoteType.task && dayEntriesByNoteId != null) {
+            final entry = dayEntriesByNoteId[item.id];
+            if (DayViewQuery.taskBelongsToDay(
+              item,
+              day,
+              now: reference,
+              entry: entry,
+            )) {
+              return true;
+            }
+          }
+          return belongsToDay(item, day, now: reference);
+        })
         .toList();
   }
 
@@ -70,14 +101,7 @@ class NotesQuery {
       return dateOnly(item.createdAt) == key || dateOnly(item.updatedAt) == key;
     }
 
-    if (dateOnly(item.createdAt) == key) return true;
-    if (item.todayAt != null && dateOnly(item.todayAt!) == key) return true;
-    if (item.dueAt != null && dateOnly(item.dueAt!) == key) return true;
-    if (item.completedAt != null && dateOnly(item.completedAt!) == key) {
-      return true;
-    }
-    if (key == dateOnly(reference) && item.isOverdue(reference)) return true;
-    return false;
+    return TaskDayQuery.belongsToDay(item, day, now: reference);
   }
 
   static String emptyMessage({

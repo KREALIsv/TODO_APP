@@ -57,14 +57,33 @@ class DayEntriesRepository {
   }
 
   /// Existing entry for (noteId, day), if any.
+  ///
+  /// Prefers an [DayOutcome.open] row; otherwise the most recent closed event.
   DayEntry? findForNoteDay(String noteId, DateTime day) {
     final key = dateOnly(day);
+    DayEntry? open;
+    DayEntry? latestClosed;
+
     for (final entry in getAll()) {
-      if (entry.noteId == noteId && dateOnly(entry.day) == key) {
-        return entry;
+      if (entry.noteId != noteId || dateOnly(entry.day) != key) continue;
+      if (entry.outcome == DayOutcome.open) {
+        open = entry;
+        break;
+      }
+      if (latestClosed == null ||
+          _eventTime(entry).isAfter(_eventTime(latestClosed))) {
+        latestClosed = entry;
       }
     }
-    return null;
+
+    return open ?? latestClosed;
+  }
+
+  DateTime _eventTime(DayEntry entry) => entry.outcomeAt ?? entry.createdAt;
+
+  bool _sameOptionalDay(DateTime? a, DateTime? b) {
+    if (a == null || b == null) return a == null && b == null;
+    return dateOnly(a) == dateOnly(b);
   }
 
   List<DayEntry> entriesForDay(DateTime day) =>
@@ -80,16 +99,9 @@ class DayEntriesRepository {
     ).where((e) => e.outcome == DayOutcome.open).toList(growable: false);
   }
 
-  /// Upsert by (noteId, day): updates existing or inserts [entry].
+  /// Upsert by entry [id]. New ids always insert (append history on same day).
   Future<DayEntry> upsert(DayEntry entry) async {
-    final existing = findForNoteDay(entry.noteId, entry.day);
-    final toSave = existing == null
-        ? entry.copyWith(day: dateOnly(entry.day))
-        : entry.copyWith(
-            id: existing.id,
-            day: dateOnly(entry.day),
-            createdAt: existing.createdAt,
-          );
+    final toSave = entry.copyWith(day: dateOnly(entry.day));
     await _box.put(toSave.id, toSave.toMap());
     return toSave;
   }
@@ -109,7 +121,7 @@ class DayEntriesRepository {
     DateTime? now,
   }) async {
     final existing = findForNoteDay(noteId, day);
-    if (existing != null) {
+    if (existing != null && existing.outcome == DayOutcome.open) {
       return existing;
     }
     final created = now ?? DateTime.now();
@@ -194,23 +206,36 @@ class DayEntriesRepository {
     required DateTime now,
   }) async {
     final existing = findForNoteDay(noteId, patch.day);
-    final entry = existing == null
-        ? DayEntry(
-            id: _uuid.v4(),
-            noteId: noteId,
-            day: patch.day,
-            via: DayVia.manual,
-            outcome: patch.outcome,
-            targetDay: patch.targetDay,
-            outcomeAt: patch.outcomeAt,
-            createdAt: now,
-          )
-        : existing.copyWith(
-            outcome: patch.outcome,
-            targetDay: patch.targetDay,
-            outcomeAt: patch.outcomeAt,
-          );
-    await upsert(entry);
+    if (existing != null && existing.outcome == DayOutcome.open) {
+      await upsert(
+        existing.copyWith(
+          outcome: patch.outcome,
+          targetDay: patch.targetDay,
+          outcomeAt: patch.outcomeAt,
+        ),
+      );
+      return;
+    }
+
+    if (existing != null &&
+        existing.outcome == patch.outcome &&
+        _sameOptionalDay(existing.targetDay, patch.targetDay)) {
+      await upsert(existing.copyWith(outcomeAt: patch.outcomeAt));
+      return;
+    }
+
+    await upsert(
+      DayEntry(
+        id: _uuid.v4(),
+        noteId: noteId,
+        day: patch.day,
+        via: DayVia.manual,
+        outcome: patch.outcome,
+        targetDay: patch.targetDay,
+        outcomeAt: patch.outcomeAt,
+        createdAt: now,
+      ),
+    );
   }
 
   Future<void> _ensureOpenDestination({
@@ -220,16 +245,25 @@ class DayEntriesRepository {
     required DateTime now,
   }) async {
     final existing = findForNoteDay(noteId, day);
-    if (existing == null) {
-      await ensurePlanned(noteId: noteId, day: day, via: via, now: now);
+    if (existing != null && existing.outcome == DayOutcome.open) {
+      await upsert(
+        existing.copyWith(
+          via: via,
+          targetDay: null,
+          outcomeAt: null,
+        ),
+      );
       return;
     }
+
     await upsert(
-      existing.copyWith(
+      DayEntry(
+        id: _uuid.v4(),
+        noteId: noteId,
+        day: dateOnly(day),
         via: via,
         outcome: DayOutcome.open,
-        targetDay: null,
-        outcomeAt: null,
+        createdAt: now,
       ),
     );
   }
