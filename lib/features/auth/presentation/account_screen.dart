@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_surface.dart';
 import '../../../global/themes/app_colors.dart';
+import '../../settings/domain/privacy_security_status.dart';
 import '../../settings/presentation/privacy_security_screen.dart';
+import '../../settings/presentation/widgets/privacy_security_status_card.dart';
 import '../../settings/presentation/widgets/settings_section.dart';
 import '../../sync/data/device_identity.dart';
 import '../../sync/data/sync_service.dart';
@@ -166,20 +168,13 @@ class _AccountScreenState extends State<AccountScreen> {
               const SizedBox(height: 20),
               SettingsSectionLabel(
                 label: 'Privacidad y seguridad',
+                caption: PrivacySecurityCopy.sectionCaption,
                 textTheme: textTheme,
                 accent: accent,
               ),
               SettingsCard(
                 children: [
-                  SettingsRow(
-                    icon: Icons.shield_outlined,
-                    title: 'Privacidad y seguridad',
-                    subtitle: privacySecuritySettingsSummary(
-                      authenticated: true,
-                    ),
-                    trailing: privacySecuritySettingsTrailing(
-                      authenticated: true,
-                    ),
+                  PrivacySecurityHubRow(
                     accent: accent,
                     onTap: () => PrivacySecurityScreen.open(context),
                   ),

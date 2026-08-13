@@ -9,6 +9,7 @@ import 'package:todos_app/features/auth/data/auth_session_repository.dart';
 import 'package:todos_app/features/encryption/data/vault_service.dart';
 import 'package:todos_app/features/notes/data/notes_repository.dart';
 import 'package:todos_app/features/settings/data/settings_repository.dart';
+import 'package:todos_app/features/settings/domain/privacy_security_status.dart';
 import 'package:todos_app/features/settings/presentation/privacy_security_screen.dart';
 import 'package:todos_app/features/settings/presentation/settings_screen.dart';
 
@@ -37,9 +38,9 @@ void main() {
   test('privacy summary when logged out', () {
     expect(
       privacySecuritySettingsSummary(authenticated: false),
-      'Inicia sesión para sincronizar',
+      PrivacySecurityCopy.sectionCaption,
     );
-    expect(privacySecuritySettingsTrailing(authenticated: false), isNull);
+    expect(privacySecuritySettingsTrailing(authenticated: false), 'Local');
   });
 
   testWidgets('settings shows dedicated privacy and security section', (
@@ -56,7 +57,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Privacidad y seguridad'), findsWidgets);
-    expect(find.textContaining('Inicia sesión para sincronizar'), findsOneWidget);
+    expect(find.text(AccountSyncCopy.sectionCaption), findsWidgets);
+    expect(find.text(PrivacySecurityCopy.sectionCaption), findsWidgets);
+    expect(find.text('Local'), findsWidgets);
   });
 
   testWidgets('privacy screen shows login prompt when logged out', (
@@ -67,8 +70,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Modo local'), findsOneWidget);
-    expect(find.text('Iniciar sesión'), findsOneWidget);
+    expect(find.text('Local'), findsWidgets);
+    expect(find.text(AccountSyncCopy.loginTitle), findsOneWidget);
     expect(find.text('Almacenamiento local'), findsOneWidget);
     expect(find.text('Sin cifrar'), findsOneWidget);
   });
@@ -91,7 +94,7 @@ void main() {
     );
     expect(
       privacySecuritySettingsSummary(authenticated: false),
-      'Cifrado en este dispositivo',
+      PrivacySecurityCopy.sectionCaption,
     );
 
     await LocalStorageService.instance.debugReset();
@@ -119,6 +122,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Regenerar código de recuperación'), findsOneWidget);
+    expect(find.text('Proteger mis datos'), findsNothing);
+    expect(find.text('Protegido'), findsOneWidget);
 
     await AuthSessionRepository.instance.clear();
     VaultService.instance.debugOverrideCloudState(

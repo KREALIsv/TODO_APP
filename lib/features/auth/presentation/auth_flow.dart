@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../global/widgets/app_alerts.dart';
+import '../../settings/domain/privacy_security_status.dart';
 import '../../settings/presentation/data_backup.dart';
 import '../../sync/data/device_identity.dart';
 import '../../sync/data/sync_service.dart';
@@ -20,6 +21,14 @@ import 'auth_screen.dart';
 
 /// Shared navigation and feedback for sign-in / sign-out.
 abstract final class AuthFlow {
+  static Future<void> openSyncLogin(BuildContext context) {
+    return openLogin(
+      context,
+      contextTitle: AccountSyncCopy.loginContextTitle,
+      contextMessage: AccountSyncCopy.loginContextMessage,
+    );
+  }
+
   static Future<void> openLogin(
     BuildContext context, {
     String? contextTitle,
@@ -102,10 +111,15 @@ abstract final class AuthFlow {
   }
 
   static Future<void> logout(BuildContext context) async {
+    final cloudProtected = VaultService.instance.accountEncryptionEnabled;
     final confirmed = await AppAlerts.confirm(
       context,
       title: 'Cerrar sesión',
-      message: 'Tus datos locales se conservarán en este dispositivo.',
+      message: cloudProtected
+          ? 'Tus notas locales se conservan. La clave de la nube se borra de '
+              'este dispositivo: para volver a ver los datos sincronizados '
+              'tendrás que vincularlo o usar el código de recuperación.'
+          : 'Tus datos locales se conservarán en este dispositivo.',
       confirmLabel: 'Cerrar sesión',
       isDestructive: true,
     );
@@ -176,7 +190,7 @@ abstract final class AuthFlow {
   static Future<void> enableCloudProtection(BuildContext context) async {
     final confirmed = await AppAlerts.confirm(
       context,
-      title: 'Proteger mis datos en la nube',
+          title: PrivacySecurityCopy.protectCta,
       message:
           'Tus notas y tareas se encriptarán antes de subirlas. '
           'Otros dispositivos tendrán que vincularse (QR) o usar un código '

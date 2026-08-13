@@ -17,12 +17,14 @@ import '../../sync/presentation/sync_conflicts_screen.dart';
 import '../../sync/data/device_identity.dart';
 import '../../sync/data/sync_service.dart';
 import '../domain/list_background.dart';
+import '../domain/privacy_security_status.dart';
 import 'about_screen.dart';
 import 'archived_screen.dart';
 import 'data_backup.dart';
 import 'fondo_picker_screen.dart';
 import 'privacy_security_screen.dart';
 import 'widgets/list_background_layer.dart';
+import 'widgets/privacy_security_status_card.dart';
 import 'widgets/settings_section.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -102,13 +104,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _openAccount(BuildContext context) {
-    return AuthFlow.openLogin(
-      context,
-      contextTitle: 'Sincronización multidispositivo',
-      contextMessage:
-          'Tus notas siguen disponibles sin conexión. Al iniciar sesión se '
-          'combinarán de forma segura con tu cuenta.',
-    );
+    return AuthFlow.openSyncLogin(context);
   }
 
   Future<void> _syncNow(BuildContext context) => AuthFlow.syncNow(context);
@@ -296,6 +292,7 @@ class SettingsScreen extends StatelessWidget {
     return [
       SettingsSectionLabel(
         label: 'Cuenta y sincronización',
+        caption: AccountSyncCopy.sectionCaption,
         textTheme: textTheme,
         accent: accent,
       ),
@@ -344,7 +341,8 @@ class SettingsScreen extends StatelessWidget {
           ] else
             SettingsRow(
               icon: Icons.account_circle_outlined,
-              title: 'Iniciar sesión',
+              title: AccountSyncCopy.loginTitle,
+              subtitle: AccountSyncCopy.loginSubtitle,
               trailing: 'Local',
               accent: accent,
               onTap: () => _openAccount(context),
@@ -354,20 +352,13 @@ class SettingsScreen extends StatelessWidget {
       const SizedBox(height: 20),
       SettingsSectionLabel(
         label: 'Privacidad y seguridad',
+        caption: PrivacySecurityCopy.sectionCaption,
         textTheme: textTheme,
         accent: accent,
       ),
       SettingsCard(
         children: [
-          SettingsRow(
-            icon: Icons.shield_outlined,
-            title: 'Privacidad y seguridad',
-            subtitle: privacySecuritySettingsSummary(
-              authenticated: AuthService.instance.isAuthenticated,
-            ),
-            trailing: privacySecuritySettingsTrailing(
-              authenticated: AuthService.instance.isAuthenticated,
-            ),
+          PrivacySecurityHubRow(
             accent: accent,
             onTap: () => PrivacySecurityScreen.open(context),
           ),
@@ -444,6 +435,7 @@ class SettingsScreen extends StatelessWidget {
           SettingsRow(
             icon: Icons.upload_outlined,
             title: 'Exportar datos',
+            subtitle: PrivacySecurityCopy.exportSubtitle,
             accent: accent,
             onTap: () => _export(context),
           ),
@@ -451,6 +443,7 @@ class SettingsScreen extends StatelessWidget {
           SettingsRow(
             icon: Icons.download_outlined,
             title: 'Importar datos',
+            subtitle: PrivacySecurityCopy.importSubtitle,
             accent: accent,
             onTap: () => _import(context),
           ),

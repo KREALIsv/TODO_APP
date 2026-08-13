@@ -9,24 +9,41 @@ class SettingsSectionLabel extends StatelessWidget {
     required this.label,
     required this.textTheme,
     this.accent,
+    this.caption,
   });
 
   final String label;
   final TextTheme textTheme;
   final Color? accent;
+  final String? caption;
 
   @override
   Widget build(BuildContext context) {
     final color = accent ?? AppColors.neutral60;
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        label.toUpperCase(),
-        style: textTheme.labelSmall?.copyWith(
-          color: color.withValues(alpha: 0.85),
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.6,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: textTheme.labelSmall?.copyWith(
+              color: color.withValues(alpha: 0.85),
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+            ),
+          ),
+          if (caption != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              caption!,
+              style: textTheme.bodySmall?.copyWith(
+                color: AppSurface.secondary(context),
+                height: 1.35,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
