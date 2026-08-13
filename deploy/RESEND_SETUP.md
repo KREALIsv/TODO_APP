@@ -1,26 +1,41 @@
-# Resend + WODO (correo transaccional)
+# Resend + WODO (correo transaccional unificado)
 
 WODO envía correos desde **`@krealistudio.com`** (marca Kreali) con enlaces a
 **`https://app.wodo.app`**. La app y la API siguen en `wodo.app` / `api.wodo.app`.
 
-## Dónde poner la API key (importante)
+Flujos (misma API Resend, cuota por flujo):
 
-| Entorno | Archivo | ¿Se sube a Git? |
-|---------|---------|-----------------|
-| **Producción (VPS)** | `/opt/wodo/.env` | **No** |
-| **Desarrollo local (API)** | `backend/.env` | **No** |
+| Flujo | Cuándo |
+|-------|--------|
+| `welcome` | Al crear cuenta |
+| `password_reset` | «¿Olvidaste tu contraseña?» |
+| `vault_recovery` | Opcional: «Enviar también a mi correo» al activar E2EE (el servidor **no** guarda el código) |
 
-**No** pongas `RESEND_API_KEY` en:
+---
+
+## Dónde poner la API key
+
+| Entorno | Archivo | Variable |
+|---------|---------|----------|
+| **Producción (VPS)** | `/opt/wodo/.env` | `RESEND_API_KEY=re_...` |
+| **Desarrollo local** | `backend/.env` | `RESEND_API_KEY=re_...` |
+
+Plantillas de ejemplo (sin secretos reales):
+
+- `deploy/.env.example` → copia conceptual del VPS
+- `backend/.env.example` → copia a `backend/.env` en local
+
+**No** pongas la key en:
 
 - el `.env` de la raíz del repo (Flutter no la usa),
-- GitHub Actions (el deploy no la necesita; la lee el contenedor `wodo-api` del VPS),
+- GitHub Actions / secrets de CI (el contenedor `wodo-api` del VPS lee `/opt/wodo/.env`),
 - el código fuente ni en commits.
 
 ### Producción — paso a paso
 
-1. SSH al VPS: `ssh usuario@144.91.71.215`
-2. Edita el env del stack: `nano /opt/wodo/.env`
-3. Añade (o completa) estas líneas:
+1. SSH: `ssh usuario@144.91.71.215`
+2. Edita: `nano /opt/wodo/.env`
+3. Asegura estas líneas:
 
 ```env
 RESEND_API_KEY=re_tu_clave_de_resend
@@ -37,7 +52,7 @@ sudo chown wododeploy:wododeploy /opt/wodo/.env
 chmod 600 /opt/wodo/.env
 ```
 
-5. Reinicia solo la API:
+5. Reinicia la API:
 
 ```bash
 cd /opt/wodo && docker compose up -d api
@@ -47,48 +62,42 @@ cd /opt/wodo && docker compose up -d api
 
 ```bash
 cp backend/.env.example backend/.env
-# Edita backend/.env y pega RESEND_API_KEY=...
+# Edita backend/.env → RESEND_API_KEY=re_...
 cd deploy && docker compose -f compose.dev.yml up --build
 ```
 
-`compose.dev.yml` ya carga `../backend/.env` en el contenedor `wodo-api-dev`.
+`compose.dev.yml` carga `../backend/.env` en `wodo-api-dev`.
+
+---
 
 ## Resend (panel)
 
-1. [resend.com](https://resend.com) → **Domains** → añade `krealistudio.com`
-2. Copia los registros **SPF / DKIM** (y **DMARC** recomendado) en el DNS del dominio
-3. **Verify DNS**
-4. **API Keys** → crea una key → pégala en `/opt/wodo/.env` como `RESEND_API_KEY`
+1. [resend.com](https://resend.com) → **Domains** → `krealistudio.com`
+2. DNS: SPF / DKIM (+ DMARC recomendado) → **Verify**
+3. **API Keys** → crea key → pégala solo en `/opt/wodo/.env` (prod) o `backend/.env` (dev)
 
-Remitente verificado típico: `WODO <noreply@krealistudio.com>` (debe coincidir con
-`MAIL_FROM`).
+Remitente: `WODO <noreply@krealistudio.com>` (= `MAIL_FROM`).
 
-## Límites anti-abuso (backend)
+---
 
-Por defecto el servidor aplica:
+## Límites anti-abuso
 
 | Control | Variable | Default |
 |---------|----------|---------|
-| Máx. correos por usuario **y flujo** (ventana) | `MAIL_MAX_PER_USER_FLOW` | `2` |
-| Ventana en horas | `MAIL_FLOW_WINDOW_HOURS` | `24` |
-| Peticiones «olvidé contraseña» por IP | throttle NestJS en el endpoint | 5 / 15 min |
+| Máx. correos por email **y flujo** | `MAIL_MAX_PER_USER_FLOW` | `2` / 24 h |
+| Ventana | `MAIL_FLOW_WINDOW_HOURS` | `24` |
+| Forgot-password / vault email por IP | throttle Nest | 5 / 15 min |
 
-Flujos contabilizados por separado:
+Si se agota la cuota → **429** en español; no se llama a Resend.
 
-- `welcome` — bienvenida al registrarse
-- `password_reset` — enlace para nueva contraseña
+---
 
-Si un usuario agota la cuota, la API responde **429** con un mensaje en español;
-no se envía el correo (protege la cuota de Resend).
-
-## Comprobar que funciona
+## Comprobar
 
 ```bash
 curl -s https://api.wodo.app/api/health
 ```
 
-Desde la app: **Iniciar sesión → ¿Olvidaste tu contraseña?** → introduce el correo.
-Revisa bandeja de entrada y spam.
-
-Enlace del correo: `https://app.wodo.app/?wodo_reset=TOKEN` (abre la pantalla de
-nueva contraseña en la web).
+- Bienvenida: crear cuenta → bandeja / spam  
+- Reset: **¿Olvidaste tu contraseña?** → `https://app.wodo.app/?wodo_reset=TOKEN`  
+- Vault: activar protección → **Enviar también a mi correo**

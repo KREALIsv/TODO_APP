@@ -10,6 +10,8 @@ import 'package:uuid/uuid.dart';
 import '../../settings/presentation/data_backup.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/domain/auth_session_expired_exception.dart';
+import '../../encryption/data/crypto_service.dart';
+import '../../encryption/data/vault_service.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
@@ -75,6 +77,14 @@ class SyncService extends ChangeNotifier {
 
   Future<void> syncNow() async {
     if (_syncing || !canSync) return;
+    final vault = VaultService.instance;
+    if (vault.blocksEncryptedSync) {
+      _state = SyncState.unavailable;
+      _errorMessage =
+          'Vincula este dispositivo o usa tu código de recuperación para sincronizar.';
+      notifyListeners();
+      return;
+    }
     _syncing = true;
     _state = SyncState.syncing;
     _errorMessage = null;
@@ -99,6 +109,14 @@ class SyncService extends ChangeNotifier {
       _syncing = false;
       notifyListeners();
     }
+  }
+
+  /// Clears sync cursors so the next sync re-pushes the full local snapshot
+  /// (used after enabling E2EE so payloads go up encrypted).
+  Future<void> resetAndSync() async {
+    await _box.delete(_cursorKey);
+    await _box.delete(_snapshotKey);
+    await syncNow();
   }
 
   Map<String, Map<String, Map<String, dynamic>>> _snapshot() {
@@ -153,6 +171,21 @@ class SyncService extends ChangeNotifier {
         operation: operation,
       ),
     );
+    for (var index = 0; index < mutations.length; index++) {
+      final mutation = mutations[index];
+      final payload = mutation['payload'];
+      if (payload is! Map<String, dynamic>) continue;
+      mutations[index] = _mutation(
+        entityType: mutation['entityType'] as String,
+        entityId: mutation['entityId'] as String,
+        operation: mutation['operation'] as String,
+        payload: await _wirePayload(
+          entityType: mutation['entityType'] as String,
+          entityId: mutation['entityId'] as String,
+          plaintext: payload,
+        ),
+      );
+    }
     for (var index = 0; index < mutations.length; index += 100) {
       final end = index + 100 > mutations.length
           ? mutations.length
@@ -221,7 +254,21 @@ class SyncService extends ChangeNotifier {
       return;
     }
     if (rawPayload is! Map) return;
-    final payload = Map<String, dynamic>.from(rawPayload);
+    var payload = Map<String, dynamic>.from(rawPayload);
+    final vault = VaultService.instance;
+    if (CryptoService.instance.isOpaqueEnvelope(payload)) {
+      if (!vault.canSyncEncrypted) return;
+      final decrypted = await vault.decryptSyncPayload(
+        payload: payload,
+        entityType: entityType,
+        entityId: entityId,
+      );
+      if (decrypted == null) return;
+      payload = decrypted;
+    } else if (vault.accountEncryptionEnabled) {
+      // Legacy plaintext left on server after enabling E2EE — ignore.
+      return;
+    }
     switch (entityType) {
       case 'note':
         await _applyRemoteNote(
@@ -245,6 +292,21 @@ class SyncService extends ChangeNotifier {
         await _dayEntries.saveFromSync(payload);
         break;
     }
+  }
+
+  Future<Map<String, dynamic>> _wirePayload({
+    required String entityType,
+    required String entityId,
+    required Map<String, dynamic> plaintext,
+  }) async {
+    final vault = VaultService.instance;
+    if (!vault.canSyncEncrypted) return plaintext;
+    final encrypted = await vault.encryptSyncPayload(
+      payload: plaintext,
+      entityType: entityType,
+      entityId: entityId,
+    );
+    return encrypted ?? plaintext;
   }
 
   Future<void> _applyRemoteNote(

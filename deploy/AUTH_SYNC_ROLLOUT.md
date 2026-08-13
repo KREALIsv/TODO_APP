@@ -80,7 +80,7 @@ flutter run -d chrome \
 
 ## Not synced yet (v1)
 
-- Image attachments (`coverAttachmentId`, blob storage)
+- Image attachments (`coverAttachmentId`, blob storage) — E2EE blob sync planned as **v2** (P3 hardening documents deferral; local Hive only today)
 - App settings (theme, background)
 - Local reminders
 

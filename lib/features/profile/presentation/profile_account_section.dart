@@ -42,13 +42,7 @@ class ProfileAccountSection extends StatelessWidget {
             status: status,
             compact: isSidebar,
             canSignIn: auth.isConfigured,
-            onSignIn: () => AuthFlow.openLogin(
-              context,
-              contextTitle: 'Tu cuenta WODO',
-              contextMessage:
-                  'Inicia sesión para sincronizar notas y tareas entre tus dispositivos. '
-                  'Sin cuenta, todo sigue guardándose aquí en local.',
-            ),
+            onSignIn: () => AuthFlow.openSyncLogin(context),
           );
         }
 

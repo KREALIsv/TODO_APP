@@ -48,7 +48,7 @@
 		</dict>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>WODO necesita la cámara para adjuntar fotos a tus tareas.</string>
+	<string>WODO usa la cámara para escanear códigos QR de vinculación y para adjuntar fotos a tus tareas.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>WODO necesita acceso a tus fotos para adjuntarlas a tus tareas.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

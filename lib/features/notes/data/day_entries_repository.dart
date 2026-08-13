@@ -3,6 +3,7 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/storage/hive_repo_notifier.dart';
+import '../../../core/storage/local_storage_service.dart';
 import '../domain/date_only.dart';
 import '../domain/day_entry.dart';
 import '../domain/day_log.dart' as day_log;
@@ -21,14 +22,13 @@ class DayEntriesRepository {
   final _changes = HiveRepoNotifier();
 
   Future<void> init() async {
-    _box = await Hive.openBox<Map>(_boxName);
+    _box = await LocalStorageService.instance.openBox<Map>(_boxName);
     _changes.bind(_box.listenable());
   }
 
   Future<void> reloadFromPeerTab() async {
     if (!Hive.isBoxOpen(_boxName)) return;
-    await _box.close();
-    _box = await Hive.openBox<Map>(_boxName);
+    _box = await LocalStorageService.instance.reopenBox<Map>(_boxName);
     _changes.bind(_box.listenable());
     _changes.reloadComplete();
   }

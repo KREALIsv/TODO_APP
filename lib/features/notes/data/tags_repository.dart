@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import '../../../core/storage/hive_repo_notifier.dart';
+import '../../../core/storage/local_storage_service.dart';
 import '../domain/default_tags.dart';
 import '../domain/tag_colors.dart';
 
@@ -24,15 +25,14 @@ class TagsRepository {
   final _changes = HiveRepoNotifier();
 
   Future<void> init() async {
-    _box = await Hive.openBox<dynamic>(_boxName);
+    _box = await LocalStorageService.instance.openBox<dynamic>(_boxName);
     _changes.bind(_box.listenable());
     await ensureDefaults();
   }
 
   Future<void> reloadFromPeerTab() async {
     if (!Hive.isBoxOpen(_boxName)) return;
-    await _box.close();
-    _box = await Hive.openBox<dynamic>(_boxName);
+    _box = await LocalStorageService.instance.reopenBox<dynamic>(_boxName);
     _changes.bind(_box.listenable());
     _changes.reloadComplete();
   }

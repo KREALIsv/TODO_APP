@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/services';
 
 @Injectable()
@@ -48,6 +48,46 @@ export class DevicesService {
     return this.prisma.device.findMany({
       where: { userId },
       orderBy: { lastSyncedAt: 'desc' },
+    });
+  }
+
+  async revoke(userId: string, appUserId: string): Promise<void> {
+    const device = await this.prisma.device.findUnique({
+      where: { appUserId },
+    });
+
+    if (!device || device.userId !== userId) {
+      throw new NotFoundException('Dispositivo no encontrado.');
+    }
+
+    await this.prisma.device.update({
+      where: { id: device.id },
+      data: {
+        trusted: false,
+        vaultState: 'revoked',
+      },
+    });
+  }
+
+  async markTrusted(userId: string, appUserId: string): Promise<void> {
+    const now = new Date();
+    await this.prisma.device.upsert({
+      where: { appUserId },
+      create: {
+        userId,
+        appUserId,
+        trusted: true,
+        vaultState: 'trusted',
+        pairedAt: now,
+        lastSyncedAt: now,
+      },
+      update: {
+        userId,
+        trusted: true,
+        vaultState: 'trusted',
+        pairedAt: now,
+        lastSyncedAt: now,
+      },
     });
   }
 }

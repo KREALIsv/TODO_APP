@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
+import '../../../core/storage/local_storage_service.dart';
 import '../../../core/theme/app_surface.dart';
 import '../../../global/constants/config.dart';
 import '../../../global/themes/app_colors.dart';
 import '../../../global/widgets/app_alerts.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/presentation/auth_flow.dart';
+import '../../encryption/data/vault_service.dart';
 import '../../notes/data/attachments_repository.dart';
 import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
@@ -16,11 +17,14 @@ import '../../sync/presentation/sync_conflicts_screen.dart';
 import '../../sync/data/device_identity.dart';
 import '../../sync/data/sync_service.dart';
 import '../domain/list_background.dart';
+import '../domain/privacy_security_status.dart';
 import 'about_screen.dart';
 import 'archived_screen.dart';
 import 'data_backup.dart';
 import 'fondo_picker_screen.dart';
+import 'privacy_security_screen.dart';
 import 'widgets/list_background_layer.dart';
+import 'widgets/privacy_security_status_card.dart';
 import 'widgets/settings_section.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -100,13 +104,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _openAccount(BuildContext context) {
-    return AuthFlow.openLogin(
-      context,
-      contextTitle: 'Sincronización multidispositivo',
-      contextMessage:
-          'Tus notas siguen disponibles sin conexión. Al iniciar sesión se '
-          'combinarán de forma segura con tu cuenta.',
-    );
+    return AuthFlow.openSyncLogin(context);
   }
 
   Future<void> _syncNow(BuildContext context) => AuthFlow.syncNow(context);
@@ -241,6 +239,8 @@ class SettingsScreen extends StatelessWidget {
         AuthService.instance,
         SyncService.instance,
         DeviceIdentity.instance,
+        VaultService.instance,
+        LocalStorageService.instance,
       ]),
       builder: (context, _) {
         final bg = _settings.listBackground;
@@ -292,6 +292,7 @@ class SettingsScreen extends StatelessWidget {
     return [
       SettingsSectionLabel(
         label: 'Cuenta y sincronización',
+        caption: AccountSyncCopy.sectionCaption,
         textTheme: textTheme,
         accent: accent,
       ),
@@ -340,11 +341,27 @@ class SettingsScreen extends StatelessWidget {
           ] else
             SettingsRow(
               icon: Icons.account_circle_outlined,
-              title: 'Iniciar sesión',
+              title: AccountSyncCopy.loginTitle,
+              subtitle: AccountSyncCopy.loginSubtitle,
               trailing: 'Local',
               accent: accent,
               onTap: () => _openAccount(context),
             ),
+        ],
+      ),
+      const SizedBox(height: 20),
+      SettingsSectionLabel(
+        label: 'Privacidad y seguridad',
+        caption: PrivacySecurityCopy.sectionCaption,
+        textTheme: textTheme,
+        accent: accent,
+      ),
+      SettingsCard(
+        children: [
+          PrivacySecurityHubRow(
+            accent: accent,
+            onTap: () => PrivacySecurityScreen.open(context),
+          ),
         ],
       ),
       const SizedBox(height: 20),
@@ -418,6 +435,7 @@ class SettingsScreen extends StatelessWidget {
           SettingsRow(
             icon: Icons.upload_outlined,
             title: 'Exportar datos',
+            subtitle: PrivacySecurityCopy.exportSubtitle,
             accent: accent,
             onTap: () => _export(context),
           ),
@@ -425,6 +443,7 @@ class SettingsScreen extends StatelessWidget {
           SettingsRow(
             icon: Icons.download_outlined,
             title: 'Importar datos',
+            subtitle: PrivacySecurityCopy.importSubtitle,
             accent: accent,
             onTap: () => _import(context),
           ),

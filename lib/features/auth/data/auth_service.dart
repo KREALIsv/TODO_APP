@@ -47,6 +47,25 @@ class AuthService extends ChangeNotifier {
     return _authenticate('auth/login', email: email, password: password);
   }
 
+  /// Applies tokens from QR pairing (or any grant) without email/password.
+  Future<void> applySessionTokens({
+    required String accessToken,
+    required String refreshToken,
+    required int expiresInSeconds,
+    String? email,
+  }) async {
+    await _sessions.save(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      expiresInSeconds: expiresInSeconds,
+      email: email?.trim().toLowerCase(),
+    );
+    if (email != null && email.trim().isNotEmpty) {
+      await _sessions.rememberLoginEmail(email.trim().toLowerCase());
+    }
+    notifyListeners();
+  }
+
   Future<void> requestPasswordReset(String email) async {
     if (!WodoApiConfig.isConfigured) {
       throw StateError('La sincronización aún no está configurada.');

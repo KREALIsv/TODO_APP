@@ -127,6 +127,26 @@ export class SyncService {
     return last?.serverRevision ?? BigInt(0);
   }
 
+  private async isEncryptionEnabled(
+    prisma: PrismaService,
+    userId: string,
+  ): Promise<boolean> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { encryptionEnabled: true },
+    });
+    return user?.encryptionEnabled ?? false;
+  }
+
+  private isOpaquePayload(payload: Record<string, unknown>): boolean {
+    return (
+      payload.v === 1 &&
+      typeof payload.alg === 'string' &&
+      typeof payload.nonce === 'string' &&
+      typeof payload.ciphertext === 'string'
+    );
+  }
+
   private async applyMutation(
     prisma: PrismaService,
     userId: string,
@@ -134,6 +154,30 @@ export class SyncService {
   ): Promise<void> {
     const payload = mutation.payload ?? {};
     const now = new Date();
+    const encryptionEnabled = await this.isEncryptionEnabled(prisma, userId);
+
+    // E2EE: sync_mutations is source of truth; do not project plaintext mirrors.
+    if (encryptionEnabled || this.isOpaquePayload(payload)) {
+      if (mutation.operation === 'DELETE') {
+        if (mutation.entityType === 'note') {
+          await prisma.note.updateMany({
+            where: { userId, id: mutation.entityId },
+            data: { deletedAt: now },
+          });
+        } else if (mutation.entityType === 'tag') {
+          await prisma.tag.updateMany({
+            where: { userId, id: mutation.entityId },
+            data: { deletedAt: now },
+          });
+        } else if (mutation.entityType === 'dayEntry') {
+          await prisma.dayEntry.updateMany({
+            where: { userId, id: mutation.entityId },
+            data: { deletedAt: now },
+          });
+        }
+      }
+      return;
+    }
 
     switch (mutation.entityType) {
       case 'note':

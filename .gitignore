@@ -53,3 +53,9 @@ app.*.map.json
 **/*.keystore
 upload-keystore.jks
 tool/
+
+# Flutter golden test diff artifacts (local only)
+test/screenshots/failures/
+
+# Capture scripts / local QA outputs (override with WODO_ARTIFACTS_DIR)
+artifacts/

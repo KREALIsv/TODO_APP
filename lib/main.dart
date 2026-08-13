@@ -5,18 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 import 'app/app.dart';
+import 'app/content_bootstrap.dart';
+import 'core/storage/local_storage_service.dart';
 import 'core/theme/theme.dart';
 import 'core/web/boot_ready.dart';
+import 'features/app_lock/app_lock_controller.dart';
 import 'features/auth/data/auth_session_repository.dart';
-import 'features/notes/data/attachments_repository.dart';
-import 'features/notes/data/day_entries_repository.dart';
-import 'features/notes/data/notes_repository.dart';
-import 'features/notes/data/tags_repository.dart';
-import 'features/notes/data/task_reminders_service.dart';
+import 'features/encryption/data/vault_service.dart';
 import 'features/settings/data/settings_repository.dart';
 import 'features/sync/data/device_identity.dart';
-import 'features/sync/data/local_tab_sync_service.dart';
-import 'features/sync/data/sync_service.dart';
 import 'global/widgets/app_boot_splash.dart';
 
 Future<void> main() async {
@@ -47,40 +44,31 @@ class _BootstrapAppState extends State<_BootstrapApp> {
     try {
       HiveLogger.level = HiveLoggerLevel.warn;
       await Hive.initFlutter();
+      await LocalStorageService.instance.init();
       await Future.wait([
-        NotesRepository.instance.init(),
-        DayEntriesRepository.instance.init(),
-        TagsRepository.instance.init(),
-        AttachmentsRepository.instance.init(),
         SettingsRepository.instance.init(),
         AuthSessionRepository.instance.init(),
         DeviceIdentity.instance.init(),
       ]);
+      await VaultService.instance.init();
+      final storage = LocalStorageService.instance;
+      if (storage.needsUnlock) {
+        AppLockController.instance.prepareLockedLaunch();
+      } else {
+        await openContentRepositories();
+        AppLockController.instance.markContentReady();
+        unawaited(runPostContentBootstrap());
+      }
       if (!mounted) return;
       setState(() => _ready = true);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         notifyWebAppReady();
       });
-      unawaited(_postBootstrap());
     } catch (e, st) {
       debugPrint('App bootstrap failed: $e\n$st');
       if (!mounted) return;
       setState(() => _error = e);
       notifyWebAppReady();
-    }
-  }
-
-  Future<void> _postBootstrap() async {
-    try {
-      await SyncService.instance.init();
-      await LocalTabSyncService.instance.init();
-      await TagsRepository.instance.ensureTags(
-        NotesRepository.instance.getAllTags(),
-      );
-      await TaskRemindersService.instance.init();
-      await NotesRepository.instance.syncAllReminders();
-    } catch (e, st) {
-      debugPrint('Post-bootstrap skipped: $e\n$st');
     }
   }
 
@@ -94,9 +82,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
       home: _error == null
-          ? (kIsWeb
-              ? const SizedBox.shrink()
-              : const AppBootSplash())
+          ? (kIsWeb ? const SizedBox.shrink() : const AppBootSplash())
           : _BootstrapErrorScreen(
               error: _error!,
               onRetry: () {
@@ -112,10 +98,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
 }
 
 class _BootstrapErrorScreen extends StatelessWidget {
-  const _BootstrapErrorScreen({
-    required this.error,
-    required this.onRetry,
-  });
+  const _BootstrapErrorScreen({required this.error, required this.onRetry});
 
   final Object error;
   final VoidCallback onRetry;
@@ -144,12 +127,12 @@ class _BootstrapErrorScreen extends StatelessWidget {
                   Text(
                     kIsWeb
                         ? 'Prueba de nuevo. Si sigue en blanco, borra los datos '
-                            'del sitio app.wodo.app en el navegador y recarga.'
+                              'del sitio app.wodo.app en el navegador y recarga.'
                         : 'Prueba de nuevo. Si el problema continúa, reinicia la app.',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   FilledButton(
