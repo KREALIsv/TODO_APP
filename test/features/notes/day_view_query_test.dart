@@ -79,6 +79,47 @@ void main() {
       );
     });
 
+    test('completed backlog task shows checked when browsing today', () {
+      final today = DateTime(2026, 8, 14);
+      final task = NoteItem(
+        id: 'feedback',
+        type: NoteType.task,
+        title: 'darle feedback a gaby',
+        body: '',
+        pinned: false,
+        completed: true,
+        createdAt: DateTime(2026, 7, 30),
+        updatedAt: DateTime(2026, 7, 31, 18),
+        completedAt: DateTime(2026, 7, 31, 18),
+      );
+
+      expect(DayViewQuery.isDisplayedCompleted(task, today), isTrue);
+      expect(
+        DayViewQuery.canToggleCompletionOnDay(
+          item: task,
+          day: today,
+          now: today,
+        ),
+        isTrue,
+      );
+    });
+
+    test('open backlog task stays unchecked when browsing today', () {
+      final today = DateTime(2026, 8, 14);
+      final task = NoteItem(
+        id: 'open',
+        type: NoteType.task,
+        title: 'open backlog',
+        body: '',
+        pinned: false,
+        completed: false,
+        createdAt: DateTime(2026, 7, 30),
+        updatedAt: DateTime(2026, 7, 30),
+      );
+
+      expect(DayViewQuery.isDisplayedCompleted(task, today), isFalse);
+    });
+
     test('task without schedule still appears on origin day via day entry', () {
       final task = migratedTask();
       final entries = {task.id: migratedFromDay2()};
