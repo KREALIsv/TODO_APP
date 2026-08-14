@@ -79,6 +79,10 @@ abstract final class DayViewQuery {
   }
 
   /// Checkbox / strikethrough for a task when browsing [day].
+  ///
+  /// Day-log rows follow that day's [DayEntry.outcome]. List views without an
+  /// entry (Hoy / Backlog / Todas) follow [NoteItem.completed] so a finished
+  /// task never looks like an open checkbox.
   static bool isDisplayedCompleted(
     NoteItem item,
     DateTime day, {
@@ -88,16 +92,7 @@ abstract final class DayViewQuery {
     if (entry != null) {
       return entry.outcome == DayOutcome.completed;
     }
-
-    final key = dateOnly(day);
-    if (TaskDayQuery.isScheduledOn(item, day) ||
-        TaskDayQuery.isInboxCaptureOn(item, day)) {
-      return item.completed;
-    }
-    if (item.completedAt != null && dateOnly(item.completedAt!) == key) {
-      return true;
-    }
-    return false;
+    return item.completed;
   }
 
   /// Whether «Quitar del día» applies while browsing [day].
@@ -154,7 +149,8 @@ abstract final class DayViewQuery {
   }) {
     if (item.isArchived || item.type != NoteType.task) return false;
     if (entry == null) {
-      return TaskDayQuery.belongsToDay(item, day, now: now);
+      return isDisplayedCompleted(item, day) ||
+          TaskDayQuery.belongsToDay(item, day, now: now);
     }
     return entry.outcome == DayOutcome.open ||
         entry.outcome == DayOutcome.completed;

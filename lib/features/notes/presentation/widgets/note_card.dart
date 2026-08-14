@@ -58,14 +58,11 @@ class NoteCard extends StatelessWidget {
 
   static const double coverHeight = 128;
 
-  Widget _buildBody(BuildContext context) {
+  Widget _buildBody(BuildContext context, {required bool isCompleted}) {
     final textTheme = Theme.of(context).textTheme;
     final isTask = item.type == NoteType.task;
     final now = DateTime.now();
     final referenceDay = viewDay ?? now;
-    final isCompleted =
-        isTask &&
-        DayViewQuery.isDisplayedCompleted(item, referenceDay, entry: dayEntry);
     final canToggleCompletion =
         isTask &&
         DayViewQuery.canToggleCompletionOnDay(
@@ -294,7 +291,7 @@ class NoteCard extends StatelessWidget {
           borderRadius: flat ? BorderRadius.zero : ThemeTokens.borderRadius,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [?cover, _buildBody(context)],
+            children: [?cover, _buildBody(context, isCompleted: isCompleted)],
           ),
         );
 
