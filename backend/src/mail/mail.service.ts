@@ -74,7 +74,7 @@ export class MailService {
           </a>
         </p>
         <p style="font-size: 14px; color: #555;">El enlace caduca en 1 hora. Si no pediste esto, ignora este correo.</p>
-        <p style="font-size: 12px; color: #888;">WODO · Kreali Studio</p>
+        <p style="font-size: 12px; color: #888;">WODO · KREALI</p>
       </div>
     `.trim();
   }
@@ -89,7 +89,7 @@ export class MailService {
             Abrir WODO
           </a>
         </p>
-        <p style="font-size: 12px; color: #888;">WODO · Kreali Studio</p>
+        <p style="font-size: 12px; color: #888;">WODO · KREALI</p>
       </div>
     `.trim();
   }
