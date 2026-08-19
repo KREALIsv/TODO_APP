@@ -2,6 +2,8 @@
 
 Dirección visual para `PRD-comentarios.md` / `TRD-comentarios.md`. No son capturas de la app.
 
+Decisiones 19 ago: diario personal, notas y tareas, ocultar **todo** lo de sistema, portada explícita desde foto de comentario, sync de texto. Layout desktop (340 dp vs editor ancho) sigue abierto — ver PRD §16.
+
 | Archivo | Qué muestra | Slice |
 |---|---|---|
 | `mobile_feed.webp` | Móvil: composer + comentario con imagen + historial de días | v1 |

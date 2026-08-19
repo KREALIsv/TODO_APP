@@ -1,23 +1,25 @@
-# TRD — Comentarios (diario) + ocultar historial de días
+# TRD — Comentarios (diario) + ocultar registros de sistema
 
 **Producto:** WODO (todos_app)  
-**Referencia PRD:** `PRD-comentarios.md`  
-**Fecha:** 17 Ago 2026  
-**Estado:** Draft — no implementado  
+**Referencia PRD:** `PRD-comentarios.md` v0.2  
+**Fecha:** 19 Ago 2026  
+**Estado:** Draft — no implementado; decisiones de producto cerradas salvo layout desktop (§6.5)  
 **Plataforma:** Flutter (iOS / Android / Web)
 
 ---
 
 ## 1. Objetivo
 
-Sustituir el bloque aislado `TaskDayHistorySection` del editor de tareas por un **feed unificado** (comentarios del usuario + `DayEntry`) con:
+Añadir en el editor de **nota y tarea** un feed unificado:
 
-- composer de texto ± imágenes  
-- toggle persistido **Ocultar detalles** (filtra `DayEntry`)  
-- persistencia Hive inmediata al enviar  
-- backup de comentarios e imágenes de comentario  
+- comentarios de la persona (texto ± imágenes; persistencia al Enviar)  
+- registros de **sistema**: `DayEntry` + `NoteAuditEvent` (ediciones al persistir)  
+- toggle **Ocultar detalles** que oculta *todo* lo de sistema  
+- portada explícita desde una foto de comentario  
+- sync de `comment` + `noteAudit` (sin blobs)  
+- backup local con bytes  
 
-Sin changelog genérico de campos, sin rich text, sin split Trello en el panel de 340 dp.
+Sin rich text, sin colaboración, sin tocar `updatedAt` al comentar.
 
 ---
 
@@ -25,24 +27,24 @@ Sin changelog genérico de campos, sin rich text, sin split Trello en el panel d
 
 ### Incluido (v1)
 
-- Tipo `NoteComment` + box Hive `comments`  
-- Extender `NoteAttachment` con `commentId` nullable (imágenes de comentario)  
-- `CommentsRepository`  
-- Widget `CommentsActivitySection` (composer + feed + toggle)  
-- Integración en `NoteEditorScreen` (full y `embedded`)  
+- `NoteComment` + box Hive `comments`  
+- `NoteAuditEvent` + box `note_audits`  
+- `NoteAttachment.commentId`  
+- `CommentsRepository`, `NoteAuditRepository`  
+- `CommentsActivitySection` en notas **y** tareas (full + embedded)  
 - Setting `hideCommentAuditDetails`  
-- Cascade: borrar comentario → blobs; borrar nota → comentarios + blobs  
-- Backup import/export  
-- Tests unitarios de modelo, merge del feed, filtro, cascade, serialización backup
+- Portada desde imagen con `commentId` (menú / visor)  
+- Sync: entidades `comment` y `noteAudit`; DTO Nest  
+- Backup + wipe  
+- Tests: serialización, feed/filtro, cascade, cover, sync de texto, backup
 
 ### Fuera de v1
 
-- Comentarios en notas (`NoteType.note`)  
 - Chip 💬 en `NoteCard`  
-- Entidad sync `comment` + cambio de DTO backend (`note` \| `tag` \| `dayEntry`)  
-- Layout de dos columnas  
-- `updatedAt` de la nota al comentar  
-- Watchers / menciones / reacciones
+- Sync de `attachment_blobs`  
+- Split de dos columnas (salvo que producto elija B en PRD §16)  
+- `updatedAt` al comentar  
+- Watchers / menciones / reacciones / avatares
 
 ---
 
@@ -50,16 +52,22 @@ Sin changelog genérico de campos, sin rich text, sin split Trello en el panel d
 
 | # | Tema | Decisión | Motivo |
 |---|---|---|---|
-| 1 | ¿Lista de comentarios embebida en `NoteItem`? | **No** — box `comments` | El ítem ya es grande (checklist, tags); el feed se lista aparte; cascade más claro |
-| 2 | ¿Reusar `DayEntry` para comentarios? | **No** | Semántica BuJo distinta; no forzar `via`/`outcome` |
-| 3 | Imágenes | **Mismo** `attachments` + `commentId` | Un pipeline de bytes/compresión/visor; `forNote` ignora las que tienen `commentId` |
-| 4 | Merge del feed | Función pura `buildCommentActivityFeed` | Testeable sin widgets |
-| 5 | Toggle | `SettingsRepository` bool | Un default para toda la app, no por tarea |
-| 6 | Composer vs Guardar editor | `CommentsRepository.add` al Enviar | Evita perder el comentario si se descarta el editor |
-| 7 | Tarea nueva (`item == null`) | Composer `enabled: false` | El `noteId` UUID ya existe en el editor, pero el ítem no está en Hive; comentar antes de Guardar dejaría huérfanos si el usuario cancela y se limpian adjuntos de sesión |
-| 8 | Orden | `createdAt` desc | Composer arriba = Trello; no chat invertido |
-| 9 | Identidad visual | Sin avatar con inicial | App de un usuario; icono `chat_bubble_outline` / `history` |
-| 10 | `TaskDayHistorySection` | Se **reutiliza la fila** (`_TaskDayHistoryTile` extraída o widget público) dentro del feed; el section widget actual queda como fallback empty o se depreca | No duplicar copy de outcomes |
+| 1 | ¿Comentarios embebidos en `NoteItem`? | **No** — box `comments` | Ítem ya grande; cascade y sync por entidad |
+| 2 | ¿Reusar `DayEntry` para comentarios o audits? | **No** | Semánticas distintas |
+| 3 | Imágenes | Mismo `attachments` + `commentId` | Un pipeline |
+| 4 | `forNote` | Sigue excluyendo `commentId != null` | La fila Adjuntos y 📎 no mezclan el diario |
+| 5 | Portada | `coverAttachmentId` puede apuntar a un adjunto con `commentId` | `getById` / bytes no filtran por commentId |
+| 6 | Auto-portada | Solo primera imagen **sin** `commentId` | Una captura de bug no debe robar la card |
+| 7 | Merge del feed | `buildCommentActivityFeed` pura | Testeable |
+| 8 | Toggle | Setting global bool | Un default para toda la app |
+| 9 | Composer vs Guardar | `CommentsRepository.add` al Enviar | No se pierde si se descarta el editor |
+| 10 | Ítem nuevo | Composer `enabled: false` | Evita huérfanos al cancelar |
+| 11 | `updatedAt` | **No** al comentar | PRD §11.1 — no mueve Del día / listas |
+| 12 | Auditoría | Diff al persistir, un evento por campo | No por tecla |
+| 13 | Comentario ≠ audit | CRUD de comentario no escribe `NoteAuditEvent` | Hide-details no los esconde |
+| 14 | Sync blobs | **No** en v1 | Placeholder remoto |
+| 15 | Identidad visual | Sin avatar | Diario personal |
+| 16 | Layout 340 dp | **A** hasta que producto cierre B | No `Row` dentro de 340 |
 
 ---
 
@@ -69,92 +77,108 @@ Sin changelog genérico de campos, sin rich text, sin split Trello en el panel d
 
 ```dart
 class NoteComment {
-  final String id;           // UUID
+  final String id;
   final String noteId;
-  final String body;         // puede ser '' si solo hay imágenes
+  final String body;         // '' permitido si hay imágenes
   final DateTime createdAt;
   final DateTime? editedAt;
 }
 ```
 
-Hive map: `id`, `noteId`, `body`, `createdAt`, `editedAt`.  
-Retrocompat: ausencia de `editedAt` → `null`.
+Validación: body vacío **y** 0 imágenes → rechazo; `body.length > 4000` → error de UI.
 
-Validación al guardar:
-
-- `body.trim().isEmpty` **y** cero imágenes → rechazo  
-- `body.length > 4000` → rechazo / truncar con error de UI
-
-### 4.2 `NoteAttachment`
-
-Campo nuevo opcional:
+### 4.2 `NoteAuditEvent`
 
 ```dart
-final String? commentId; // null = adjunto del ítem (portada / fila Adjuntos)
+enum NoteAuditKind {
+  created,
+  titleChanged,
+  bodyChanged,
+  tagsChanged,
+  dueChanged,
+  todayChanged,
+  reminderChanged,
+  completed,
+  reopened,
+  archived,
+  restored,
+  typeChanged,
+  checklistChanged,
+  coverChanged,
+}
+
+class NoteAuditEvent {
+  final String id;
+  final String noteId;
+  final NoteAuditKind kind;
+  final DateTime createdAt;
+  final String? summary; // copy ES ya resuelto, p. ej. "Título actualizado"
+}
 ```
 
-`AttachmentsRepository.forNote(noteId)` **filtra** `commentId == null` (comportamiento actual de Adjuntos y `📎 N`).
+No persistir old/new values en v1 (privacidad + tamaño). El copy es suficiente.
 
-Nuevo: `forComment(commentId)`, `countForComment`, `deleteForComment`.
+`DayEntry` **no** se duplica como audit: el feed lo incluye como kind `dayEntry`.
 
-`maxPerNote = 12` sigue aplicando **solo** a adjuntos de ítem. Tope de comentario: constante `maxImagesPerComment = 4` en el repo de comentarios (cuenta `forComment`).
-
-Al `addImage`, overload o parámetro opcional `commentId`. Si viene, no dispara auto-portada.
-
-### 4.3 Setting
-
-`SettingsRepository`: `hideCommentAuditDetails` default `false`.
-
-### 4.4 Feed (dominio puro)
+### 4.3 `NoteAttachment`
 
 ```dart
-enum CommentFeedKind { comment, dayEntry }
+final String? commentId; // null = fila Adjuntos
+```
 
-class CommentFeedItem {
-  final CommentFeedKind kind;
-  final DateTime sortAt;
-  final NoteComment? comment;
-  final DayEntry? dayEntry;
-}
+`forNote` filtra `commentId == null`.  
+`forComment(commentId)`, `deleteForComment`.  
+`getById` / `bytesFor` sin filtro (portada y visor).
+
+`addImage(..., {String? commentId})`: si `commentId != null`, no auto-cover.
+
+`maxImagesPerComment = 4`. `maxPerNote = 12` solo cuenta adjuntos de ítem.
+
+### 4.4 Setting
+
+`hideCommentAuditDetails` default `false`.
+
+### 4.5 Feed
+
+```dart
+enum CommentFeedKind { comment, dayEntry, audit }
 
 List<CommentFeedItem> buildCommentActivityFeed({
   required List<NoteComment> comments,
   required List<DayEntry> dayEntries,
+  required List<NoteAuditEvent> audits,
   required bool hideDetails,
 })
 ```
 
-- `sortAt`: comentario → `createdAt`; dayEntry → `outcomeAt ?? createdAt` (igual que `entriesForNote`).  
-- `hideDetails == true` → omitir `dayEntry`.  
-- Sort desc por `sortAt`; tie-breaker: comentarios antes que dayEntry si mismo instante.
+- `sortAt`: comment → `createdAt`; dayEntry → `outcomeAt ?? createdAt`; audit → `createdAt`.  
+- `hideDetails` → omitir `dayEntry` y `audit`.  
+- Sort desc; empate: comment > audit > dayEntry.
 
 ---
 
-## 5. Persistencia
+## 5. Persistencia y escritura de auditoría
 
 | Box | Contenido |
 |---|---|
-| `comments` | `Map` de `NoteComment.toMap()` keyed by `id` |
-| `attachments` | ya existe; maps con `commentId` |
+| `comments` | `NoteComment` |
+| `note_audits` | `NoteAuditEvent` |
+| `attachments` | maps con `commentId` opcional |
 | `attachment_blobs` | sin cambio |
-| settings box | key bool nueva |
+| settings | `hideCommentAuditDetails` |
 
-`CommentsRepository`:
+`NotesRepository.add` / `update` / `archive` / `restore` / `toggleCompleted` / `saveTaskFromEditor` / `applyCoverAttachmentChange`:
 
-- `init` / `initWithBoxes` (tests)  
-- `forNote(noteId)` → lista desc  
-- `add`, `updateBody`, `delete`  
-- `deleteForNote`  
-- `ValueListenable` o `ChangeNotifier` (`changes`) para el editor  
-- `exportAllMaps` / `replaceAllFromMaps`
+1. Persistir el ítem como hoy (`updatedAt` **sí** se actualiza en esos flujos: son ediciones reales).  
+2. Diff `previous` vs `next` → `NoteAuditRepository.addAll(events)`.
 
-Init en `main.dart` junto a attachments / day entries.
+Helper puro `diffNoteAudits(NoteItem? previous, NoteItem next)` → lista de eventos. Tests unitarios por campo.
 
-Borrar nota (`NotesRepository.delete`): además de adjuntos de ítem, `comments.deleteForNote` (que borra blobs de comentario).
+Comentar **no** pasa por ese diff.
 
-Descartar sesión de **nueva** tarea: hoy se borran adjuntos añadidos en sesión. Los comentarios no se pueden crear aún (composer off) → no hay leak.
+Borrar ítem: `comments.deleteForNote` + `audits.deleteForNote` + adjuntos (incluye commentId). Si la portada era de un comentario, ya se va el ítem.
 
-Duplicar nota (si existe flujo): v1 **no** copia comentarios (bitácora del original). Documentar; P1 si producto lo pide.
+Duplicar ítem (si existe): no copiar comments ni audits.
 
 ---
 
@@ -164,94 +188,85 @@ Duplicar nota (si existe flujo): v1 **no** copia comentarios (bitácora del orig
 
 | Archivo | Rol |
 |---|---|
-| `lib/features/notes/domain/note_comment.dart` | Modelo |
-| `lib/features/notes/domain/comment_activity_feed.dart` | Merge + filtro |
-| `lib/features/notes/data/comments_repository.dart` | Hive |
-| `lib/features/notes/presentation/widgets/comments_activity_section.dart` | Sección |
-| `lib/features/notes/presentation/widgets/comment_composer.dart` | Campo + clip + thumbs + Enviar |
-| `lib/features/notes/presentation/widgets/comment_tile.dart` | Fila comentario |
-| `test/features/notes/note_comment_test.dart` | Serialización |
-| `test/features/notes/comment_activity_feed_test.dart` | Orden y hide-details |
-| `test/features/notes/comments_repository_test.dart` | CRUD + cascade |
-| `test/features/notes/comments_activity_section_test.dart` | Toggle copy, disabled, empty |
+| `domain/note_comment.dart` | Modelo |
+| `domain/note_audit_event.dart` | Modelo + enum |
+| `domain/comment_activity_feed.dart` | Merge + filtro |
+| `domain/note_audit_diff.dart` | Diff previous/next |
+| `data/comments_repository.dart` | Hive comments |
+| `data/note_audit_repository.dart` | Hive audits |
+| `widgets/comments_activity_section.dart` | Sección |
+| `widgets/comment_composer.dart` | Campo + clip + Enviar |
+| `widgets/comment_tile.dart` | Fila comentario + menú portada |
+| `widgets/system_activity_tile.dart` | Fila audit / reexport day tile |
 
 ### 6.2 Archivos tocados
 
 | Archivo | Cambio |
 |---|---|
 | `note_attachment.dart` | `commentId` |
-| `attachments_repository.dart` | filtro `forNote`; `forComment`; `addImage(..., commentId)` sin auto-cover |
-| `note_editor_screen.dart` | Reemplazar `TaskDayHistorySection` por `CommentsActivitySection` cuando `isTask && _isEditing` |
-| `task_day_history_section.dart` | Extraer tile pública `TaskDayHistoryTile` para reuso |
-| `data_backup.dart` | clave `comments` en payload; wipe |
-| `settings_repository.dart` | bool toggle |
-| `main.dart` | `CommentsRepository.instance.init()` |
+| `attachments_repository.dart` | filtro `forNote`; `forComment`; `addImage` con commentId |
+| `attachment_actions.dart` / visor | `Usar como portada` válido si el id existe, tenga o no commentId |
+| `note_editor_screen.dart` | Sección si `_isEditing` (nota **o** tarea); historial de días deja de estar solo |
+| `notes_repository.dart` | hooks de audit + cascade |
+| `sync_service.dart` + snapshot | secciones `comment`, `noteAudit` |
+| `backend` DTO `IsIn` + tipos | `comment`, `noteAudit` |
+| `data_backup.dart` | `comments`, `noteAudits` |
+| `settings_repository.dart` | bool |
+| `main.dart` | init repos |
 
-Nueva tarea (`!_isEditing`): mostrar la sección con composer disabled + hint, **sin** feed (no hay historial). Evita un hueco raro al crear.
+Composer disabled: hint según `NoteType`.
 
 ### 6.3 `CommentsActivitySection`
 
-Props: `noteId`, `enabled` (false si no persistida), `onDayTap` opcional.
+Props: `noteId`, `enabled`, `onDayTap`.
 
-Estructura:
+1. Header + toggle si hay ≥1 fila de sistema **o** el setting está en hide.  
+2. Composer.  
+3. Feed.  
+4. Empty copy del PRD §12.
 
-1. Header: título + `TextButton` toggle (si hay ≥1 `DayEntry` **o** el setting está en hide, para poder volver). Si no hay ningún dayEntry, ocultar el botón.  
-2. `CommentComposer` si `enabled`; si no, hint.  
-3. `ListenableBuilder` de comments + dayEntries + settings → `buildCommentActivityFeed`.  
-4. Empty states según PRD §12.
+Móvil y desktop: **el mismo widget**. Sin split salvo decisión B.
 
-Móvil y desktop: **el mismo widget**. El panel de 340 dp ya scrollea; no hay `Row` de dos columnas.
+### 6.4 Portada desde comentario
 
-Teclado: `scrollPadding` en el `TextField` del composer (pauta del título/cuerpo). No `Scaffold.bottomSheet` en v1 (el editor no es un scaffold con FAB). En compact, si el IME tapa, el `ListView` del editor ya hace scroll al foco.
+En `comment_tile` / visor: mismas acciones de portada que Adjuntos.  
+`applyCoverAttachmentChange` ya persiste `coverAttachmentId` y **sí** toca `updatedAt` (es un cambio del ítem, no un comentario). Eso puede meter la card en Del día: correcto, eligieron portada.
 
-### 6.4 Composer
+Borrar comentario cuya imagen es portada → `coverAttachmentId = null` (sin auto-promote).
 
-- `TextField` filled, hint `Escribe un comentario…`, maxLines 4, 4000 chars.  
-- `IconButton` clip → reusar `attachment_actions` / mismo sheet que `AttachmentsEditor`.  
-- Thumbs locales (bytes en memoria o ids temporales): al Enviar, `add` comentario + `addImage(..., commentId)`.  
-- `Enviar`: `FilledButton` o `TextButton` primary; disabled si vacío.  
-- No checkbox Seguir.  
-- No toolbar Tt/B/I.
+### 6.5 Desktop 340 dp
 
-Editar: tap Editar abre el mismo composer en modo edición (body + thumbs existentes) o un `showModalBottomSheet` en compact. Preferir **sheet** en compact para no pelear con el scroll del editor; en desktop embedded, inline.
-
-### 6.5 Desktop 340 dp — reglas de layout
-
-- Header: `Wrap` o `Column` si `maxWidth < 300`: título arriba, toggle debajo alineado a la derecha.  
-- Composer: clip y Enviar en `Row` bajo el campo (`MainAxisAlignment.spaceBetween`).  
-- No `AdaptiveBreakpoints.expanded` split.
-
-P1 (fuera): si `MediaQuery.size.width >= 1200` **y** se ensancha el contexto, un `CommentsActivitySection.sideBySide`. No implementar ahora.
+Default **A**: Wrap del header, composer a ancho. Ver PRD §16.  
+Si producto elige **B**: slice aparte de `DesktopContextPanel` (ensanchar contexto ≥ 720) **antes** o junto a la sección; no un `Row` dentro de 340.
 
 ---
 
 ## 7. Backup
 
-Payload actual: `notes`, `tags`, `dayEntries`, `attachments` (maps con `bytesBase64`).
+Añadir `"comments"` y `"noteAudits"`. Attachments ya exportan todos los maps (incluidos `commentId`) + `bytesBase64`. Import tolerante si faltan claves.
 
-Añadir `"comments": [ ...maps ]`.
-
-Imágenes de comentario **ya viajan** dentro de `attachments` si se exportan todos los maps (incluidos los que tienen `commentId`). Verificar que `exportAllMaps` no filtre por `commentId`. Import: `fromMap` debe aceptar `commentId` ausente.
-
-Versión de backup: si hay número de schema, incrementarlo; si no, import tolerante (falta `comments` → `[]`).
-
-Wipe: `comments.resetAll()` además de notes/tags/day/attachments.
+Wipe: reset comments + audits.
 
 ---
 
-## 8. Sync (v1.1, contrato)
+## 8. Sync (v1, sin blobs)
 
-Hoy `SyncService._localSnapshot()` = `{ note, tag, dayEntry }`.  
+Hoy snapshot = `{ note, tag, dayEntry }`.  
 Backend `entityType`: `'note' | 'tag' | 'dayEntry'`.
 
-Para comentarios de texto:
+Añadir:
 
-1. Box en snapshot `comment`.  
-2. Ampliar DTO Nest `IsIn`.  
-3. Conflictos: last-write-wins por `id` (igual tags/dayEntry). Borrar remoto = DELETE.  
-4. Blobs: **no**. Un dispositivo verá el comentario y thumbs rotos hasta sync de attachments — inaceptable. Por eso **sync de comments queda bloqueado** hasta blobs **o** se synca solo `body` y se ocultan imágenes missing (UI: placeholder «Imagen no sincronizada»). Preferir **bloquear el slice de sync** antes que thumbs rotos.
+1. `comment` → `CommentsRepository` save/delete from sync.  
+2. `noteAudit` → idem.  
+3. Ampliar `SyncMutationDto`, `SyncResponseItem`, tests de snapshot.  
+4. `SyncService`: escuchar `changes` de ambos repos; `_snapshot()` incluye las secciones.  
+5. Conflictos: last-write-wins por `id`.  
+6. Pull de comentario con `attachmentIds` cuyos blobs no existen → UI placeholder.  
+7. `coverAttachmentId` ya viaja en `note`; sin blob, la card usa el empty de portada actual.
 
-v1 local-only es coherente con adjuntos actuales (tampoco sync).
+**No** meter `bytesBase64` en el mutation de comment (payload grande, timeout). Eso es el slice de attachments.
+
+Orden de apply: note primero, luego comment/audit (FK lógica). Si llega comment de un `noteId` aún no local, guardar igual (el editor no se abre).
 
 ---
 
@@ -259,80 +274,72 @@ v1 local-only es coherente con adjuntos actuales (tampoco sync).
 
 | # | Caso | Esperado |
 |---|---|---|
-| 1 | `fromMap` sin `editedAt` / `commentId` | Carga |
-| 2 | Feed mixto orden desc | Comentario más nuevo primero |
-| 3 | `hideDetails` | Cero items `dayEntry` |
-| 4 | Empate de timestamp | Comentario gana |
-| 5 | `forNote` attachments | No lista imágenes con `commentId` |
-| 6 | Delete comment | Blobs de ese commentId desaparecen; adjuntos de ítem intactos |
-| 7 | Delete note | Cero comments y cero attachments del noteId |
-| 8 | Add imagen comentario | `coverAttachmentId` no cambia |
-| 9 | Add comentario body vacío + 0 imgs | Error |
-| 10 | Backup roundtrip | Comments + bytes |
-| 11 | Widget: `enabled: false` | Hint, no Enviar |
-| 12 | Widget: hide toggle copy | `Mostrar detalles` cuando setting true |
-| 13 | Cover count 📎 | No incrementa por img de comentario |
+| 1 | `fromMap` sin `editedAt` / `commentId` / `summary` | Carga |
+| 2 | Feed mixto desc | Comentario más nuevo primero |
+| 3 | `hideDetails` | Cero dayEntry y cero audit |
+| 4 | Empate de timestamp | Comment gana |
+| 5 | `forNote` | No lista imgs con commentId |
+| 6 | Cover apunta a commentId | Card / visor resuelven bytes |
+| 7 | Delete comment portada | `coverAttachmentId` null; adjuntos de ítem intactos |
+| 8 | Add img comentario | No auto-cover |
+| 9 | Diff save título+tags | 2 audits; `updatedAt` del ítem sí cambia |
+| 10 | Add comment | 0 audits; `updatedAt` del ítem igual |
+| 11 | Backup roundtrip | Comments + audits + bytes |
+| 12 | Sync push/pull texto | Comment aparece en el otro snapshot |
+| 13 | Sync sin blob | Placeholder, no crash |
+| 14 | Widget nota nueva | Hint nota, no Enviar |
+| 15 | 📎 count | No incrementa por img de comentario |
 
 ---
 
 ## 10. Orden de implementación
 
-1. Modelo `NoteComment` + `commentId` en attachment + tests de serialización.  
-2. `CommentsRepository` + cascade desde `NotesRepository.delete` + tests.  
-3. `buildCommentActivityFeed` + tests.  
-4. Setting + `CommentsActivitySection` texto-only (sin imágenes) + extraer tile de historial.  
-5. Composer imágenes (reusar picker/compresión).  
+1. Modelos `NoteComment`, `NoteAuditEvent`, `commentId` + tests.  
+2. Repos + `diffNoteAudits` + hooks en `NotesRepository` + cascade.  
+3. `buildCommentActivityFeed` + tests de hide.  
+4. UI sección texto-only en nota y tarea.  
+5. Composer imágenes + portada explícita.  
 6. Backup.  
-7. Ajustes de layout 340 dp (Wrap header) + tests de widget.  
-8. (v1.1) sync — solo con plan de blobs.
-
-No hace falta levantar backend para v1.
+7. Sync client + DTO backend + tests de snapshot.  
+8. Placeholder de imagen remota.  
+9. Layout 340 dp (o slice B si producto lo pide).
 
 ---
 
 ## 11. Criterios de done (v1)
 
-- [ ] En una tarea guardada puedo enviar un comentario de solo texto y verlo al instante  
-- [ ] Puedo enviar un comentario con 1–4 imágenes; tap abre el visor  
-- [ ] Esas imágenes no aparecen en Adjuntos ni como portada ni en 📎 de la card  
-- [ ] Ocultar detalles esconde el historial de días y deja comentarios; el setting sobrevive a reabrir  
-- [ ] En «Nueva tarea» el composer explica que hay que guardar primero  
-- [ ] Eliminar comentario / eliminar tarea no deja blobs huérfanos  
-- [ ] Exportar e importar restaura comentarios e imágenes  
-- [ ] Móvil y panel desktop usan el mismo widget; el shell de 3 columnas no gana una columna extra  
-- [ ] `flutter test` incluye los casos de §9  
-- [ ] `flutter analyze` no añade avisos en archivos nuevos (preexistentes en el repo se ignoran)
+- [ ] En una **nota o tarea** guardada envío un comentario de texto y se ve al instante  
+- [ ] Puedo adjuntar 1–4 imágenes; `Usar como portada` pinta la card; no aparecen en Adjuntos ni en 📎  
+- [ ] Ocultar detalles esconde días **y** «Título actualizado»; deja comentarios  
+- [ ] Comentar no cambia `updatedAt` ni mueve Del día  
+- [ ] Guardar un cambio de título sí escribe audit y sí actualiza `updatedAt`  
+- [ ] Ítem nuevo: composer disabled con hint correcto  
+- [ ] Delete comment / delete nota no deja blobs; portada se limpia  
+- [ ] Export/import restaura comments + audits + fotos locales  
+- [ ] Segundo dispositivo (o test de snapshot) recibe el texto del comentario  
+- [ ] Foto no sincronizada: placeholder, la app no crashea  
+- [ ] `flutter test` cubre §9  
 
 ---
 
-## 12. Impacto en el editor actual
+## 12. Impacto en el editor
 
-Hoy el historial vive al final, tras el switch «Es una tarea»:
+Hoy el historial solo aparece en tareas:
 
 ```498:517:lib/features/notes/presentation/note_editor_screen.dart
         if (isTask && _isEditing) ...[
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-          TaskDayHistorySection(noteId: _noteId),
-          // …
+          // TaskDayHistorySection
         ],
 ```
 
-Se reemplaza por `CommentsActivitySection`. El divider se mantiene como corte «definición vs diario».
+Pasa a: `if (_isEditing) CommentsActivitySection(...)`.  
+Las filas `DayEntry` siguen existiendo solo para tareas (el repo no tiene rows en notas).
 
-`AdaptiveBreakpoints.contextPanelWidth = 340` **no se cambia** en este slice.
-
----
-
-## 13. Consultas técnicas (si producto cierra distinto)
-
-Si §14 del PRD responde «sí a split desktop» → este TRD necesita un segundo slice de shell (ensanchar contexto o editor overlay), no un `Row` dentro de 340 dp.
-
-Si §14 responde «sí a sync v1» → bloquear ship de comentarios con imagen **o** implementar blobs en sync en el mismo PR (alcance mucho mayor: `attachment_blobs` no está en snapshot).
+`contextPanelWidth = 340` no se toca en el camino A.
 
 ---
 
-## 14. Mocks
+## 13. Mocks
 
-Ver `PRD-comentarios.md` §15 y `docs/comentarios/`. v1 implementa **15.1–15.3** (una columna). 15.4 es P1 de shell, no de este slice.
+`PRD-comentarios.md` §15 y `docs/comentarios/`.  
+15.1–15.3 = camino A. 15.4 = camino B (P1 salvo que producto lo pida antes).
