@@ -1,5 +1,5 @@
 export interface SyncResponseItem {
-  entityType: 'note' | 'tag' | 'dayEntry';
+  entityType: 'note' | 'tag' | 'dayEntry' | 'comment' | 'noteAudit';
   entityId: string;
   operation: 'CREATE' | 'UPDATE' | 'DELETE';
   payload: Record<string, unknown> | null;

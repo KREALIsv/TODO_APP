@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/web/local_tab_sync.dart';
+import '../../notes/data/comments_repository.dart';
 import '../../notes/data/day_entries_repository.dart';
+import '../../notes/data/note_audit_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
 import 'sync_service.dart';
@@ -25,6 +27,8 @@ class LocalTabSyncService {
     NotesRepository.instance.changes,
     TagsRepository.instance.changes,
     DayEntriesRepository.instance.changes,
+    CommentsRepository.instance.changes,
+    NoteAuditRepository.instance.changes,
   ]);
 
   void _onLocalChange() {
@@ -44,6 +48,8 @@ class LocalTabSyncService {
         NotesRepository.instance.reloadFromPeerTab(),
         TagsRepository.instance.reloadFromPeerTab(),
         DayEntriesRepository.instance.reloadFromPeerTab(),
+        CommentsRepository.instance.reloadFromPeerTab(),
+        NoteAuditRepository.instance.reloadFromPeerTab(),
       ]);
       if (SyncService.instance.isAvailable) {
         await SyncService.instance.syncNow();
