@@ -48,7 +48,7 @@ Con >20 tareas acumuladas, la vista Tareas deja de servir para decidir qué hace
 ### No-objetivos (v1 de este PRD)
 - Notificaciones / reminders push (v2 del PRD principal)
 - Recurrencia de tareas
-- Reordenamiento manual con drag handle (6 puntitos) — **v1.1 de este PRD**
+- Reordenamiento manual con drag handle (6 puntitos) — **v1.1**, spec en `PRD-orden-hoy.md`
 - Fecha de inicio (`startAt`) — solo si producto lo pide tras usar due
 - Estados más allá de done/undone
 - Prioridad como campo (se sigue usando el tag `Urgente`)
@@ -258,9 +258,9 @@ Sobre cards en cualquier lista (usando `Dismissible`/`Slidable` con backgrounds 
 
 **Spec:** `PRD-orden-hoy.md`. Resumen:
 
-- Handle de 6 puntitos **siempre visible** en pendientes de Hoy (no “modo reorden”).
-- Orden persistido en `DayEntry.sortOrder` (por día). El ranking de §6.2 es semilla hasta el primer drag.
-- Completadas al final, sin handle. Guardar contenido o comentar **no** mueve la card.
+- Handle de 6 puntitos **siempre visible** en pendientes de Hoy y en Fijadas (entre ellas).
+- Hoy: `DayEntry.sortOrder`. Fijadas: `NoteItem.pinnedOrder`. El ranking de §6.2 es semilla; el primer drag congela el snapshot y **solo mueve esa card**.
+- Completadas de Hoy al final, sin handle. Guardar contenido o comentar **no** mueve la card.
 
 ### 6.12 Detalle de fecha — Recordatorios y Periodicidad
 

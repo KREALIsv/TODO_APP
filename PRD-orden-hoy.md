@@ -3,7 +3,7 @@
 **Producto:** Todos App (wodo)  
 **Versión:** 0.1  
 **Fecha:** 19 Ago 2026  
-**Estado:** Draft — decisiones 1–9 y A cerradas (19 Ago 2026)  
+**Estado:** Draft — decisiones 1–9 y A cerradas; Fijadas entre ellas + congelar snapshot (19 Ago 2026)  
 **Plataforma:** Flutter (iOS / Android / Web)  
 **Relación:** Cierra el v1.1 aparcado en `PRD-control-tareas.md` §6.11. Enmienda el orden de `PRD.md` §6.4 (Recientes / `updatedAt`) para las **tareas del día**. Extiende `DayEntry` de `PRD-day-review.md`.
 
@@ -13,9 +13,11 @@
 
 **Hoy** deja de ser una lista que se reordena sola cada vez que se guarda algo. Pasa a ser una **cola de ejecución**: las tareas del día se pueden **arrastrar** para dejarlas en el orden en que se quieren cumplir.
 
-`updatedAt` **sigue existiendo** (último guardado de título / cuerpo / tags / fechas). Deja de ser la llave de orden de esas tareas. Un comentario sigue sin tocar `updatedAt` ni mover la card.
+**Fijadas** es atención (lo que quieres ver arriba). En este mismo cambio se pueden **ordenar entre ellas**. No se mezclan con Hoy / Del día: no arrastras una fijada hacia Del día ni al revés (eso sigue siendo fijar / desfijar).
 
-Esta propuesta **no cambia quién entra** a Hoy ni a Del día. Solo cambia **en qué orden se ven** las tareas de hoy, y cómo se persiste ese orden.
+`updatedAt` **sigue existiendo** (último guardado de título / cuerpo / tags / fechas). Deja de ser la llave de orden de esas listas una vez el usuario mueve una card. Un comentario sigue sin tocar `updatedAt` ni mover la card.
+
+Esta propuesta **no cambia quién entra** a Hoy, Del día o Fijadas. Cambia **en qué orden se ven** y cómo se persiste.
 
 ---
 
@@ -81,7 +83,9 @@ La lista de hoy se comporta como un **feed de recencia** (o como un ranking de v
 
 ### Producto
 - Que las tareas de **Hoy** se puedan ordenar a mano: press/click + arrastrar.
-- Que ese orden sea el de **cumplimiento**, no el de último guardado.
+- Que **mover una** deje las demás **donde estaban**. Un orden inicial automático es suficiente; el usuario no pide que el sistema reacomode el resto.
+- Que **Fijadas** se puedan ordenar **entre ellas** (atención), con la misma regla: un drag no reordena solas las otras.
+- Que ese orden de Hoy sea el de **cumplimiento**, no el de último guardado.
 - Que `updatedAt` siga midiendo “último cambio de contenido”, no “posición en la cola”.
 
 ### UX
@@ -91,7 +95,7 @@ La lista de hoy se comporta como un **feed de recencia** (o como un ranking de v
 - Una tarea nueva o recién sumada a Hoy **no se cuela arriba** por recencia.
 
 ### No-objetivos (este cambio)
-- Drag en **Fijadas**. Esa sección sigue arriba como referencia; si algún día se reordena, es otro trabajo. El Home viejo lo tenía como P1 aparte.
+- Arrastrar **entre** Fijadas y Del día / Hoy (eso es fijar o “hacer hoy”, no sort).
 - Drag en **Próximas**, **Backlog / Sin fecha**, replay de días pasados, o checklist/adjuntos.
 - Cambiar quién entra a Hoy / Del día (`TaskDayQuery` / `NotesQuery.ofDayFrom`).
 - Que un comentario empiece a tocar `updatedAt` (sigue prohibido).
@@ -104,34 +108,38 @@ La lista de hoy se comporta como un **feed de recencia** (o como un ranking de v
 
 ### Concepto
 
-**Hoy = cola del día.**  
-Membresía = reglas actuales.  
-Orden = el que el usuario dejó, persistido **por día**.
+Dos listas, dos jobs, **mismo gesto**, **misma regla de congelar**:
+
+**Hoy = cola del día** (cómo quiero cumplir hoy). Orden en `DayEntry`.  
+**Fijadas = atención** (qué quiero ver arriba, independiente del día). Orden en la nota.
 
 ```
-Chip Tareas, día = hoy
+Chip Todas, día = hoy
 ┌─────────────────────────────┐
-│ Hoy                    2/5  │
-│  ⋮⋮  1. Llamar a Ana        │  ← handle + drag entre pendientes
-│  ⋮⋮  2. Comprar filtro      │
-│  ⋮⋮  3. Mandar presupuesto  │
-│  ——  4. ~~Mail de las 9~~   │  ← hechas, abajo, sin handle
-│  ——  5. ~~Sacar basura~~    │
+│ Fijadas                     │
+│  ⋮⋮  Proyecto X             │  ← handle; solo entre fijadas
+│  ⋮⋮  Receta de la semana    │
+├─────────────────────────────┤
+│ Del día                     │
+│  ⋮⋮  Llamar a Ana           │  ← misma cola que Hoy
+│  ⋮⋮  Comprar filtro         │
+│  ——  ~~Mail de las 9~~      │
+│  Nota de la reunión         │  ← notas: recencia, sin handle
 └─────────────────────────────┘
 ```
 
-`updatedAt` no aparece en este diagrama. Editar el presupuesto no lo mueve al 1.
+Mover “Comprar filtro” no reordena “Llamar a Ana” ni las fijadas. Solo cambia el hueco de esa card.
 
 ### Dónde se puede arrastrar
 
 | Superficie | ¿Drag? | Por qué |
 |---|---|---|
-| Chip **Tareas** → grupo **Hoy** (día = hoy) | **Sí (P0)** | Cola de ejecución |
-| Chip **Todas** → **Del día** (día = hoy), solo las **tareas** de esa cola | **Sí (P0), mismo orden** | Si no, Todas y Tareas se contradicen |
-| Chip Todas → Del día, **notas** | **No** | Siguen siendo diario: `updatedAt` desc |
-| Fijadas | No | Otra lista (referencia). Este cambio no la toca. |
+| Chip **Tareas** → grupo **Hoy** (día = hoy) | **Sí** | Cola de ejecución |
+| Chip **Todas** → **Del día** (día = hoy), solo las **tareas** de esa cola | **Sí, mismo orden** | Si no, Todas y Tareas se contradicen |
+| Chip Todas → Del día, **notas** | **No** | Diario: `updatedAt` desc |
+| **Fijadas** (sección en Todas, o chip Fijadas) | **Sí, entre ellas** | Atención. No cruzan a Del día |
 | Próximas / Backlog | No | Ahí manda `dueAt` / recencia |
-| Día futuro (plan) | **P1** | Mismo `DayEntry.sortOrder` cuando se implemente |
+| Día futuro (plan) | **Después** | Mismo `DayEntry.sortOrder` |
 | Día pasado (replay) | No | Auditoría, no plan |
 
 En Del día (Todas, hoy) la lista queda en **dos bandas implícitas**, sin título extra:
@@ -156,6 +164,8 @@ Siguen vigentes:
 
 Este PRD **no** reabre vencidas, switch, captura inbox ni completadas de hoy.
 
+Una tarea **fijada y de hoy** puede verse en **dos sitios**: Fijadas (chip Todas) y Hoy (chip Tareas). Son dos órdenes distintos y no se copian: atención vs cola del día. En Todas no aparece otra vez en Del día (sigue `pinned` fuera de esa banda).
+
 ### 6.2 Qué deja de ordenar `updatedAt`
 
 | Lista | Orden actual | Orden propuesto |
@@ -164,7 +174,8 @@ Este PRD **no** reabre vencidas, switch, captura inbox ni completadas de hoy.
 | Hoy (completadas hoy) | Al final, desempate `updatedAt` | Al final, `sortOrder` relativo que tenían (o `completedAt` desc si nunca se ordenó) |
 | Del día — tareas (hoy) | `updatedAt` desc (vía `getAll`) | El mismo `sortOrder` que Hoy |
 | Del día — notas | `updatedAt` desc | **Sin cambio** |
-| Fijadas / chip Notas / búsqueda | `updatedAt` desc | **Sin cambio** |
+| Fijadas (sección y chip) | `updatedAt` desc | `NoteItem.pinnedOrder` tras el primer drag entre fijadas |
+| Chip Notas / búsqueda | `updatedAt` desc | **Sin cambio** |
 | Próximas | `dueAt` asc | **Sin cambio** |
 | Backlog | `updatedAt` desc | **Sin cambio** |
 
@@ -174,38 +185,67 @@ Este PRD **no** reabre vencidas, switch, captura inbox ni completadas de hoy.
 - membresía de **notas** en Del día;
 - heatmap / sync / conflictos.
 
-`updatedAt` **deja de ser** la razón por la que una tarea salta de sitio en Hoy.
+`updatedAt` **deja de ser** la razón por la que una tarea salta de sitio en Hoy, y deja de reordenar Fijadas una vez esa lista está congelada.
 
-### 6.3 Persistencia: orden por día, no global
+### 6.3 Persistencia: dos sitios, dos significados
 
-**Campo nuevo:** `DayEntry.sortOrder` (`int`, default `0` si ausente).
+| Lista | Campo | Por qué ahí |
+|---|---|---|
+| Cola de **Hoy** / tareas de Del día | `DayEntry.sortOrder` (`int`, default `0`) | La cola es de **este día**. Mañana es otra entry. |
+| **Fijadas** | `NoteItem.pinnedOrder` (`int?`, default `null`) | La atención **no es de un día**. Vivir en el día no se entendería. |
 
-| Por qué no `NoteItem.sortOrder` | Por qué `DayEntry` |
-|---|---|
-| Una tarea vive en muchos días (due, switch, migrar) | La cola es “cómo quiero cumplir **este** día” |
-| Un número global choca entre Hoy de hoy y el plan del jueves | Ya hay una fila `(noteId, day)` |
-| Medianoche / `todayAt` que expira no debería arrastrar el orden de ayer | Mañana es otra entry, otra cola |
+No hay un `NoteItem.sortOrder` genérico. Ese nombre mezclaría Hoy con Fijadas.
 
-Si una tarea entra a Hoy y **aún no hay** `DayEntry`, el writer actual de compromiso/due/captura crea o actualiza la entry (ya ocurre en el repo) y le asigna `sortOrder`.
+**Hoy / DayEntry**
 
-**Backup / sync:** el campo viaja en `DayEntry.toMap()`. Ausente = `0` (legacy). No es contenido conflictuable (título/cuerpo/checklist): last-write-wins en el mapa de entries, igual que `outcome`. Detalle en el TRD.
+Si una tarea entra a Hoy y aún no hay `DayEntry`, el writer actual crea o actualiza la entry y, si el día ya está congelado, le pone `sortOrder` al final de pendientes.
 
-### 6.4 Semilla (antes del primer drag)
+Backup / sync: viaja en `DayEntry.toMap()`. Ausente = `0`. No es contenido conflictuable. Last-write-wins.
 
-Hasta que el usuario reordene **ese** día:
+**Fijadas / nota**
 
-1. Mostrar el orden automático actual de `TaskGroupsQuery._compareToday` (vencidas → hora → switch → hechas).
-2. En el **primer drag** de ese día, **congelar** esa secuencia en `sortOrder` (0, 10, 20, …) y aplicar el movimiento.
-3. A partir de ahí, el manual **gana** dentro de las pendientes.
+`pinnedOrder` solo cuenta si `pinned == true`. Al desfijar se puede dejar el número (no estorba) o limpiarlo; al volver a fijar, si el bloque ya está congelado, entra **al final** (como “nueva en atención”).
 
-No se escribe `sortOrder` solo por abrir Home. Así un usuario que nunca arrastra no cambia datos.
+Backup / sync: viaja en `NoteItem.toMap()`. Ausente = `null` (semilla por `updatedAt`). Tampoco es conflicto de contenido.
 
-**Nueva tarea o recién sumada a Hoy** (sin `sortOrder` propio, y el día ya tiene orden congelado):
+### 6.4 Semilla y “solo se mueve la que arrastro”
 
-- Se inserta **al final de las pendientes** (antes de las completadas).
-- No al tope. Eso es el cambio respecto al feed por `updatedAt`.
+Un **orden inicial** automático es adecuado. El usuario no tiene que acomodar las 12 cards el primer día. Lo que no puede pasar: que al mover **una**, el sistema **reordene las otras** (ranking de vencidas, `updatedAt`, etc.).
 
-**Huecos / reindex:** al soltar, reescribir `sortOrder` de las pendientes visibles en pasos de 10. Las completadas conservan el número que tenían (solo para desempate entre ellas).
+**Cola Hoy (por día)**
+
+Hasta el primer drag **en esa cola, ese día**:
+
+1. Mostrar el orden automático actual (`TaskGroupsQuery._compareToday`: vencidas → hora → switch → hechas).
+2. Ese snapshot **es** la semilla. No se escribe a disco solo por abrir Home.
+
+En el **primer drag** de esa cola:
+
+1. Congelar **exactamente** la secuencia que el usuario está viendo (`sortOrder` 0, 10, 20, …).
+2. Aplicar **solo** el movimiento de esa card (el resto mantiene el orden relativo).
+3. A partir de ahí el ranking automático **no vuelve a correr** para esa cola ese día.
+
+**Fijadas (atención, no por día)**
+
+Hasta el primer drag **entre fijadas**:
+
+1. Semilla = orden actual (`updatedAt` desc), el que ya se ve.
+2. Primer drag: congelar esa secuencia en `pinnedOrder` y mover **solo** esa card.
+
+Abrir Home, guardar una nota, completar o comentar **no** congela ni reordena.
+
+**Después de congelada cada lista**
+
+| Evento | Hoy (pendientes) | Fijadas |
+|---|---|---|
+| Drag de una card | Solo esa cambia de sitio | Solo esa cambia de sitio |
+| Nueva / “Hacer hoy” / volver a comprometer | Final de pendientes | — |
+| Fijar una nueva | No entra a Fijadas por este evento si ya estaba fijada; si se fija ahora | **Final** del bloque |
+| Guardar título/cuerpo/tags/fechas | No mueve | No mueve |
+| Comentario | No mueve | No mueve |
+| Completar | Baja al final de Hoy, sin handle | Si está fijada, **se queda** en Fijadas (atención ≠ done) |
+
+**Reindex:** al soltar, reescribir los números de **esa** lista en pasos de 10. No tocar la otra lista.
 
 ### 6.5 Completar, reabrir, sacar del día
 
@@ -222,9 +262,11 @@ Arrastrar **solo** entre pendientes. No se puede soltar una hecha en medio de la
 
 ### 6.6 Gesto
 
-- Handle de **6 puntitos** a la izquierda de la card, **solo** en tareas pendientes de la cola de hoy (chip Tareas → Hoy, y las mismas cards en Del día hoy).
-- Press / click en el handle + arrastrar. Feedback: elevación + hueco.
-- Completadas, notas, Fijadas, Próximas, Backlog, replay: **sin** handle.
+- Handle de **6 puntitos** a la izquierda:
+  - tareas **pendientes** de la cola de hoy (chip Tareas → Hoy, y las mismas en Del día hoy);
+  - **todas** las cards de Fijadas (notas o tareas; la atención no se apaga al completar).
+- Press / click en el handle + arrastrar. Feedback: elevación + hueco. El resto de cards de **esa** lista no cambia de orden relativo, salvo el hueco de la que se mueve.
+- Completadas de Hoy, notas de Del día, Próximas, Backlog, replay: **sin** handle.
 - Búsqueda o filtro extra: lista plana, **sin** drag (igual que hoy se pierde el agrupado).
 - Web / desktop: el handle es el hit target; no hace falta “modo reorden”.
 - El v1.1 viejo (“handle solo tras long-press en el título del grupo”) se **descarta**: oculta el job. El handle visible en la cola es el affordance.
@@ -249,31 +291,37 @@ Empty de Hoy: sin cambio (`Nada para hoy · …`).
 
 ```
 DayEntry
-  + sortOrder: int   // 0 = legacy / sin congelar
+  + sortOrder: int        // 0 = legacy / semilla aún no congelada
+
+NoteItem
+  + pinnedOrder: int?     // null = semilla por updatedAt; solo aplica si pinned
 ```
 
-No se añade `sortOrder` a `NoteItem`.
-
-Query nueva (nombre tentativo): `DayOrderQuery.sortTasks(items, entriesByNoteId)` usada por `TaskGroupsQuery.from` y por el render de Del día.
+Queries tentativas: `DayOrderQuery.sortTasks(...)` para Hoy / Del día; `PinnedOrderQuery.sort(...)` para Fijadas.
 
 ---
 
 ## 8. Criterios de aceptación
 
 - [ ] En chip Tareas → Hoy, las pendientes muestran handle y se pueden reordenar por drag.
+- [ ] Mover **una** pendiente no cambia el orden relativo de las otras (solo el hueco de esa card).
 - [ ] Al soltar, el orden sobrevive a hot restart / relanzar la app.
-- [ ] El mismo orden se ve en Todas → Del día (hoy) para esas tareas; las notas del día siguen por `updatedAt` desc **debajo** (o tras) esa banda.
-- [ ] Guardar título/cuerpo/tags/fechas **no** mueve la card en Hoy.
+- [ ] El mismo orden se ve en Todas → Del día (hoy) para esas tareas; las notas del día siguen por `updatedAt` desc **debajo** de esa banda.
+- [ ] Fijadas (sección y chip) muestran handle y se reordenan **solo entre ellas**; no se pueden soltar en Del día.
+- [ ] Mover **una** fijada no reordena las otras fijadas ni la cola de Hoy.
+- [ ] Guardar título/cuerpo/tags/fechas **no** mueve la card en Hoy ni en Fijadas (si esa lista ya está congelada).
 - [ ] Un comentario **no** mueve la card ni cambia `updatedAt`.
-- [ ] Completar manda la card al final y quita el handle; el badge `X/Y` sigue bien.
-- [ ] Reabrir la devuelve a pendientes según su `sortOrder`.
-- [ ] Una tarea nueva / “Hacer hoy” entra al **final** de pendientes si el día ya está congelado.
-- [ ] El primer drag del día congela el orden automático previo (vencidas → hora → switch).
+- [ ] Completar manda la card al final de Hoy y quita el handle ahí; si está fijada, **sigue** en Fijadas en su sitio.
+- [ ] Reabrir la devuelve a pendientes de Hoy según su `sortOrder`.
+- [ ] Una tarea nueva / “Hacer hoy” entra al **final** de pendientes si Hoy ya está congelado.
+- [ ] Fijar una nueva entra al **final** de Fijadas si ese bloque ya está congelado.
+- [ ] El primer drag de Hoy congela el snapshot visible (vencidas → hora → switch) y aplica solo ese movimiento.
+- [ ] El primer drag de Fijadas congela el snapshot visible (`updatedAt` desc) y aplica solo ese movimiento.
 - [ ] Tap, long-press y swipe siguen funcionando en la misma card.
-- [ ] Sin handle / sin drag en Fijadas, Próximas, Backlog, replay, búsqueda.
-- [ ] Maps legacy de `DayEntry` sin `sortOrder` cargan como `0`.
-- [ ] Tests unitarios: semilla, insert al final, completar/reabrir, Del día notas vs tareas.
-- [ ] QA manual iOS + Android + web: drag vs scroll vs swipe.
+- [ ] Sin handle / sin drag en Próximas, Backlog, replay, búsqueda, notas de Del día.
+- [ ] Maps legacy de `DayEntry` sin `sortOrder` cargan como `0`; `NoteItem` sin `pinnedOrder` carga como `null`.
+- [ ] Tests unitarios: semilla, un solo movimiento, insert al final, completar/reabrir, Fijadas vs Hoy, Del día notas vs tareas.
+- [ ] QA manual iOS + Android + web: drag vs scroll vs swipe en ambas listas.
 
 ---
 
@@ -285,7 +333,8 @@ Query nueva (nombre tentativo): `DayOrderQuery.sortTasks(items, entriesByNoteId)
 | Todas vs Tareas con órdenes distintos | P0: **un** `sortOrder` por `(note, día)` |
 | Usuario nunca arrastra y “pierde” el ranking de vencidas | El ranking sigue siendo la semilla hasta el primer drag |
 | Vencida nueva a media tarde “debería” ir arriba | **Cerrado:** tras el primer drag del día, entra al **final de pendientes**. El usuario la arrastra si quiere. |
-| Sync: dos dispositivos reordenan | Last-write-wins en la entry; no es conflicto de contenido |
+| Sync: dos dispositivos reordenan | Last-write-wins en la entry / `pinnedOrder`; no es conflicto de contenido |
+| Tarea fijada + de hoy con dos órdenes | Correcto: Fijadas ≠ Hoy. No sincronizar `pinnedOrder` con `DayEntry.sortOrder`. |
 
 ---
 
@@ -295,16 +344,16 @@ Query nueva (nombre tentativo): `DayOrderQuery.sortTasks(items, entriesByNoteId)
 
 | # | Pregunta | Decisión |
 |---|---|---|
-| 1 | ¿Dónde se guarda el orden? | **En el día:** `DayEntry.sortOrder`. No en la nota. Una tarea puede estar en muchos días; la cola es “cómo quiero cumplir **este** día”. |
+| 1 | ¿Dónde se guarda el orden de Hoy? | **En el día:** `DayEntry.sortOrder`. No en la nota. |
 | 2 | ¿Del día (Todas) usa la misma cola? | **Sí**, para las **tareas** de hoy. Las **notas** de Del día se quedan **debajo**, por recencia (`updatedAt`). |
 | 3 | ¿Las notas de Del día se arrastran? | **No.** Diario, no cola. |
-| A | Tras el primer drag, ¿una vencida nueva se ancla sola arriba? | **No.** Entra al **final de pendientes**. Si quieres verla antes, la arrastras. |
-| 4 | ¿`updatedAt` desaparece? | **No.** Deja de ordenar la cola de tareas de hoy. |
-| 5 | ¿Completadas se arrastran? | **No.** Siempre al final. |
-| 6 | ¿Gesto? | **Handle visible** en pendientes. Long-press sigue siendo menú. |
-| 7 | ¿Cuándo se persiste? | En el **primer drag** del día (congela semilla) y en cada drop. |
-| 8 | ¿Dónde entra lo nuevo? | **Final de pendientes** si el día ya está congelado. |
-| 9 | ¿También reordenamos **Fijadas** en este cambio? | **No.** Este cambio es solo la cola de Hoy / tareas de Del día. Fijadas es otra lista (arriba, referencia). El Home viejo apuntaba drag en Fijadas como trabajo aparte; aquí no se toca. |
+| A | Tras el primer drag, ¿una vencida nueva se ancla sola arriba? | **No.** Entra al **final de pendientes**. |
+| 4 | ¿`updatedAt` desaparece? | **No.** Deja de reordenar Hoy / Fijadas una vez congeladas. |
+| 5 | ¿Completadas se arrastran en Hoy? | **No.** Siempre al final de Hoy. En Fijadas, si sigue pinneada, **se queda**. |
+| 6 | ¿Gesto? | **Handle visible**. Long-press sigue siendo menú. |
+| 7 | ¿Cuándo se persiste? | Primer drag de **esa** lista (congela el snapshot visible) y cada drop. Mover una no reordena las otras. |
+| 8 | ¿Dónde entra lo nuevo? | **Final** de esa lista si ya está congelada. |
+| 9 | ¿También reordenamos **Fijadas**? | **Sí, entre ellas.** Atención, no cola del día. Orden en `NoteItem.pinnedOrder`. No se cruza con Hoy / Del día. |
 
 ### Abiertas (no bloquean este cambio)
 
@@ -321,20 +370,21 @@ Query nueva (nombre tentativo): `DayOrderQuery.sortTasks(items, entriesByNoteId)
 | Doc | Cambio |
 |---|---|
 | `PRD-control-tareas.md` §6.2 / §6.11 / decisión 8 | El orden automático de Hoy pasa a ser **semilla**. Drag deja de ser “v1.1 sin spec”. |
-| `PRD.md` §6.4 | Recientes/`updatedAt` ya no describe la cola de tareas de hoy. Fijadas siguen por `updatedAt`; su drag, si se hace, es otro cambio. |
+| `PRD.md` §6.4 | Recientes/`updatedAt` ya no describe la cola de tareas de hoy. Fijadas se ordenan entre ellas (`pinnedOrder`). |
 | `PRD-day-review.md` §8.1 | `DayEntry` gana `sortOrder`. |
 
 ---
 
 ## 12. Implementación (orden sugerido)
 
-1. Campo `sortOrder` en `DayEntry` + roundtrip Hive/backup.  
-2. `DayOrderQuery` + tests (semilla, insert, complete/reopen).  
-3. `TaskGroupsQuery` usa esa query para Hoy.  
+1. `DayEntry.sortOrder` + `NoteItem.pinnedOrder` + roundtrip Hive/backup.  
+2. `DayOrderQuery` + `PinnedOrderQuery` + tests (semilla, **un solo movimiento**, insert al final, complete/reopen).  
+3. `TaskGroupsQuery` usa `DayOrderQuery` para Hoy.  
 4. Del día (hoy): banda tareas por `sortOrder`, notas por `updatedAt`.  
-5. UI: sliver reordenable + handle; swipe/long-press intactos.  
-6. Repo: `reorderDayTasks(day, orderedNoteIds)` — no toca `NoteItem.updatedAt`.  
-7. QA gestos.
+5. Fijadas: `PinnedOrderQuery` en sección y chip.  
+6. UI: dos slivers reordenables (Fijadas / Hoy); no se puede soltar de uno en el otro.  
+7. Repo: `reorderDayTasks` y `reorderPinned` — no tocan `updatedAt`.  
+8. QA gestos.
 
 **Próximo paso:** `TRD-orden-hoy.md` (widgets, conflictos de gesto, sync) → implementar en el orden de esta sección.
 
