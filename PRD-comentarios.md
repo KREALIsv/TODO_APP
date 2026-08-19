@@ -3,7 +3,7 @@
 **Producto:** WODO (todos_app)  
 **Versión:** 0.2  
 **Fecha:** 19 Ago 2026  
-**Estado:** Draft — decisiones de producto cerradas el 19 ago (salvo layout desktop, §16)  
+**Estado:** Draft — decisiones de producto cerradas el 19 ago (layout A, `updatedAt` sí)  
 **Plataforma:** Flutter (iOS / Android / Web)  
 **Relación:** Extiende el editor (`NoteEditorScreen`), el historial BuJo (`TaskDayHistorySection` / `DayEntry`) y los adjuntos (`PRD-adjuntos-imagen.md`). **No** copia el feed colaborativo de Trello.
 
@@ -113,11 +113,11 @@ Comentarios con o sin imagen: mismo pipeline de adjuntos. Una foto de comentario
 - @menciones, reacciones, hilos anidados, «Seguir», avatares de otras personas.  
 - Colaboración multi-usuario (futuro externo; el feed no se modela como chat).  
 - Rich text, markdown renderizado, GIFs, vídeo, PDF.  
-- Layout Trello 60/40 en el shell de tres columnas (pendiente §16).  
+- Layout Trello 60/40 / ensanchar el editor (camino B, fuera de v1).  
 - Sync de **blobs** de imagen (adjuntos de ítem y fotos de comentario).  
 - Autoguardado de auditoría por tecla (solo al persistir).  
 - Contador 💬 en la card de Home (P1).  
-- Que un comentario mueva la card de sitio o cambie `updatedAt`.
+- Cambiar `completed` / `pinned` / `archivedAt` / fechas solo por comentar.
 
 ---
 
@@ -250,8 +250,9 @@ P1: `💬 N` en meta si `commentCount > 0`.
 - Visible en **notas y tareas ya persistidas**.  
 - Enviar habilitado si `trim(text).isNotEmpty` **o** hay ≥1 imagen pendiente.  
 - Persistencia inmediata (Hive), independiente de Guardar del editor.  
-- No cambia `NoteItem.body`, `completed`, `pinned`, `archivedAt`, fechas ni **`updatedAt`**.  
-- No cuenta en el heatmap / racha.
+- **Sí** actualiza `NoteItem.updatedAt` (es un cambio). No toca `body`, `completed`, `pinned`, `archivedAt` ni fechas.  
+- Efecto en Home: una **nota** puede entrar en **Del día** hoy y subir en listas por `updatedAt`. Las **tareas** siguen entrando a Del día por fechas / log de días, no solo por este timestamp.  
+- Heatmap de escritura: **sí** cuenta (usa `updatedAt`). La racha sigue siendo solo completar tareas.
 
 ### 7.2 Imágenes (P0)
 - 0–N por comentario, tope §6.5.  
@@ -309,7 +310,7 @@ P1: `💬 N` en meta si `commentCount > 0`.
 ## 9. Flujos
 
 ### F1 — Comentario de texto
-Abrir nota o tarea existente → scroll a Comentarios → escribir → Enviar. La card en Home **no** cambia de sitio.
+Abrir nota o tarea existente → scroll a Comentarios → escribir → Enviar. `updatedAt` se refresca: una nota puede aparecer hoy en **Del día**.
 
 ### F2 — Comentario con imagen + portada
 Clip → galería/cámara → Enviar → thumb en el comentario → `Usar como portada` → la card de lista muestra esa foto. Sigue sin aparecer en la fila Adjuntos.
@@ -359,38 +360,37 @@ Ajustes → Exportar incluye `comments`, `noteAudits` y bytes locales.
 | 3 | ¿Qué oculta «Ocultar detalles»? | **Todo registro de sistema** (días + ediciones al persistir). Los comentarios de persona se quedan. | 19 ago |
 | 4 | ¿Rich text? | **No** — texto plano | 17 ago |
 | 5 | ¿Foto de comentario como portada? | **Sí**, acción explícita. No auto. No entra a la fila Adjuntos. | 19 ago |
-| 6 | ¿Layout Trello en desktop? | **Pendiente** — ver §16 | — |
+| 6 | ¿Layout desktop? | **A** — feed al final del panel de 340 dp. Split = v2. | 19 ago |
 | 7 | ¿«Seguir»? | **No** | 17 ago |
 | 8 | ¿Persistencia vs Guardar del editor? | **Inmediata al Enviar** | 17 ago |
 | 9 | ¿Comentar ítem no guardado? | **No** — hint para guardar primero | 17 ago |
-| 10 | ¿Un comentario mueve la lista / `updatedAt`? | **No.** No cambia estado del ítem. Ver §11.1. | 19 ago |
+| 10 | ¿Un comentario toca `updatedAt`? | **Sí.** Es un cambio. No altera completed/pin/archivo/fechas. Ver §11.1. | 19 ago |
 | 11 | ¿Default del toggle? | **Mostrar detalles** | 17 ago |
 | 12 | ¿Avatares? | **No** | 17 ago |
 | 13 | ¿Sync de comentarios en v1? | **Sí** (texto + auditoría). Blobs no. | 19 ago |
 
-### Abiertas (no bloquean el diseño; sí el kickoff de código)
-
-Ver también la lista al final de este documento. Las más cargadas:
+### Abiertas (no bloquean kickoff)
 
 | # | Pregunta | Inclinación |
 |---|---|---|
-| A | ¿El comentario cuenta como actividad del heatmap / racha? | **No** |
+| A | ¿Heatmap / racha? | Heatmap de escritura **sí** (via `updatedAt`). Racha **no** (solo completar). |
 | B | ¿Editar un comentario deja huella «editado»? | **Sí**, timestamp `editedAt` discreto |
 | C | ¿Límite de longitud del texto? | **4000** caracteres |
 | D | ¿Orden del feed: nuevo arriba o abajo tipo chat? | **Nuevo arriba** (Trello; el composer está arriba) |
 
-### 11.1 Qué era «Recientes» y por qué el comentario no empuja nada
+### 11.1 «Recientes», Del día y `updatedAt`
 
-En el PRD original de Home, **Recientes** era la lista de notas *no fijadas*, ordenadas por `updatedAt` (última vez que guardaste título, cuerpo, tags o fechas).
+En el PRD original de Home, **Recientes** era la lista de notas no fijadas, ordenadas por `updatedAt`. Ese título **ya no está en pantalla**. El chip Todas muestra **Fijadas** + **Del día**.
 
-En la Home de hoy ese nombre ya no está en pantalla. El chip Todas muestra **Fijadas** + **Del día**. Una nota entra en «Del día» si se **creó o actualizó** ese día (`createdAt` / `updatedAt`). Las tareas entran por fechas o por el log de días, no por un comentario.
+| Superficie hoy | Cómo entra un ítem |
+|---|---|
+| **Del día** (notas) | `createdAt` o `updatedAt` caen en ese día de calendario |
+| **Del día** (tareas) | Fechas / log de días (`todayAt`, `dueAt`, `DayEntry`), no solo `updatedAt` |
+| Listas por «último cambio» | `updatedAt` desc (p. ej. Fijadas, búsquedas) |
+| Heatmap de escritura | Días con create/edit (`updatedAt`) |
+| Racha | Solo completar tarea (`completedAt`) |
 
-Si al comentar tocáramos `updatedAt`, la card:
-
-- subiría en cualquier lista ordenada por «último cambio»;
-- podría aparecer hoy en **Del día** aunque no la hayas reescrito.
-
-Por eso v1 **no toca** `updatedAt` ni ningún otro estado (`completed`, `pinned`, `archivedAt`, `dueAt`, `todayAt`). El comentario solo da contexto. Tampoco cuenta en el heatmap.
+Comentar **sí** actualiza `updatedAt` porque es un cambio: la nota puede aparecer en Del día hoy y subir en esas listas; el heatmap puede marcar el día. **No** cambia completed, pin, archivo ni fechas. **No** suma racha.
 
 ---
 
@@ -445,9 +445,9 @@ No usar «Actividad» en el título: en WODO eso es el heatmap del perfil. El to
 | 1 | Diario **personal**. Colaboración = futuro externo, no se diseña ahora. |
 | 2 | Ocultar **todo** lo de sistema (días + ediciones). Lo escrito en Comentarios se queda. |
 | 3 | **Notas y tareas**, mismo comportamiento. |
-| 4 | No empujar nada. «Recientes» era el orden por `updatedAt`; hoy se parece a **Del día**. Ver §11.1. |
+| 4 | **Sí** tocar `updatedAt` (es un cambio). «Recientes» ya no existe como título; el efecto visible es Del día / orden. Ver §11.1. |
 | 5 | La foto de comentario **sí puede ser portada** (explícito). |
-| 6 | **Sigue abierta.** La pregunta original era opaca; está reescrita en §16. |
+| 6 | **A** — feed en el panel de 340 dp. Ver §16. |
 | 7 | **Sí** sincronizar comentarios (texto). Imágenes siguen sin blob en sync. |
 
 ---
@@ -484,35 +484,25 @@ Layout de referencia tipo Trello **adaptado** (definición a la izquierda, diari
 
 ---
 
-## 16. La pregunta del panel de 340 dp (abierta)
+## 16. Layout desktop — cerrado: camino A
 
-En **móvil** el editor es pantalla completa: comentarios al final del scroll. Eso no cambia.
+En **móvil** el editor es pantalla completa: comentarios al final del scroll.
 
-En **desktop ancho** (≥ 1200 px) la app ya tiene tres columnas fijas:
+En **desktop ancho** (≥ 1200 px) el shell sigue igual:
 
 ```
 ┌─ ~300 dp ─┬──────── lista ────────┬─ 340 dp fijos ─┐
 │  Perfil   │  Fijadas / Del día    │  Editor        │
-│  heatmap  │  cards                │  título        │
-│           │                       │  cuerpo        │
-│           │                       │  tags / adj.   │
+│  heatmap  │  cards                │  … formulario  │
 │           │                       │  comentarios ← │
 └───────────┴───────────────────────┴────────────────┘
 ```
 
-Esos **340 dp** son `AdaptiveBreakpoints.contextPanelWidth`. Ahí cabe el formulario, no un split tipo Trello.
+**v1 = A:** el feed vive al final de esos 340 dp (`AdaptiveBreakpoints.contextPanelWidth`). Más scroll. Cero rediseño de `DesktopContextPanel`.
 
-Hay **dos caminos**, no un sí/no abstracto:
-
-**A — v1 barato (recomendado para ship):** comentarios al **final del mismo panel**, igual que en móvil. Más scroll. Cero cambio de shell.
-
-**B — invertir en el editor primero:** al abrir una nota, el panel derecho se ensancha (p. ej. overlay ≥ 720 dp) y el feed va **al lado** del formulario (mock §15.4). Se lee mejor; es otro slice de `DesktopContextPanel`.
-
-No es «¿hacemos desktop o no?». Es: **¿el primer ship vive en los 340 dp actuales, o paramos a ensanchar el editor?**
-
-Inclinación de ingeniería: **A en v1**, B en v1.1/v2. Hace falta confirmación de producto.
+**B (v2):** ensanchar el editor (≥ 720 dp) y poner el diario al lado (mock §15.4). Fuera de este slice.
 
 ---
 
 **Owner:** Product / Design / Engineering  
-**Próximo paso:** Cerrar §16 (A o B) → implementar `TRD-comentarios.md`.
+**Próximo paso:** Implementar `TRD-comentarios.md` (storage → audit + feed → composer → portada → backup → sync texto).

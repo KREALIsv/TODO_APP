@@ -2,7 +2,7 @@
 
 Dirección visual para `PRD-comentarios.md` / `TRD-comentarios.md`. No son capturas de la app.
 
-Decisiones 19 ago: diario personal, notas y tareas, ocultar **todo** lo de sistema, portada explícita desde foto de comentario, sync de texto. Layout desktop (340 dp vs editor ancho) sigue abierto — ver PRD §16.
+Decisiones 19 ago: diario personal, notas y tareas, ocultar **todo** lo de sistema, portada explícita, sync de texto, **`updatedAt` sí**, layout desktop **A** (panel 340 dp). Split ancho = v2.
 
 | Archivo | Qué muestra | Slice |
 |---|---|---|

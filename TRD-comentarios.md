@@ -3,7 +3,7 @@
 **Producto:** WODO (todos_app)  
 **Referencia PRD:** `PRD-comentarios.md` v0.2  
 **Fecha:** 19 Ago 2026  
-**Estado:** Draft — no implementado; decisiones de producto cerradas salvo layout desktop (§6.5)  
+**Estado:** Draft — no implementado; decisiones de producto cerradas (layout A, `updatedAt` sí)  
 **Plataforma:** Flutter (iOS / Android / Web)
 
 ---
@@ -19,7 +19,7 @@ Añadir en el editor de **nota y tarea** un feed unificado:
 - sync de `comment` + `noteAudit` (sin blobs)  
 - backup local con bytes  
 
-Sin rich text, sin colaboración, sin tocar `updatedAt` al comentar.
+Sin rich text, sin colaboración. Comentar **sí** actualiza `NoteItem.updatedAt`. Layout desktop = camino A (panel 340 dp).
 
 ---
 
@@ -42,8 +42,8 @@ Sin rich text, sin colaboración, sin tocar `updatedAt` al comentar.
 
 - Chip 💬 en `NoteCard`  
 - Sync de `attachment_blobs`  
-- Split de dos columnas (salvo que producto elija B en PRD §16)  
-- `updatedAt` al comentar  
+- Split de dos columnas / ensanchar el editor (camino B, v2)  
+- Dejar `updatedAt` quieto al comentar  
 - Watchers / menciones / reacciones / avatares
 
 ---
@@ -62,12 +62,12 @@ Sin rich text, sin colaboración, sin tocar `updatedAt` al comentar.
 | 8 | Toggle | Setting global bool | Un default para toda la app |
 | 9 | Composer vs Guardar | `CommentsRepository.add` al Enviar | No se pierde si se descarta el editor |
 | 10 | Ítem nuevo | Composer `enabled: false` | Evita huérfanos al cancelar |
-| 11 | `updatedAt` | **No** al comentar | PRD §11.1 — no mueve Del día / listas |
+| 11 | `updatedAt` | **Sí** al crear/editar/borrar comentario | Es un cambio; mueve Del día (notas) y heatmap de escritura. No toca completed/pin/archivo |
 | 12 | Auditoría | Diff al persistir, un evento por campo | No por tecla |
 | 13 | Comentario ≠ audit | CRUD de comentario no escribe `NoteAuditEvent` | Hide-details no los esconde |
 | 14 | Sync blobs | **No** en v1 | Placeholder remoto |
 | 15 | Identidad visual | Sin avatar | Diario personal |
-| 16 | Layout 340 dp | **A** hasta que producto cierre B | No `Row` dentro de 340 |
+| 16 | Layout 340 dp | **A** cerrado | No `Row` dentro de 340; B es v2 |
 
 ---
 
@@ -174,7 +174,7 @@ List<CommentFeedItem> buildCommentActivityFeed({
 
 Helper puro `diffNoteAudits(NoteItem? previous, NoteItem next)` → lista de eventos. Tests unitarios por campo.
 
-Comentar **no** pasa por ese diff.
+Comentar **no** pasa por ese diff (no es una edición de campos del ítem). Tras `comments.add` / `updateBody` / `delete`, el repo de comentarios llama a `notes.touchUpdatedAt(noteId)` (o `update` solo de `updatedAt`) para que Home / heatmap vean el cambio. Ese touch **no** genera `NoteAuditEvent`: el comentario ya es la fila de persona.
 
 Borrar ítem: `comments.deleteForNote` + `audits.deleteForNote` + adjuntos (incluye commentId). Si la portada era de un comentario, ya se va el ítem.
 
@@ -230,14 +230,13 @@ Móvil y desktop: **el mismo widget**. Sin split salvo decisión B.
 ### 6.4 Portada desde comentario
 
 En `comment_tile` / visor: mismas acciones de portada que Adjuntos.  
-`applyCoverAttachmentChange` ya persiste `coverAttachmentId` y **sí** toca `updatedAt` (es un cambio del ítem, no un comentario). Eso puede meter la card en Del día: correcto, eligieron portada.
+`applyCoverAttachmentChange` persiste `coverAttachmentId` y toca `updatedAt` (cambio del ítem + audit `coverChanged`). Comentar también toca `updatedAt`, pero sin fila de audit.
 
 Borrar comentario cuya imagen es portada → `coverAttachmentId = null` (sin auto-promote).
 
-### 6.5 Desktop 340 dp
+### 6.5 Desktop 340 dp (cerrado: A)
 
-Default **A**: Wrap del header, composer a ancho. Ver PRD §16.  
-Si producto elige **B**: slice aparte de `DesktopContextPanel` (ensanchar contexto ≥ 720) **antes** o junto a la sección; no un `Row` dentro de 340.
+Wrap del header, composer a ancho. **No** ensanchar `DesktopContextPanel`. Camino B (overlay ≥ 720) queda en v2.
 
 ---
 
@@ -283,7 +282,7 @@ Orden de apply: note primero, luego comment/audit (FK lógica). Si llega comment
 | 7 | Delete comment portada | `coverAttachmentId` null; adjuntos de ítem intactos |
 | 8 | Add img comentario | No auto-cover |
 | 9 | Diff save título+tags | 2 audits; `updatedAt` del ítem sí cambia |
-| 10 | Add comment | 0 audits; `updatedAt` del ítem igual |
+| 10 | Add comment | 0 audits; `updatedAt` del ítem **avanza** |
 | 11 | Backup roundtrip | Comments + audits + bytes |
 | 12 | Sync push/pull texto | Comment aparece en el otro snapshot |
 | 13 | Sync sin blob | Placeholder, no crash |
@@ -302,7 +301,7 @@ Orden de apply: note primero, luego comment/audit (FK lógica). Si llega comment
 6. Backup.  
 7. Sync client + DTO backend + tests de snapshot.  
 8. Placeholder de imagen remota.  
-9. Layout 340 dp (o slice B si producto lo pide).
+9. Layout 340 dp (Wrap header; sin split).
 
 ---
 
@@ -311,7 +310,7 @@ Orden de apply: note primero, luego comment/audit (FK lógica). Si llega comment
 - [ ] En una **nota o tarea** guardada envío un comentario de texto y se ve al instante  
 - [ ] Puedo adjuntar 1–4 imágenes; `Usar como portada` pinta la card; no aparecen en Adjuntos ni en 📎  
 - [ ] Ocultar detalles esconde días **y** «Título actualizado»; deja comentarios  
-- [ ] Comentar no cambia `updatedAt` ni mueve Del día  
+- [ ] Comentar actualiza `updatedAt` (nota puede entrar en Del día) y **no** escribe `NoteAuditEvent`  
 - [ ] Guardar un cambio de título sí escribe audit y sí actualiza `updatedAt`  
 - [ ] Ítem nuevo: composer disabled con hint correcto  
 - [ ] Delete comment / delete nota no deja blobs; portada se limpia  
@@ -342,4 +341,4 @@ Las filas `DayEntry` siguen existiendo solo para tareas (el repo no tiene rows e
 ## 13. Mocks
 
 `PRD-comentarios.md` §15 y `docs/comentarios/`.  
-15.1–15.3 = camino A. 15.4 = camino B (P1 salvo que producto lo pida antes).
+15.1–15.3 = v1 (camino A). 15.4 = v2.
