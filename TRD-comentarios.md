@@ -259,9 +259,10 @@ Añadir:
 2. `noteAudit` → idem.  
 3. Ampliar `SyncMutationDto`, `SyncResponseItem`, tests de snapshot.  
 4. `SyncService`: escuchar `changes` de ambos repos; `_snapshot()` incluye las secciones.  
-5. Conflictos: last-write-wins por `id`.  
+5. Conflictos: last-write-wins por `id` (entidades append-friendly). **No** pasar `comment` / `noteAudit` por el three-way merge de `note` (`TRD-sync-conflict-content-merge.md`).  
 6. Pull de comentario con `attachmentIds` cuyos blobs no existen → UI placeholder.  
-7. `coverAttachmentId` ya viaja en `note`; sin blob, la card usa el empty de portada actual.
+7. `coverAttachmentId` ya viaja en `note`; sin blob, la card usa el empty de portada actual.  
+8. Alineación con `TRD-sync-conflict-content-merge.md` (ya en `main`): `contentEqual` **ignora** `updatedAt`. Comentar (solo timestamp en la nota) **no** crea copia de conflicto. Si el apply toma el remote porque el local solo cambió `updatedAt`, dejar `updatedAt = max(local, remote)` para no borrar el toque de Del día / heatmap. Test: comentar + pull de título remoto = 0 conflict copies; `updatedAt` queda el más nuevo.
 
 **No** meter `bytesBase64` en el mutation de comment (payload grande, timeout). Eso es el slice de attachments.
 
