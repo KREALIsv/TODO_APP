@@ -37,10 +37,36 @@ class CommentTile extends StatelessWidget {
   NotesRepository get _notes => notes ?? NotesRepository.instance;
 
   Future<void> _edit(BuildContext context) async {
+    final controller = TextEditingController(text: comment.body);
     final next = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => _EditCommentDialog(initialText: comment.body),
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Editar'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            minLines: 2,
+            maxLines: 6,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              hintText: 'Escribe un comentario…',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, controller.text),
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
     );
+    controller.dispose();
     if (next == null) return;
     final trimmed = next.trim();
     if (trimmed == comment.body.trim()) return;
@@ -215,58 +241,6 @@ class CommentTile extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _EditCommentDialog extends StatefulWidget {
-  const _EditCommentDialog({required this.initialText});
-
-  final String initialText;
-
-  @override
-  State<_EditCommentDialog> createState() => _EditCommentDialogState();
-}
-
-class _EditCommentDialogState extends State<_EditCommentDialog> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialText);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Editar'),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        minLines: 2,
-        maxLines: 6,
-        textCapitalization: TextCapitalization.sentences,
-        decoration: const InputDecoration(
-          hintText: 'Escribe un comentario…',
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _controller.text),
-          child: const Text('Guardar'),
-        ),
-      ],
     );
   }
 }
