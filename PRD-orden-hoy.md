@@ -3,7 +3,7 @@
 **Producto:** Todos App (wodo)  
 **Versión:** 0.1  
 **Fecha:** 19 Ago 2026  
-**Estado:** Draft — propuesta para revisar  
+**Estado:** Draft — decisiones 1–9 y A cerradas (19 Ago 2026)  
 **Plataforma:** Flutter (iOS / Android / Web)  
 **Relación:** Cierra el v1.1 aparcado en `PRD-control-tareas.md` §6.11. Enmienda el orden de `PRD.md` §6.4 (Recientes / `updatedAt`) para las **tareas del día**. Extiende `DayEntry` de `PRD-day-review.md`.
 
@@ -90,8 +90,8 @@ La lista de hoy se comporta como un **feed de recencia** (o como un ranking de v
 - Completar no obliga a reordenar: las hechas se van al final y dejan de arrastrarse.
 - Una tarea nueva o recién sumada a Hoy **no se cuela arriba** por recencia.
 
-### No-objetivos (este slice)
-- Drag en **Fijadas** (sigue siendo P1 del PRD Home; otro slice).
+### No-objetivos (este cambio)
+- Drag en **Fijadas**. Esa sección sigue arriba como referencia; si algún día se reordena, es otro trabajo. El Home viejo lo tenía como P1 aparte.
 - Drag en **Próximas**, **Backlog / Sin fecha**, replay de días pasados, o checklist/adjuntos.
 - Cambiar quién entra a Hoy / Del día (`TaskDayQuery` / `NotesQuery.ofDayFrom`).
 - Que un comentario empiece a tocar `updatedAt` (sigue prohibido).
@@ -129,7 +129,7 @@ Chip Tareas, día = hoy
 | Chip **Tareas** → grupo **Hoy** (día = hoy) | **Sí (P0)** | Cola de ejecución |
 | Chip **Todas** → **Del día** (día = hoy), solo las **tareas** de esa cola | **Sí (P0), mismo orden** | Si no, Todas y Tareas se contradicen |
 | Chip Todas → Del día, **notas** | **No** | Siguen siendo diario: `updatedAt` desc |
-| Fijadas | No | Otro job (referencia), otro slice |
+| Fijadas | No | Otra lista (referencia). Este cambio no la toca. |
 | Próximas / Backlog | No | Ahí manda `dueAt` / recencia |
 | Día futuro (plan) | **P1** | Mismo `DayEntry.sortOrder` cuando se implemente |
 | Día pasado (replay) | No | Auditoría, no plan |
@@ -284,35 +284,35 @@ Query nueva (nombre tentativo): `DayOrderQuery.sortTasks(items, entriesByNoteId)
 | Drag pelea con swipe y con scroll | Handle estrecho; `ReorderableListView` / sliver con `dragStartBehavior` solo en el handle |
 | Todas vs Tareas con órdenes distintos | P0: **un** `sortOrder` por `(note, día)` |
 | Usuario nunca arrastra y “pierde” el ranking de vencidas | El ranking sigue siendo la semilla hasta el primer drag |
-| Vencida nueva a media tarde “debería” ir arriba | Tras congelar, **no** se reinserta arriba sola; el usuario la arrastra. (Si duele, P1: “anclar vencidas arriba” como opción.) |
+| Vencida nueva a media tarde “debería” ir arriba | **Cerrado:** tras el primer drag del día, entra al **final de pendientes**. El usuario la arrastra si quiere. |
 | Sync: dos dispositivos reordenan | Last-write-wins en la entry; no es conflicto de contenido |
 
 ---
 
 ## 10. Decisiones
 
-### Recomendadas (esta propuesta)
+### Cerradas (19 Ago 2026)
 
-| # | Pregunta | Recomendación |
+| # | Pregunta | Decisión |
 |---|---|---|
-| 1 | ¿Dónde se guarda el orden? | **`DayEntry.sortOrder`**, no `NoteItem.sortOrder` |
-| 2 | ¿Qué lista es la cola? | **Hoy** (chip Tareas) + las **tareas** de Del día hoy |
-| 3 | ¿Las notas de Del día se arrastran? | **No.** Siguen por `updatedAt` (diario, no cola) |
-| 4 | ¿`updatedAt` desaparece? | **No.** Deja de ordenar la cola de tareas de hoy |
-| 5 | ¿Completadas se arrastran? | **No.** Siempre al final |
-| 6 | ¿Gesto? | **Handle visible** en pendientes. Long-press sigue siendo menú |
-| 7 | ¿Cuándo se persiste? | En el **primer drag** del día (congela semilla) y en cada drop |
-| 8 | ¿Dónde entra lo nuevo? | **Final de pendientes** si el día ya está congelado |
-| 9 | ¿Fijadas en este slice? | **No** |
+| 1 | ¿Dónde se guarda el orden? | **En el día:** `DayEntry.sortOrder`. No en la nota. Una tarea puede estar en muchos días; la cola es “cómo quiero cumplir **este** día”. |
+| 2 | ¿Del día (Todas) usa la misma cola? | **Sí**, para las **tareas** de hoy. Las **notas** de Del día se quedan **debajo**, por recencia (`updatedAt`). |
+| 3 | ¿Las notas de Del día se arrastran? | **No.** Diario, no cola. |
+| A | Tras el primer drag, ¿una vencida nueva se ancla sola arriba? | **No.** Entra al **final de pendientes**. Si quieres verla antes, la arrastras. |
+| 4 | ¿`updatedAt` desaparece? | **No.** Deja de ordenar la cola de tareas de hoy. |
+| 5 | ¿Completadas se arrastran? | **No.** Siempre al final. |
+| 6 | ¿Gesto? | **Handle visible** en pendientes. Long-press sigue siendo menú. |
+| 7 | ¿Cuándo se persiste? | En el **primer drag** del día (congela semilla) y en cada drop. |
+| 8 | ¿Dónde entra lo nuevo? | **Final de pendientes** si el día ya está congelado. |
+| 9 | ¿También reordenamos **Fijadas** en este cambio? | **No.** Este cambio es solo la cola de Hoy / tareas de Del día. Fijadas es otra lista (arriba, referencia). El Home viejo apuntaba drag en Fijadas como trabajo aparte; aquí no se toca. |
 
-### Abiertas (no bloquean el slice)
+### Abiertas (no bloquean este cambio)
 
 | # | Pregunta | Nota |
 |---|---|---|
-| A | Tras congelar, ¿una vencida nueva debe anclarse sola arriba? | Default **no**. Revisar en QA. |
 | B | ¿Toast Deshacer al soltar? | Default **no**. |
-| C | ¿Plan de día futuro en el mismo PR? | **P1**, mismo campo. |
-| D | ¿Pisar `updatedAt` al completar/fijar/archivar? | Hoy el repo lo hace. Fuera de este slice; no debería usarse para ordenar Hoy. |
+| C | ¿Plan de día futuro en el mismo PR de implementación? | **Después**, mismo campo `DayEntry.sortOrder`. |
+| D | ¿Pisar `updatedAt` al completar/fijar/archivar? | Hoy el repo lo hace. Fuera de este cambio; no debería usarse para ordenar Hoy. |
 
 ---
 
@@ -321,7 +321,7 @@ Query nueva (nombre tentativo): `DayOrderQuery.sortTasks(items, entriesByNoteId)
 | Doc | Cambio |
 |---|---|
 | `PRD-control-tareas.md` §6.2 / §6.11 / decisión 8 | El orden automático de Hoy pasa a ser **semilla**. Drag deja de ser “v1.1 sin spec”. |
-| `PRD.md` §6.4 | Recientes/`updatedAt` ya no describe la cola de tareas de hoy. Fijadas siguen por `updatedAt` hasta su propio slice. |
+| `PRD.md` §6.4 | Recientes/`updatedAt` ya no describe la cola de tareas de hoy. Fijadas siguen por `updatedAt`; su drag, si se hace, es otro cambio. |
 | `PRD-day-review.md` §8.1 | `DayEntry` gana `sortOrder`. |
 
 ---
@@ -336,7 +336,7 @@ Query nueva (nombre tentativo): `DayOrderQuery.sortTasks(items, entriesByNoteId)
 6. Repo: `reorderDayTasks(day, orderedNoteIds)` — no toca `NoteItem.updatedAt`.  
 7. QA gestos.
 
-**Próximo paso:** validar §10 con producto → `TRD-orden-hoy.md` (widgets, conflictos de gesto, sync) → implementar en ese orden.
+**Próximo paso:** `TRD-orden-hoy.md` (widgets, conflictos de gesto, sync) → implementar en el orden de esta sección.
 
 ---
 
