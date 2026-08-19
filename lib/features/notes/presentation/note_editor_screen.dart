@@ -18,9 +18,9 @@ import '../domain/task_when_save_hint.dart';
 import 'widgets/resolve_remove_from_day.dart';
 import 'widgets/attachments_editor.dart';
 import 'widgets/checklist_editor.dart';
+import 'widgets/comments_activity_section.dart';
 import 'widgets/note_task_type_switch.dart';
 import 'widgets/tags_editor.dart';
-import 'widgets/task_day_history_section.dart';
 import 'widgets/task_when_field.dart';
 import 'widgets/task_when_save_hint_banner.dart';
 
@@ -495,25 +495,27 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             });
           },
         ),
-        if (isTask && _isEditing) ...[
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-          TaskDayHistorySection(noteId: _noteId),
-          if (_showRemoveFromDay) ...[
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton(
-                onPressed: _removeFromDay,
-                child: Text(
-                  widget.contextDay == null
-                      ? 'Quitar del día'
-                      : 'Quitar del ${formatDayMonth(widget.contextDay!)}',
-                ),
+        const SizedBox(height: 24),
+        const Divider(height: 1),
+        const SizedBox(height: 8),
+        CommentsActivitySection(
+          noteId: _noteId,
+          enabled: _isEditing,
+          noteType: _type,
+        ),
+        if (isTask && _isEditing && _showRemoveFromDay) ...[
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton(
+              onPressed: _removeFromDay,
+              child: Text(
+                widget.contextDay == null
+                    ? 'Quitar del día'
+                    : 'Quitar del ${formatDayMonth(widget.contextDay!)}',
               ),
             ),
-          ],
+          ),
         ],
       ],
     );
