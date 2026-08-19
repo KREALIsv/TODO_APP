@@ -299,92 +299,6 @@ void main() {
     });
   });
 
-  group('shouldCreateSyncConflict (compat)', () {
-    test('is false when local matches sync snapshot', () {
-      final local = _task(id: 'a', title: 'Hola', updatedAt: baseTime);
-      expect(
-        shouldCreateSyncConflict(
-          local: local,
-          syncedSnapshot: local.toMap(),
-          remote: local.copyWith(
-            title: 'Remoto',
-            updatedAt: baseTime.add(const Duration(hours: 1)),
-          ),
-          entityUpdatedDuringPull: false,
-        ),
-        isFalse,
-      );
-    });
-
-    test('is false during replay of same entity', () {
-      final synced = _task(id: 'a', title: 'V1', updatedAt: baseTime);
-      final local = _task(
-        id: 'a',
-        title: 'V2',
-        updatedAt: baseTime.add(const Duration(minutes: 5)),
-      );
-      final remote = _task(
-        id: 'a',
-        title: 'V3',
-        updatedAt: baseTime.add(const Duration(hours: 1)),
-      );
-
-      expect(
-        shouldCreateSyncConflict(
-          local: local,
-          syncedSnapshot: synced.toMap(),
-          remote: remote,
-          entityUpdatedDuringPull: true,
-        ),
-        isFalse,
-      );
-    });
-
-    test('is true for genuine concurrent edit', () {
-      final synced = _task(id: 'a', title: 'V1', updatedAt: baseTime);
-      final local = _task(
-        id: 'a',
-        title: 'Edit local',
-        updatedAt: baseTime.add(const Duration(minutes: 10)),
-      );
-      final remote = _task(
-        id: 'a',
-        title: 'Remoto',
-        updatedAt: baseTime.add(const Duration(hours: 1)),
-      );
-
-      expect(
-        shouldCreateSyncConflict(
-          local: local,
-          syncedSnapshot: synced.toMap(),
-          remote: remote,
-          entityUpdatedDuringPull: false,
-        ),
-        isTrue,
-      );
-    });
-
-    test('is false when remote only completes same task', () {
-      final synced = _task(id: 'a', title: '6 ago', updatedAt: baseTime);
-      final local = synced;
-      final remote = synced.copyWith(
-        completed: true,
-        completedAt: baseTime.add(const Duration(days: 1)),
-        updatedAt: baseTime.add(const Duration(days: 1)),
-      );
-
-      expect(
-        shouldCreateSyncConflict(
-          local: local,
-          syncedSnapshot: synced.toMap(),
-          remote: remote,
-          entityUpdatedDuringPull: false,
-        ),
-        isFalse,
-      );
-    });
-  });
-
   group('legacy helpers', () {
     test('isSyncConflictCopy detects metadata and legacy title prefix', () {
       expect(
@@ -412,6 +326,13 @@ void main() {
         ),
         isTrue,
       );
+    });
+
+    test('noteItemFromSyncMap parses snapshot maps safely', () {
+      final note = _task(id: 'a', title: 'Hola', updatedAt: baseTime);
+      expect(noteItemFromSyncMap(note.toMap())?.title, 'Hola');
+      expect(noteItemFromSyncMap(null), isNull);
+      expect(noteItemFromSyncMap(const {'title': 1}), isNull);
     });
 
     test('buildSyncConflictCopy links to canonical note without title prefix', () {

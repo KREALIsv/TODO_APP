@@ -269,14 +269,7 @@ class SyncService extends ChangeNotifier {
 
     final remote = NoteItem.fromMap(payload);
     final local = _notes.getById(entityId);
-    NoteItem? base;
-    if (storedBaseMap != null) {
-      try {
-        base = NoteItem.fromMap(storedBaseMap);
-      } catch (_) {
-        base = null;
-      }
-    }
+    final base = noteItemFromSyncMap(storedBaseMap);
 
     final merge = resolveNoteMerge(
       local: local,

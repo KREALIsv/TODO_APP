@@ -126,6 +126,16 @@ bool mergeableStateEqual(NoteItem a, NoteItem b) {
   );
 }
 
+/// Safe parse of a sync snapshot / payload map into [NoteItem].
+NoteItem? noteItemFromSyncMap(Map<String, dynamic>? map) {
+  if (map == null) return null;
+  try {
+    return NoteItem.fromMap(map);
+  } catch (_) {
+    return null;
+  }
+}
+
 /// Three-way merge keyed by note [id]. [base] is the last successful sync snapshot.
 NoteMergeResult resolveNoteMerge({
   required NoteItem? local,
@@ -155,29 +165,6 @@ NoteMergeResult resolveNoteMerge({
     return NoteMergeResult(action: NoteMergeAction.applyRemote, note: remote);
   }
   return NoteMergeResult(action: NoteMergeAction.merged, note: merged);
-}
-
-/// Legacy helper — prefers [resolveNoteMerge] for new call sites.
-bool shouldCreateSyncConflict({
-  required NoteItem? local,
-  required Map<String, dynamic>? syncedSnapshot,
-  required NoteItem remote,
-  required bool entityUpdatedDuringPull,
-}) {
-  NoteItem? base;
-  if (syncedSnapshot != null) {
-    try {
-      base = NoteItem.fromMap(syncedSnapshot);
-    } catch (_) {
-      base = null;
-    }
-  }
-  return resolveNoteMerge(
-    local: local,
-    base: base,
-    remote: remote,
-    entityUpdatedDuringPull: entityUpdatedDuringPull,
-  ).shouldCreateConflictCopy;
 }
 
 NoteItem buildSyncConflictCopy(
@@ -375,15 +362,13 @@ bool _pickBool({
   required bool remote,
   required bool remoteNewer,
 }) {
-  if (base == null) return remoteNewer ? remote : local;
-  final localChanged = local != base;
-  final remoteChanged = remote != base;
-  if (localChanged && !remoteChanged) return local;
-  if (remoteChanged && !localChanged) return remote;
-  if (localChanged && remoteChanged && local != remote) {
-    return remoteNewer ? remote : local;
-  }
-  return remote;
+  return _pickByEquality<bool>(
+    base: base,
+    local: local,
+    remote: remote,
+    remoteNewer: remoteNewer,
+    equal: (a, b) => a == b,
+  );
 }
 
 DateTime? _pickNullableDate({
