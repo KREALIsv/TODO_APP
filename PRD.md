@@ -284,6 +284,7 @@ Instrumentación mínima: `note_created`, `note_opened`, `note_pinned`, `task_co
 - Widgets OS
 - Reminders inteligentes
 - Export Markdown / PDF
+- Diario de comentarios en notas y tareas (`PRD-comentarios.md` v0.2 — decisiones cerradas; layout A)
 
 ---
 
