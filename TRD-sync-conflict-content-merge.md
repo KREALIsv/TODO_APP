@@ -3,7 +3,7 @@
 **Producto:** Todos App (wodo)  
 **Referencia:** incidente “401 → cerrar sesión → conflictos masivos”; PR #26 / fix `7bc28ca`  
 **Fecha:** 19 Ago 2026  
-**Estado:** Propuesto (pendiente de implementar)  
+**Estado:** Implementado (v1 cliente)  
 **Analogía UX:** OneNote / editores colaborativos — el conflicto es por **nota concreta con cambios incompatibles**, nunca por “toda la libreta”.
 
 ---
