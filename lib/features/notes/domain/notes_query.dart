@@ -61,8 +61,9 @@ class NotesQuery {
   /// Unpinned items that belong to [day] (local calendar day).
   ///
   /// Notes: created or updated that day.
-  /// Tasks: todayAt / dueAt / completedAt on that day, overdue when [day] is
-  /// today, captured that day, or any stored [DayEntry] for that day (audit).
+  /// Tasks (PRD-day-review §8.2):
+  /// - today / future → live schedule only ([TaskDayQuery] + open day-log);
+  /// - past → day-log replay (closed outcomes like migrated/scheduled stay).
   static List<NoteItem> ofDayFrom(
     List<NoteItem> items,
     DateTime day, {

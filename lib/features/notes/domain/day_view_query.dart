@@ -4,8 +4,12 @@ import 'note_item.dart';
 import 'task_day_query.dart';
 import 'task_dates.dart';
 
-/// Per-day audit rules for Home «Del día»: what appeared on a calendar day and
-/// how it should look, independent of the task's current schedule.
+/// Per-day rules for Home «Del día» (PRD-day-review §8.2).
+///
+/// - **Today / future** → execution or plan: only live commitments
+///   ([TaskDayQuery] + open day-log rows that still belong).
+/// - **Past** → diary replay: closed [DayEntry] outcomes stay visible so
+///   migradas / agendadas are not lost.
 abstract final class DayViewQuery {
   /// Whether a task row should stay visible on [day] thanks to day-log history.
   static bool hasAuditableEntry(DayEntry entry) {
@@ -20,6 +24,30 @@ abstract final class DayViewQuery {
     }
   }
 
+  /// Past calendar days use full day-log replay; today and future do not.
+  static bool isReplayDay(DateTime day, {DateTime? now}) {
+    return dateOnly(day).isBefore(dateOnly(now ?? DateTime.now()));
+  }
+
+  /// Open day-log row that still counts as a live commitment on [day].
+  static bool _openEntryBelongsToDay(
+    NoteItem item,
+    DateTime day,
+    DayEntry entry, {
+    required DateTime reference,
+  }) {
+    if (entry.outcome != DayOutcome.open) return false;
+    if (TaskDayQuery.isScheduledOn(item, day)) return true;
+    if (entry.via == DayVia.migratedIn || entry.via == DayVia.scheduledIn) {
+      return true;
+    }
+    if (TaskDayQuery.isInboxCaptureOn(item, day) &&
+        dateOnly(day) == dateOnly(reference)) {
+      return true;
+    }
+    return false;
+  }
+
   /// Task membership for «Del día» when [entry] is the resolved row for [day].
   static bool taskBelongsToDay(
     NoteItem item,
@@ -30,17 +58,35 @@ abstract final class DayViewQuery {
     if (item.type != NoteType.task) return false;
     final reference = now ?? DateTime.now();
 
+    // Today / future: execution & plan — never keep closed audit-only rows
+    // (e.g. "Agendada → mañana" must leave today's work list).
+    if (!isReplayDay(day, now: reference)) {
+      if (entry != null) {
+        if (entry.outcome == DayOutcome.open) {
+          return _openEntryBelongsToDay(
+            item,
+            day,
+            entry,
+            reference: reference,
+          );
+        }
+        // Completions still surface via live schedule / completedAt.
+        // Other closed outcomes (migrated, scheduled, cancelled, backlogged)
+        // are diary-only and must not re-enter via inbox-capture rules.
+        if (entry.outcome != DayOutcome.completed) return false;
+      }
+      return TaskDayQuery.belongsToDay(item, day, now: reference);
+    }
+
+    // Past: full diary replay from the day log.
     if (entry != null && hasAuditableEntry(entry)) {
       if (entry.outcome == DayOutcome.open) {
-        if (TaskDayQuery.isScheduledOn(item, day)) return true;
-        if (entry.via == DayVia.migratedIn || entry.via == DayVia.scheduledIn) {
-          return true;
-        }
-        if (TaskDayQuery.isInboxCaptureOn(item, day) &&
-            dateOnly(day) == dateOnly(reference)) {
-          return true;
-        }
-        return false;
+        return _openEntryBelongsToDay(
+          item,
+          day,
+          entry,
+          reference: reference,
+        );
       }
       return true;
     }
