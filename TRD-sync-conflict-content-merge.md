@@ -224,11 +224,11 @@ Backend: sin cambio obligatorio (log de mutaciones ya es por `entityId`).
 
 ## 9. Criterios de aceptación
 
-- [ ] Expiración de refresh + re-login **sin** ediciones locales concurrentes incompatibles → **0** copias de conflicto nuevas.
-- [ ] Misma `id`: completar / archivar / fechas en un dispositivo no duplica la nota en el otro.
-- [ ] Conflicto UI solo si hay divergencia de **contenido** (título, cuerpo, checklist textual, comentarios cuando existan).
-- [ ] Una nota en conflicto no implica marcar el resto de la libreta.
-- [ ] Tests de §7 en verde; sin regresiones del cleanup de conflict-copies en push.
+- [x] Expiración de refresh + re-login **sin** ediciones locales concurrentes incompatibles → **0** copias de conflicto nuevas.
+- [x] Misma `id`: completar / archivar / fechas en un dispositivo no duplica la nota en el otro.
+- [x] Conflicto UI solo si hay divergencia de **contenido** (título, cuerpo, checklist textual, comentarios cuando existan).
+- [x] Una nota en conflicto no implica marcar el resto de la libreta.
+- [x] Tests de §7 en verde; sin regresiones del cleanup de conflict-copies en push.
 
 ---
 
