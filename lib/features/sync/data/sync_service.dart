@@ -83,13 +83,22 @@ class SyncService extends ChangeNotifier {
       final token = await _auth.accessToken();
       if (token == null) return;
       await DeviceRegistry.instance.register();
+      // Last successful sync snapshot = three-way merge base (not live Hive).
+      final storedSnapshot = _readSnapshot();
       final beforePull = _snapshot();
       await _push(token, beforePull);
-      await _pull(token, beforePull);
+      await _pull(
+        token,
+        beforePull: beforePull,
+        storedNoteBase: storedSnapshot['note'] ?? const {},
+      );
+      // Flush field-merges produced during pull (idempotent via clientMutationId).
+      await _push(token, _snapshot());
       await _box.put(_snapshotKey, _snapshot());
       await _markBoundToCurrentAccount();
       _state = SyncState.idle;
     } on AuthSessionExpiredException {
+      // Tokens cleared by AuthService; keep cursor/snapshot for same-account re-login.
       _state = SyncState.unavailable;
       _errorMessage = null;
     } catch (error) {
@@ -163,9 +172,10 @@ class SyncService extends ChangeNotifier {
   }
 
   Future<void> _pull(
-    String token,
-    Map<String, Map<String, Map<String, dynamic>>> beforePull,
-  ) async {
+    String token, {
+    required Map<String, Map<String, Map<String, dynamic>>> beforePull,
+    required Map<String, Map<String, dynamic>> storedNoteBase,
+  }) async {
     final updatedDuringPull = <String>{};
     String? cursor = _box.get(_cursorKey) as String?;
     do {
@@ -173,7 +183,7 @@ class SyncService extends ChangeNotifier {
         'sync/pull',
         token: token,
         query: {
-          if (cursor != null) 'cursor': cursor,
+          'cursor': ?cursor,
           'appUserId': DeviceIdentity.instance.appUserId,
         },
       );
@@ -183,6 +193,7 @@ class SyncService extends ChangeNotifier {
         await _applyRemote(
           Map<String, dynamic>.from(item),
           beforePull,
+          storedNoteBase,
           updatedDuringPull,
         );
       }
@@ -194,6 +205,7 @@ class SyncService extends ChangeNotifier {
   Future<void> _applyRemote(
     Map<String, dynamic> mutation,
     Map<String, Map<String, Map<String, dynamic>>> beforePull,
+    Map<String, Map<String, dynamic>> storedNoteBase,
     Set<String> updatedDuringPull,
   ) async {
     final entityType = mutation['entityType'] as String?;
@@ -227,7 +239,7 @@ class SyncService extends ChangeNotifier {
         await _applyRemoteNote(
           entityId,
           payload,
-          beforePull['note']?[entityId],
+          storedNoteBase[entityId],
           updatedDuringPull,
         );
         break;
@@ -250,28 +262,41 @@ class SyncService extends ChangeNotifier {
   Future<void> _applyRemoteNote(
     String entityId,
     Map<String, dynamic> payload,
-    Map<String, dynamic>? synced,
+    Map<String, dynamic>? storedBaseMap,
     Set<String> updatedDuringPull,
   ) async {
     if (shouldIgnoreRemoteNoteMutation(payload)) return;
 
     final remote = NoteItem.fromMap(payload);
     final local = _notes.getById(entityId);
-    if (shouldCreateSyncConflict(
+    final base = noteItemFromSyncMap(storedBaseMap);
+
+    final merge = resolveNoteMerge(
       local: local,
-      syncedSnapshot: synced,
+      base: base,
       remote: remote,
       entityUpdatedDuringPull: updatedDuringPull.contains(entityId),
-    )) {
+    );
+
+    if (merge.shouldCreateConflictCopy && local != null) {
       await _notes.saveFromSync(
         buildSyncConflictCopy(
-          local!,
+          local,
           id: const Uuid().v4(),
           originalNoteId: entityId,
         ),
       );
     }
-    await _notes.saveFromSync(remote);
+
+    switch (merge.action) {
+      case NoteMergeAction.keepLocal:
+        break;
+      case NoteMergeAction.applyRemote:
+      case NoteMergeAction.merged:
+      case NoteMergeAction.conflict:
+        final toSave = merge.note ?? remote;
+        await _notes.saveFromSync(toSave);
+    }
     updatedDuringPull.add(entityId);
   }
 
@@ -307,11 +332,6 @@ class SyncService extends ChangeNotifier {
       'operation': operation,
       'payload': ?payload,
     };
-  }
-
-  bool _sameMap(Map<String, dynamic>? first, Map<String, dynamic>? second) {
-    if (first == null || second == null) return first == second;
-    return jsonEncode(first) == jsonEncode(second);
   }
 
   Future<Map<String, dynamic>> _request(
@@ -396,6 +416,8 @@ class SyncService extends ChangeNotifier {
   void _onAuthChanged() {
     final authenticated = _auth.isAuthenticated;
     if (!authenticated) {
+      // Logout / session expiry must NOT call _resetSyncProgress so the same
+      // account can re-login and three-way merge against the stored snapshot.
       unawaited(_clearPendingAccountSwitch());
       _state = SyncState.unavailable;
       notifyListeners();

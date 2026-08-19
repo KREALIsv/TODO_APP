@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'sync_conflict.dart';
 
 typedef SyncMutationPayload = Map<String, dynamic>;
@@ -38,14 +36,6 @@ SyncEntitySnapshot sanitizeSyncSnapshot(SyncEntitySnapshot snapshot) {
   };
 }
 
-bool mapsEqualForSyncSnapshot(
-  Map<String, dynamic>? first,
-  Map<String, dynamic>? second,
-) {
-  if (first == null || second == null) return first == second;
-  return jsonEncode(first) == jsonEncode(second);
-}
-
 /// Computes push mutations from previous and current sanitized snapshots.
 ///
 /// Extracted for unit/integration tests and to keep conflict copies out of push.
@@ -64,7 +54,7 @@ List<SyncMutationPayload> buildSyncPushMutations({
     final before = previous[entityType] ?? const <String, Map<String, dynamic>>{};
     final after = current[entityType] ?? const <String, Map<String, dynamic>>{};
     for (final entry in after.entries) {
-      if (mapsEqualForSyncSnapshot(before[entry.key], entry.value)) continue;
+      if (mapsEqualForSync(before[entry.key], entry.value)) continue;
       mutations.add(
         mutationBuilder(
           entityType: entityType,
