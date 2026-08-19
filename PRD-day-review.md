@@ -157,6 +157,7 @@ Registro append-friendly por `(noteId, day)`. Una tarea puede tener varias entri
 | `targetDay` | `DateTime?` | Destino si migrated/scheduled |
 | `outcomeAt` | `DateTime?` | Cuándo se cerró el outcome (null si `open`) |
 | `createdAt` | `DateTime` | Alta de la entry |
+| `sortOrder` | `int` | Orden de la cola de ese día (0 = legacy / sin congelar). Ver `PRD-orden-hoy.md` |
 
 **Cuándo se crea / actualiza una entry**
 

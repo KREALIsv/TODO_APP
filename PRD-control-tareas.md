@@ -137,6 +137,8 @@ Una tarea activa (no archivada) pertenece al grupo **Hoy** si cumple **cualquier
 4. Solo switch (por `todayAt` asc)
 5. Completadas hoy (al final)
 
+Ese ranking es la **semilla** hasta el primer drag del día. El orden de ejecución persistido vive en `DayEntry.sortOrder`. Ver `PRD-orden-hoy.md`.
+
 ### 6.3 Vista Tareas agrupada (P0)
 
 Con chip **Tareas** activo y sin búsqueda:
@@ -252,11 +254,13 @@ Sobre cards en cualquier lista (usando `Dismissible`/`Slidable` con backgrounds 
 - Crear/editar sigue contando por `createdAt`/`updatedAt` (sin cambio).
 - Archivar/restaurar **no** cuenta como actividad.
 
-### 6.11 Reorden manual con drag (v1.1 — fuera de este slice)
+### 6.11 Reorden manual con drag (v1.1)
 
-- Handle de 6 puntitos visible solo en modo reorden (long-press en título del grupo o botón).
-- Requiere campo `sortOrder` y reglas de interacción con el orden automático de §6.2 (el manual gana dentro del grupo).
-- Se especificará en TRD propio cuando este PRD esté estable.
+**Spec:** `PRD-orden-hoy.md`. Resumen:
+
+- Handle de 6 puntitos **siempre visible** en pendientes de Hoy (no “modo reorden”).
+- Orden persistido en `DayEntry.sortOrder` (por día). El ranking de §6.2 es semilla hasta el primer drag.
+- Completadas al final, sin handle. Guardar contenido o comentar **no** mueve la card.
 
 ### 6.12 Detalle de fecha — Recordatorios y Periodicidad
 
@@ -369,7 +373,7 @@ Instrumentación mínima: `task_due_set`, `task_today_toggled`, `task_completed_
 - Tests de lógica Hoy + serialización
 
 ### v1.1
-- Drag reorder (6 puntitos) con `sortOrder`
+- Drag reorder en Hoy — ver `PRD-orden-hoy.md` (`DayEntry.sortOrder`)
 - Filtro por rango de fechas en el listado (sobre `dueAt`) — conecta con P1 del PRD principal
 - Vencidas: acción rápida `Mover a hoy` / `Reprogramar`
 - Ordenar Sin fecha por antigüedad configurable
@@ -439,7 +443,7 @@ Ver §6.12. Orden de construcción:
 | 5 | ¿Swipe borra? | **Nunca.** Borrar solo tras archivo o vía editor/long-press con confirmación |
 | 6 | ¿Fechas en notas? | **No** — solo `type == task` en v1 |
 | 7 | ¿`startAt` en v1? | **No** — diferido a v2 si hay demanda |
-| 8 | ¿Drag reorder en v1? | **No** — v1.1 con `sortOrder` y TRD propio |
+| 8 | ¿Drag reorder en v1? | **No en v1.** v1.1 spec en `PRD-orden-hoy.md`: handle visible, `DayEntry.sortOrder`, semilla = §6.2 |
 | 9 | ¿Hora obligatoria con fecha? | **No** — hora opcional vía `dueHasTime` |
 | 10 | ¿`startAt` (fecha de inicio)? | **No.** Se resuelve el mismo job con "Algún día" + recordatorio en la fecha deseada; un campo menos que migrar y mantener |
 | 11 | ¿Punto de entrada de fecha/hora/recordatorio? | **Mix**: chips rápidos (§6.5) + **resumen único** bajo chips que abre sheet de detalle (§6.12). Sin links sueltos ni calendario permanente |

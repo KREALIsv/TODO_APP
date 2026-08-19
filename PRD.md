@@ -143,8 +143,9 @@ Campos mínimos:
 
 ### 6.4 Fijadas y ordenamiento (P0)
 - Sección “Fijadas” arriba si hay ≥1.
-- Dentro de Fijadas y Recientes: orden por `updatedAt` desc (default).
-- Reorden manual (drag) solo en Fijadas (P1).
+- **Recientes** (este PRD) se implementó como **Del día**: no-fijadas que pertenecen al día. Las **notas** de Del día siguen por `updatedAt` desc (último guardado de título/cuerpo/tags/fechas). Un comentario no toca `updatedAt` ni mueve la card.
+- Las **tareas** de hoy no usan esa recencia: cola de ejecución con drag. Ver `PRD-orden-hoy.md`.
+- Reorden manual (drag) en Fijadas: sigue P1 de este PRD (otro slice).
 
 ### 6.5 Búsqueda y filtros (P0 / P1)
 **P0**
