@@ -20,6 +20,7 @@ class AttachmentsRepository {
   static const String metaBoxName = 'attachments';
   static const String blobBoxName = 'attachment_blobs';
   static const int maxPerNote = 12;
+  static const int maxImagesPerComment = 4;
   static const int maxBytesBeforeCompress = 8 * 1024 * 1024;
   static const int maxDecodeEdge = 1920;
   static const _uuid = Uuid();
@@ -43,10 +44,25 @@ class AttachmentsRepository {
 
   ValueListenable<Box<Map>> listenable() => _meta.listenable();
 
-  List<NoteAttachment> forNote(String noteId) {
+  List<NoteAttachment> _allForNote(String noteId) {
     final items = _meta.values
         .map((raw) => NoteAttachment.fromMap(Map<dynamic, dynamic>.from(raw)))
         .where((a) => a.noteId == noteId)
+        .toList();
+    items.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return items;
+  }
+
+  List<NoteAttachment> forNote(String noteId) {
+    return _allForNote(noteId)
+        .where((a) => a.commentId == null)
+        .toList(growable: false);
+  }
+
+  List<NoteAttachment> forComment(String commentId) {
+    final items = _meta.values
+        .map((raw) => NoteAttachment.fromMap(Map<dynamic, dynamic>.from(raw)))
+        .where((a) => a.commentId == commentId)
         .toList();
     items.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     return items;
@@ -65,23 +81,23 @@ class AttachmentsRepository {
     return null;
   }
 
-  int countFor(String noteId) {
-    var count = 0;
-    for (final raw in _meta.values) {
-      if (raw['noteId'] == noteId) count++;
-    }
-    return count;
-  }
+  int countFor(String noteId) => forNote(noteId).length;
 
   Future<NoteAttachment> addImage({
     required String noteId,
     required Uint8List bytes,
     required String fileName,
     String mimeType = 'image/jpeg',
+    String? commentId,
   }) async {
-    final existing = forNote(noteId);
-    if (existing.length >= maxPerNote) {
+    final existing = commentId == null
+        ? forNote(noteId)
+        : forComment(commentId);
+    if (commentId == null && existing.length >= maxPerNote) {
       throw StateError('Máximo $maxPerNote imágenes por nota');
+    }
+    if (commentId != null && existing.length >= maxImagesPerComment) {
+      throw StateError('Máximo $maxImagesPerComment imágenes por comentario');
     }
     if (bytes.lengthInBytes > maxBytesBeforeCompress * 2) {
       throw StateError('La imagen es demasiado grande');
@@ -101,6 +117,7 @@ class AttachmentsRepository {
       sortOrder: existing.isEmpty ? 0 : existing.last.sortOrder + 1,
       width: compressed.width,
       height: compressed.height,
+      commentId: commentId,
     );
 
     await _blobs.put(id, compressed.bytes);
@@ -114,7 +131,13 @@ class AttachmentsRepository {
   }
 
   Future<void> deleteForNote(String noteId) async {
-    for (final item in forNote(noteId)) {
+    for (final item in _allForNote(noteId)) {
+      await delete(item.id);
+    }
+  }
+
+  Future<void> deleteForComment(String commentId) async {
+    for (final item in forComment(commentId)) {
       await delete(item.id);
     }
   }

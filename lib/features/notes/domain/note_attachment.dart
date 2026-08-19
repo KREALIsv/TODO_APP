@@ -12,6 +12,7 @@ class NoteAttachment {
     required this.sortOrder,
     this.width,
     this.height,
+    this.commentId,
   });
 
   final String id;
@@ -24,6 +25,9 @@ class NoteAttachment {
   final int? width;
   final int? height;
 
+  /// When set, this image belongs to a [NoteComment], not the Adjuntos strip.
+  final String? commentId;
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -35,6 +39,7 @@ class NoteAttachment {
       'sortOrder': sortOrder,
       'width': width,
       'height': height,
+      if (commentId != null) 'commentId': commentId,
     };
   }
 
@@ -70,6 +75,7 @@ class NoteAttachment {
           : rawHeight is num
               ? rawHeight.toInt()
               : null,
+      commentId: map['commentId'] as String?,
     );
   }
 
@@ -83,6 +89,7 @@ class NoteAttachment {
     int? sortOrder,
     Object? width = _unset,
     Object? height = _unset,
+    Object? commentId = _unset,
   }) {
     return NoteAttachment(
       id: id ?? this.id,
@@ -94,6 +101,8 @@ class NoteAttachment {
       sortOrder: sortOrder ?? this.sortOrder,
       width: identical(width, _unset) ? this.width : width as int?,
       height: identical(height, _unset) ? this.height : height as int?,
+      commentId:
+          identical(commentId, _unset) ? this.commentId : commentId as String?,
     );
   }
 }

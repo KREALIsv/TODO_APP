@@ -9,7 +9,9 @@ import 'core/theme/theme.dart';
 import 'core/web/boot_ready.dart';
 import 'features/auth/data/auth_session_repository.dart';
 import 'features/notes/data/attachments_repository.dart';
+import 'features/notes/data/comments_repository.dart';
 import 'features/notes/data/day_entries_repository.dart';
+import 'features/notes/data/note_audit_repository.dart';
 import 'features/notes/data/notes_repository.dart';
 import 'features/notes/data/tags_repository.dart';
 import 'features/notes/data/task_reminders_service.dart';
@@ -50,6 +52,8 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       await Future.wait([
         NotesRepository.instance.init(),
         DayEntriesRepository.instance.init(),
+        CommentsRepository.instance.init(),
+        NoteAuditRepository.instance.init(),
         TagsRepository.instance.init(),
         AttachmentsRepository.instance.init(),
         SettingsRepository.instance.init(),
