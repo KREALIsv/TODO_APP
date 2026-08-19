@@ -23,7 +23,9 @@ void main() {
     expect(find.text('Guarda la nota para comentar'), findsOneWidget);
     expect(find.text('Enviar'), findsOneWidget);
     expect(
-      tester.widget<TextButton>(find.widgetWithText(TextButton, 'Enviar')).onPressed,
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Enviar'))
+          .onPressed,
       isNull,
     );
   });

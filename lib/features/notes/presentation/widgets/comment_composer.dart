@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_surface.dart';
+import '../../../../global/themes/tokens.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../../../global/widgets/app_loading.dart';
 import '../../data/attachments_repository.dart';
@@ -120,93 +121,115 @@ class _CommentComposerState extends State<CommentComposer> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (_pending.isNotEmpty) ...[
-          SizedBox(
-            height: 64,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _pending.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final image = _pending[index];
-                return Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.memory(
-                        image.bytes,
-                        width: 64,
-                        height: 64,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: IconButton(
-                        tooltip: 'Quitar',
-                        visualDensity: VisualDensity.compact,
-                        iconSize: 16,
-                        onPressed: _busy
-                            ? null
-                            : () => setState(() => _pending.removeAt(index)),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+    final canAttach = widget.enabled && !_busy;
+
+    return DecoratedBox(
+      decoration: AppSurface.cardDecoration(context),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                enabled: widget.enabled && !_busy,
-                minLines: 1,
-                maxLines: 4,
-                textCapitalization: TextCapitalization.sentences,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  hintText: _hint,
-                  alignLabelWithHint: true,
-                ),
+            TextField(
+              controller: _controller,
+              enabled: widget.enabled && !_busy,
+              minLines: 2,
+              maxLines: 5,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: _hint,
+                isDense: true,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
               ),
             ),
-            IconButton(
-              tooltip: 'Añadir imagen',
-              onPressed: widget.enabled && !_busy ? _showAddSheet : null,
-              icon: const Icon(Icons.attach_file),
-            ),
-            _busy
-                ? const Padding(
+            if (_pending.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              SizedBox(
+                height: 64,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _pending.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final image = _pending[index];
+                    return Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: ThemeTokens.borderRadius,
+                          child: Image.memory(
+                            image.bytes,
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: IconButton(
+                            tooltip: 'Quitar',
+                            visualDensity: VisualDensity.compact,
+                            iconSize: 16,
+                            onPressed: _busy
+                                ? null
+                                : () =>
+                                    setState(() => _pending.removeAt(index)),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+            if (_controller.text.trim().length > NoteComment.maxBodyLength)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 4),
+                child: Text(
+                  'El comentario es demasiado largo',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: AppSurface.secondary(context),
+                  ),
+                ),
+              ),
+            Row(
+              children: [
+                IconButton(
+                  tooltip: 'Añadir imagen',
+                  onPressed: canAttach ? _showAddSheet : null,
+                  icon: Icon(
+                    Icons.attach_file,
+                    color: canAttach
+                        ? AppSurface.mutedIcon(context)
+                        : AppSurface.mutedIcon(context).withValues(alpha: 0.45),
+                  ),
+                ),
+                const Spacer(),
+                if (_busy)
+                  const Padding(
                     padding: EdgeInsets.all(12),
                     child: AppLoading(size: 18),
                   )
-                : TextButton(
+                else
+                  FilledButton.icon(
                     onPressed: _canSend ? _send : null,
-                    child: const Text('Enviar'),
+                    icon: const Icon(Icons.send_rounded, size: 18),
+                    label: const Text('Enviar'),
                   ),
+              ],
+            ),
           ],
         ),
-        if (_controller.text.trim().length > NoteComment.maxBodyLength)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              'El comentario es demasiado largo',
-              style: textTheme.bodySmall?.copyWith(
-                color: AppSurface.secondary(context),
-              ),
-            ),
-          ),
-      ],
+      ),
     );
   }
 }

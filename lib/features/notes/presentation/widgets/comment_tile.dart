@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_surface.dart';
 import '../../../../global/themes/app_colors.dart';
+import '../../../../global/themes/tokens.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../data/attachments_repository.dart';
 import '../../data/comments_repository.dart';
@@ -12,8 +13,6 @@ import '../../domain/note_attachment.dart';
 import '../../domain/note_comment.dart';
 import '../attachment_viewer_screen.dart';
 import 'attachment_actions.dart';
-import 'attachment_format.dart';
-import 'attachment_thumb_tile.dart';
 import 'relative_time.dart';
 
 class CommentTile extends StatelessWidget {
@@ -182,121 +181,142 @@ class CommentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final images = _attachments.forComment(comment.id);
-    final note = _notes.getById(comment.noteId);
     final timeLabel = formatRelativeTime(comment.createdAt);
     final edited = comment.editedAt != null;
+    final secondary = textTheme.bodySmall?.copyWith(
+      color: AppSurface.secondary(context),
+    );
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (comment.hasText)
-                      Text(comment.body, style: textTheme.bodyMedium),
-                    const SizedBox(height: 2),
-                    Text(
-                      edited ? '$timeLabel · editado' : timeLabel,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: AppSurface.secondary(context),
-                      ),
+          DecoratedBox(
+            decoration: AppSurface.cardDecoration(context),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (comment.hasText)
+                    Text(comment.body, style: textTheme.bodyMedium),
+                  if (comment.hasText && images.isNotEmpty)
+                    const SizedBox(height: 10),
+                  for (var i = 0; i < images.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 8),
+                    _CommentImagePreview(
+                      bytes: _attachments.bytesFor(images[i].id),
+                      onTap: () => _openViewer(context, images, i),
+                      onLongPress: enabled
+                          ? () => _showImageMenu(context, images[i])
+                          : null,
                     ),
                   ],
-                ),
+                ],
               ),
-              if (enabled)
-                PopupMenuButton<String>(
-                  tooltip: 'Más',
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      _edit(context);
-                    } else if (value == 'delete') {
-                      _delete(context);
-                    }
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(value: 'edit', child: Text('Editar')),
-                    PopupMenuItem(value: 'delete', child: Text('Eliminar')),
-                  ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                edited ? '$timeLabel · editado' : timeLabel,
+                style: secondary,
+              ),
+              if (enabled) ...[
+                Text(' · ', style: secondary),
+                _MetaLink(
+                  label: 'Editar',
+                  onTap: () => _edit(context),
                 ),
+                Text(' · ', style: secondary),
+                _MetaLink(
+                  label: 'Eliminar',
+                  onTap: () => _delete(context),
+                ),
+              ],
             ],
           ),
-          if (images.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (var i = 0; i < images.length; i++)
-                  _CommentImageThumb(
-                    item: images[i],
-                    bytes: _attachments.bytesFor(images[i].id),
-                    isCover: images[i].id == note?.coverAttachmentId,
-                    onTap: () => _openViewer(context, images, i),
-                    onLongPress:
-                        enabled ? () => _showImageMenu(context, images[i]) : null,
-                  ),
-              ],
-            ),
-          ],
         ],
       ),
     );
   }
 }
 
-class _CommentImageThumb extends StatelessWidget {
-  const _CommentImageThumb({
-    required this.item,
+class _MetaLink extends StatelessWidget {
+  const _MetaLink({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: ThemeTokens.borderRadius,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppSurface.secondary(context),
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CommentImagePreview extends StatelessWidget {
+  const _CommentImagePreview({
     required this.bytes,
-    required this.isCover,
     required this.onTap,
     this.onLongPress,
   });
 
-  final NoteAttachment item;
   final Uint8List? bytes;
-  final bool isCover;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
-    final thumb = attachmentStripThumbSize(
-      imageWidth: item.width,
-      imageHeight: item.height,
-    );
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AttachmentThumbTile(
-          bytes: bytes,
-          isCover: isCover,
-          width: thumb.width,
-          height: thumb.height,
-          onTap: onTap,
-          onLongPress: onLongPress,
-        ),
-        if (bytes == null) ...[
-          const SizedBox(height: 4),
-          SizedBox(
-            width: thumb.width,
-            child: Text(
-              'Imagen no sincronizada',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: AppSurface.secondary(context),
-                  ),
-            ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        borderRadius: ThemeTokens.borderRadius,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: ThemeTokens.borderRadius,
+            border: Border.all(color: AppSurface.border(context)),
           ),
-        ],
-      ],
+          child: ClipRRect(
+            borderRadius: ThemeTokens.borderRadius,
+            child: bytes == null
+                ? SizedBox(
+                    height: 96,
+                    child: Center(
+                      child: Text(
+                        'Imagen no sincronizada',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppSurface.secondary(context),
+                            ),
+                      ),
+                    ),
+                  )
+                : Image.memory(
+                    bytes!,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: 140,
+                  ),
+          ),
+        ),
+      ),
     );
   }
 }
