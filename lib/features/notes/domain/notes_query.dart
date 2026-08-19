@@ -64,6 +64,9 @@ class NotesQuery {
   /// Tasks (PRD-day-review §8.2):
   /// - today / future → live schedule only ([TaskDayQuery] + open day-log);
   /// - past → day-log replay (closed outcomes like migrated/scheduled stay).
+  ///
+  /// When [dayEntriesByNoteId] is provided, task membership is decided only by
+  /// [DayViewQuery.taskBelongsToDay] (no second pass via [belongsToDay]).
   static List<NoteItem> ofDayFrom(
     List<NoteItem> items,
     DateTime day, {
@@ -75,15 +78,12 @@ class NotesQuery {
         .where((item) {
           if (item.pinned) return false;
           if (item.type == NoteType.task && dayEntriesByNoteId != null) {
-            final entry = dayEntriesByNoteId[item.id];
-            if (DayViewQuery.taskBelongsToDay(
+            return DayViewQuery.taskBelongsToDay(
               item,
               day,
               now: reference,
-              entry: entry,
-            )) {
-              return true;
-            }
+              entry: dayEntriesByNoteId[item.id],
+            );
           }
           return belongsToDay(item, day, now: reference);
         })
