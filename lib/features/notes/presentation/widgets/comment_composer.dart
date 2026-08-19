@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/layout/adaptive_breakpoints.dart';
 import '../../../../core/theme/app_surface.dart';
 import '../../../../global/themes/tokens.dart';
 import '../../../../global/widgets/app_alerts.dart';
@@ -122,6 +123,8 @@ class _CommentComposerState extends State<CommentComposer> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final canAttach = widget.enabled && !_busy;
+    final showSendLabel =
+        AdaptiveBreakpoints.layoutOf(context) != AdaptiveLayout.compact;
 
     return DecoratedBox(
       decoration: AppSurface.cardDecoration(context),
@@ -219,11 +222,17 @@ class _CommentComposerState extends State<CommentComposer> {
                     padding: EdgeInsets.all(12),
                     child: AppLoading(size: 18),
                   )
-                else
+                else if (showSendLabel)
                   FilledButton.icon(
                     onPressed: _canSend ? _send : null,
                     icon: const Icon(Icons.send_rounded, size: 18),
                     label: const Text('Enviar'),
+                  )
+                else
+                  IconButton.filled(
+                    tooltip: 'Enviar',
+                    onPressed: _canSend ? _send : null,
+                    icon: const Icon(Icons.send_rounded),
                   ),
               ],
             ),

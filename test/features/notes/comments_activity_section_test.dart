@@ -7,6 +7,8 @@ import 'package:todos_app/features/notes/presentation/widgets/comment_composer.d
 
 void main() {
   testWidgets('new note composer shows hint and cannot send', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -47,8 +49,10 @@ void main() {
     expect(find.text('Guarda la tarea para comentar'), findsOneWidget);
   });
 
-  testWidgets('enabled composer can send text', (tester) async {
+  testWidgets('enabled desktop composer can send text', (tester) async {
     var sent = '';
+    await tester.binding.setSurfaceSize(const Size(1280, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -69,6 +73,29 @@ void main() {
     await tester.tap(find.text('Enviar'));
     await tester.pump();
     expect(sent, 'Hoy avancé');
+  });
+
+  testWidgets('compact composer shows send icon without label', (tester) async {
+    tester.view.physicalSize = const Size(390, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: CommentComposer(
+            noteId: 'n1',
+            enabled: true,
+            noteType: NoteType.note,
+            onSubmit: _unusedSubmit,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Enviar'), findsNothing);
+    expect(find.byTooltip('Enviar'), findsOneWidget);
+    expect(find.byIcon(Icons.send_rounded), findsOneWidget);
   });
 }
 
