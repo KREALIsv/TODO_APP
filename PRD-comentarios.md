@@ -430,7 +430,7 @@ No usar «Actividad» en el título: en WODO eso es el heatmap del perfil. El to
 
 - `NoteEditorScreen` / `TaskDayHistorySection` (feed unificado; historial de días pasa a ser una fila de sistema)  
 - `AttachmentsRepository` + visor + action sheet  
-- `DayEntriesRepository` + nuevo `NoteAuditEventsRepository`  
+- `DayEntriesRepository` + `NoteAuditRepository` (misma plantilla Hive)  
 - `SettingsRepository`  
 - Backup (`data_backup.dart`)  
 - Sync: entidades `comment` y `noteAudit`; DTO Nest  

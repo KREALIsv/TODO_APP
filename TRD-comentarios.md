@@ -69,6 +69,31 @@ Sin rich text, sin colaboración. Comentar **sí** actualiza `NoteItem.updatedAt
 | 15 | Identidad visual | Sin avatar | Diario personal |
 | 16 | Layout 340 dp | **A** cerrado | No `Row` dentro de 340; B es v2 |
 
+### 3.1 Contrato de arquitectura (anti-duplicación)
+
+Este PR **aún no añade Dart**. Al implementar, no se crean pipelines paralelos. Capas actuales: `domain` (tipos + funciones puras) → `data` (Hive singleton + `HiveRepoNotifier`) → `presentation` (widgets). Sync y backup son orquestadores, no dueños de lógica.
+
+| Ya existe | Reusar | No crear |
+|---|---|---|
+| `DayEntriesRepository` | Plantilla de `CommentsRepository` y `NoteAuditRepository`: singleton, `HiveRepoNotifier`, `init` / `initWithBox`, `changes`, `reloadFromPeerTab`, `saveFromSync` / `deleteFromSync`, `exportAllMaps` / `replaceAllFromMaps` / `resetAll` | Un framework de repos nuevo; `ChangeNotifier` ad hoc |
+| `DayEntry` + `dayOutcomeShortLabel` + `TaskDayHistorySection` | Extraer `TaskDayHistoryTile` (hoy privada) y usarla en el feed | Segundo historial de días; `system_activity_tile.dart` |
+| Completar / Hoy / due / migrar | Siguen escribiendo **solo** `DayEntry` vía `NotesRepository` | `NoteAuditEvent` `completed` / `reopened` / `dueChanged` / `todayChanged` (saldrían dos filas) |
+| `AttachmentsRepository` + `addImage` / `compressImageBytes` | `commentId` opcional en el mismo `addImage` | `CommentAttachmentsRepository` o box de blobs extra |
+| `AttachmentsEditor` picker | Extraer `pickAndStoreImage` a `attachment_actions.dart` (un call site más) | Copiar `ImagePicker` + límites en el composer |
+| `AttachmentViewerScreen` | Añadir `List<NoteAttachment>? items` (default = `forNote`) para abrir fotos de comentario | Un visor nuevo |
+| `AttachmentThumbTile` + `applyCoverAttachmentChange` | Thumbs y portada del comentario | Otro menú de portada |
+| `SettingsRepository.showHeatmapDayNumbers` | Mismo patrón bool (`hideCommentAuditDetails`) | Box settings paralela |
+| `notes.update(copyWith(updatedAt: …))` | Tras CRUD de comentario | Método `touchUpdatedAt` |
+| `NotesRepository.delete` (ya borra adjuntos) | Ahí mismo `comments.deleteForNote` + `audits.deleteForNote` | Cascade en el widget |
+| `saveFromSync` de notas | **No** corre `diffNoteAudits` (el pull no es una edición local) | Audits fantasma en cada sync |
+| `SyncService._applyRemote` switch | Dos `case` como `dayEntry` | Registry / strategy de sync |
+| `LocalTabSyncService` | Incluir `changes` + `reloadFromPeerTab` de comments y audits | Tabs web que no ven el diario |
+| `encodeBackup` / wipe | Claves nuevas en el JSON v2 existente | Segundo formato de backup |
+| `relative_time.dart`, `AppAlerts`, `AppSurface`, `ThemeTokens` | Copy y chrome | Tema o toasts propios |
+| `CommentsActivitySection` | Un widget en nota **y** tarea (`embedded` igual que el editor) | Sección distinta por tipo |
+
+`TaskDayHistorySection` **deja de montarse** en el editor (la sustituye el feed). Puede quedar para el sheet de contexto de card si ya se usa ahí; no duplicar el bloque en `NoteEditorScreen`.
+
 ---
 
 ## 4. Modelo
@@ -91,18 +116,15 @@ Validación: body vacío **y** 0 imágenes → rechazo; `body.length > 4000` →
 
 ```dart
 enum NoteAuditKind {
-  created,
+  created, // solo notas; las tareas ya nacen con DayEntry
   titleChanged,
   bodyChanged,
   tagsChanged,
-  dueChanged,
-  todayChanged,
   reminderChanged,
-  completed,
-  reopened,
   archived,
   restored,
   typeChanged,
+  pinnedChanged,
   checklistChanged,
   coverChanged,
 }
@@ -118,7 +140,8 @@ class NoteAuditEvent {
 
 No persistir old/new values en v1 (privacidad + tamaño). El copy es suficiente.
 
-`DayEntry` **no** se duplica como audit: el feed lo incluye como kind `dayEntry`.
+`DayEntry` **no** se duplica como audit: el feed lo incluye como kind `dayEntry`.  
+`diffNoteAudits` **ignora** completed / due / today — si no, el feed mostraría «Completada» dos veces.
 
 ### 4.3 `NoteAttachment`
 
@@ -167,14 +190,15 @@ List<CommentFeedItem> buildCommentActivityFeed({
 | `attachment_blobs` | sin cambio |
 | settings | `hideCommentAuditDetails` |
 
-`NotesRepository.add` / `update` / `archive` / `restore` / `toggleCompleted` / `saveTaskFromEditor` / `applyCoverAttachmentChange`:
+Hooks de audit **solo en escrituras locales** (`add`, `update` desde editor, `archive` / `restore`, `togglePinned`, `saveTaskFromEditor`, `applyCoverAttachmentChange`):
 
-1. Persistir el ítem como hoy (`updatedAt` **sí** se actualiza en esos flujos: son ediciones reales).  
-2. Diff `previous` vs `next` → `NoteAuditRepository.addAll(events)`.
+1. Persistir como hoy.  
+2. `diffNoteAudits(previous, next)` → `NoteAuditRepository.addAll`.  
+3. **No** en `saveFromSync` ni en `toggleCompleted` / cambios de «¿Cuándo?» (ahí el sistema visible es `DayEntry`).
 
-Helper puro `diffNoteAudits(NoteItem? previous, NoteItem next)` → lista de eventos. Tests unitarios por campo.
+Helper puro `diffNoteAudits` — tests por campo.
 
-Comentar **no** pasa por ese diff (no es una edición de campos del ítem). Tras `comments.add` / `updateBody` / `delete`, el repo de comentarios llama a `notes.touchUpdatedAt(noteId)` (o `update` solo de `updatedAt`) para que Home / heatmap vean el cambio. Ese touch **no** genera `NoteAuditEvent`: el comentario ya es la fila de persona.
+Tras `CommentsRepository.add` / `updateBody` / `delete`, la sección llama `notes.update(note.copyWith(updatedAt: now))`. Eso **no** pasa por el diff de audit (el comentario ya es la fila de persona). No añadir `touchUpdatedAt`.
 
 Borrar ítem: `comments.deleteForNote` + `audits.deleteForNote` + adjuntos (incluye commentId). Si la portada era de un comentario, ya se va el ítem.
 
@@ -194,25 +218,28 @@ Duplicar ítem (si existe): no copiar comments ni audits.
 | `domain/note_audit_diff.dart` | Diff previous/next |
 | `data/comments_repository.dart` | Hive comments |
 | `data/note_audit_repository.dart` | Hive audits |
-| `widgets/comments_activity_section.dart` | Sección |
-| `widgets/comment_composer.dart` | Campo + clip + Enviar |
-| `widgets/comment_tile.dart` | Fila comentario + menú portada |
-| `widgets/system_activity_tile.dart` | Fila audit / reexport day tile |
+| `widgets/comments_activity_section.dart` | Sección (composer + feed). `_AuditTile` privada (ListTile denso). |
+| `widgets/comment_composer.dart` | Campo + clip + Enviar; picker vía `pickAndStoreImage` |
+| `widgets/comment_tile.dart` | Fila comentario; portada vía `applyCoverAttachmentChange` |
 
 ### 6.2 Archivos tocados
 
 | Archivo | Cambio |
 |---|---|
 | `note_attachment.dart` | `commentId` |
-| `attachments_repository.dart` | filtro `forNote`; `forComment`; `addImage` con commentId |
-| `attachment_actions.dart` / visor | `Usar como portada` válido si el id existe, tenga o no commentId |
-| `note_editor_screen.dart` | Sección si `_isEditing` (nota **o** tarea); historial de días deja de estar solo |
-| `notes_repository.dart` | hooks de audit + cascade |
-| `sync_service.dart` + snapshot | secciones `comment`, `noteAudit` |
-| `backend` DTO `IsIn` + tipos | `comment`, `noteAudit` |
-| `data_backup.dart` | `comments`, `noteAudits` |
-| `settings_repository.dart` | bool |
-| `main.dart` | init repos |
+| `attachments_repository.dart` | `forNote` excluye commentId; `forComment`; `addImage(..., commentId)` |
+| `attachment_actions.dart` | `pickAndStoreImage` extraído; portada ya sirve con cualquier id |
+| `attachments_editor.dart` | Usa el helper extraído (mismo flujo, sin copiar) |
+| `attachment_viewer_screen.dart` | `items` opcional; default `forNote` |
+| `task_day_history_section.dart` | Tile pública; el section widget sigue en el context sheet si aplica |
+| `note_editor_screen.dart` | `if (_isEditing) CommentsActivitySection` — **quita** `TaskDayHistorySection` de aquí |
+| `notes_repository.dart` | `diffNoteAudits` en writes locales; cascade delete |
+| `sync_service.dart` + snapshot | `case 'comment'` / `'noteAudit'` como `dayEntry` |
+| `local_tab_sync_service.dart` | merge listenables + reload de los dos repos nuevos |
+| `backend` DTO `IsIn` | `comment`, `noteAudit` |
+| `data_backup.dart` | claves en el payload v2 existente |
+| `settings_repository.dart` | bool como `showHeatmapDayNumbers` |
+| `main.dart` | `init()` junto a day entries |
 
 Composer disabled: hint según `NoteType`.
 
@@ -289,6 +316,8 @@ Orden de apply: note primero, luego comment/audit (FK lógica). Si llega comment
 | 13 | Sync sin blob | Placeholder, no crash |
 | 14 | Widget nota nueva | Hint nota, no Enviar |
 | 15 | 📎 count | No incrementa por img de comentario |
+| 16 | `toggleCompleted` | 0 audits nuevos; sí hay/actualiza `DayEntry` |
+| 17 | `saveFromSync` de nota | 0 audits nuevos |
 
 ---
 

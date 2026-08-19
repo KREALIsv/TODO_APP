@@ -4,6 +4,8 @@ Dirección visual para `PRD-comentarios.md` / `TRD-comentarios.md`. No son captu
 
 Decisiones 19 ago: diario personal, notas y tareas, ocultar **todo** lo de sistema, portada explícita, sync de texto, **`updatedAt` sí**, layout desktop **A** (panel 340 dp). Split ancho = v2.
 
+Al implementar: no duplicar picker/visor/DayEntry; ver `TRD-comentarios.md` §3.1.
+
 | Archivo | Qué muestra | Slice |
 |---|---|---|
 | `mobile_feed.webp` | Móvil: composer + comentario con imagen + historial de días | v1 |
