@@ -10,6 +10,7 @@ import '../../notes/data/day_entries_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/domain/date_only.dart';
 import '../../notes/domain/day_entry.dart';
+import '../../notes/domain/day_view_query.dart';
 import '../../notes/domain/note_item.dart';
 import '../../notes/domain/notes_filter.dart';
 import '../../notes/domain/notes_query.dart';
@@ -531,6 +532,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final dayEntriesByNoteId = {
       for (final entry in dayEntriesForView) entry.noteId: entry,
     };
+    // Live days omit diary-only outcomes from card chrome (pinned included).
+    final cardEntriesByNoteId = {
+      for (final entry in dayEntriesForView)
+        if (DayViewQuery.cardEntryForDay(entry, contextDay, now: _now) != null)
+          entry.noteId: entry,
+    };
     final pinned = NotesQuery.pinnedFrom(filtered);
     final ofDay = NotesQuery.ofDayFrom(
       filtered,
@@ -543,14 +550,25 @@ class _HomeScreenState extends State<HomeScreen> {
       searchQuery: searchQuery,
       hasAnyItems: all.isNotEmpty,
     );
-    final groups =
-        useGrouped ? TaskGroupsQuery.from(filtered, now: _now) : null;
+    final groups = useGrouped
+        ? TaskGroupsQuery.from(
+            filtered,
+            now: _now,
+            dayEntriesByNoteId: dayEntriesByNoteId,
+          )
+        : null;
     final planBacklog = usePlanWithBacklog
-        ? TaskGroupsQuery.from(filtered, now: _now).undated
+        ? TaskGroupsQuery.from(
+            filtered,
+            now: _now,
+            dayEntriesByNoteId: dayEntriesByNoteId,
+          ).undated
         : const <NoteItem>[];
-    final browsePastDay = !isToday && searchQuery.trim().isEmpty;
-    final listItems = browsePastDay ? ofDay : filtered;
-    final auditDay = !isToday ? contextDay : null;
+    final isReplay = DayViewQuery.isReplayDay(contextDay, now: _now);
+    final browseDayScopedList = !isToday && searchQuery.trim().isEmpty;
+    final listItems = browseDayScopedList ? ofDay : filtered;
+    // Flat filter lists: full day-log chrome only on past replay days.
+    final auditDay = isReplay ? contextDay : null;
     final auditEntries = auditDay != null ? dayEntriesByNoteId : null;
     final conflicts = searchQuery.trim().isEmpty &&
             _effectiveFilter == NotesFilter.all
@@ -643,7 +661,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 (item) => _openEditor(context, item: item),
                 bottomPadding: 0,
                 viewDay: contextDay,
-                dayEntriesByNoteId: dayEntriesByNoteId,
+                dayEntriesByNoteId: cardEntriesByNoteId,
               ),
           ],
           _buildSectionHeader(
@@ -670,7 +688,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ofDay,
                 (item) => _openEditor(context, item: item),
                 viewDay: contextDay,
-                dayEntriesByNoteId: dayEntriesByNoteId,
+                dayEntriesByNoteId: cardEntriesByNoteId,
               ),
         ];
       }() else ...[

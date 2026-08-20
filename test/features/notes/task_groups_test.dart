@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:todos_app/features/notes/domain/day_entry.dart';
 import 'package:todos_app/features/notes/domain/note_item.dart';
 import 'package:todos_app/features/notes/domain/task_groups.dart';
 
@@ -65,6 +66,65 @@ void main() {
     );
     expect(groups.today, isEmpty);
     expect(groups.undated.map((e) => e.id), ['old']);
+  });
+
+  test('diary-only today entry keeps inbox capture out of Hoy', () {
+    final createdToday = DateTime(2026, 7, 16, 10);
+    final item = NoteItem(
+      id: 'cancelled-inbox',
+      type: NoteType.task,
+      title: 'cancelled-inbox',
+      body: '',
+      pinned: false,
+      completed: false,
+      createdAt: createdToday,
+      updatedAt: createdToday,
+    );
+    final entry = DayEntry(
+      id: 'e',
+      noteId: 'cancelled-inbox',
+      day: DateTime(2026, 7, 16),
+      via: DayVia.manual,
+      outcome: DayOutcome.cancelled,
+      outcomeAt: createdToday,
+      createdAt: createdToday,
+    );
+
+    final withoutEntry = TaskGroupsQuery.from([item], now: now);
+    expect(withoutEntry.today.map((e) => e.id), ['cancelled-inbox']);
+
+    final withEntry = TaskGroupsQuery.from(
+      [item],
+      now: now,
+      dayEntriesByNoteId: {item.id: entry},
+    );
+    expect(withEntry.today, isEmpty);
+    expect(withEntry.undated.map((e) => e.id), ['cancelled-inbox']);
+  });
+
+  test('scheduled-away task leaves Hoy and lands in Próximas', () {
+    final item = task(
+      id: 'moved',
+      dueAt: DateTime(2026, 7, 17),
+    );
+    final entry = DayEntry(
+      id: 'e',
+      noteId: 'moved',
+      day: DateTime(2026, 7, 16),
+      via: DayVia.manual,
+      outcome: DayOutcome.scheduled,
+      targetDay: DateTime(2026, 7, 17),
+      outcomeAt: now,
+      createdAt: now,
+    );
+
+    final groups = TaskGroupsQuery.from(
+      [item],
+      now: now,
+      dayEntriesByNoteId: {item.id: entry},
+    );
+    expect(groups.today, isEmpty);
+    expect(groups.upcoming.map((e) => e.id), ['moved']);
   });
 
   test('completed today stays in Hoy and counts in progress', () {

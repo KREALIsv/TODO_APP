@@ -4,20 +4,71 @@ import 'note_item.dart';
 import 'task_day_query.dart';
 import 'task_dates.dart';
 
-/// Per-day audit rules for Home «Del día»: what appeared on a calendar day and
-/// how it should look, independent of the task's current schedule.
+/// Per-day rules for Home «Del día» (PRD-day-review §8.2).
+///
+/// - **Today / future** → execution or plan: only live commitments
+///   ([TaskDayQuery] + open day-log rows that still belong).
+/// - **Past** → diary replay: any [DayEntry] for that day stays visible so
+///   migradas / agendadas / pendientes are not lost.
 abstract final class DayViewQuery {
-  /// Whether a task row should stay visible on [day] thanks to day-log history.
-  static bool hasAuditableEntry(DayEntry entry) {
-    switch (entry.outcome) {
-      case DayOutcome.open:
-      case DayOutcome.completed:
+  /// Past calendar days use full day-log replay; today and future do not.
+  static bool isReplayDay(DateTime day, {DateTime? now}) {
+    return dateOnly(day).isBefore(dateOnly(now ?? DateTime.now()));
+  }
+
+  /// Future calendar days use plan views (commitments + optional Backlog).
+  static bool isPlanDay(DateTime day, {DateTime? now}) {
+    return dateOnly(day).isAfter(dateOnly(now ?? DateTime.now()));
+  }
+
+  /// Closed outcomes that belong in the diary only — not in live work lists
+  /// or live card chrome on today/future.
+  static bool isDiaryOnlyOutcome(DayOutcome outcome) {
+    switch (outcome) {
       case DayOutcome.migrated:
       case DayOutcome.scheduled:
       case DayOutcome.cancelled:
       case DayOutcome.backlogged:
         return true;
+      case DayOutcome.open:
+      case DayOutcome.completed:
+        return false;
     }
+  }
+
+  /// Day-log row to pass into list cards for [day].
+  ///
+  /// On live days, diary-only outcomes are omitted so «Agendada →» chrome
+  /// cannot appear on execution/plan rows (including pinned).
+  static DayEntry? cardEntryForDay(
+    DayEntry? entry,
+    DateTime day, {
+    DateTime? now,
+  }) {
+    if (entry == null) return null;
+    if (!isReplayDay(day, now: now) && isDiaryOnlyOutcome(entry.outcome)) {
+      return null;
+    }
+    return entry;
+  }
+
+  /// Open day-log row that still counts as a live commitment on [day].
+  static bool _openEntryBelongsToDay(
+    NoteItem item,
+    DateTime day,
+    DayEntry entry, {
+    required DateTime reference,
+  }) {
+    if (entry.outcome != DayOutcome.open) return false;
+    if (TaskDayQuery.isScheduledOn(item, day)) return true;
+    if (entry.via == DayVia.migratedIn || entry.via == DayVia.scheduledIn) {
+      return true;
+    }
+    if (TaskDayQuery.isInboxCaptureOn(item, day) &&
+        dateOnly(day) == dateOnly(reference)) {
+      return true;
+    }
+    return false;
   }
 
   /// Task membership for «Del día» when [entry] is the resolved row for [day].
@@ -30,21 +81,33 @@ abstract final class DayViewQuery {
     if (item.type != NoteType.task) return false;
     final reference = now ?? DateTime.now();
 
-    if (entry != null && hasAuditableEntry(entry)) {
+    // Past: full diary — any stored day-log row stays visible.
+    if (isReplayDay(day, now: reference)) {
+      if (entry != null) return true;
+      return TaskDayQuery.belongsToDay(item, day, now: reference);
+    }
+
+    // Today / future: execution & plan — never keep diary-only rows
+    // (e.g. "Agendada → mañana" must leave today's work list).
+    if (entry != null) {
       if (entry.outcome == DayOutcome.open) {
-        if (TaskDayQuery.isScheduledOn(item, day)) return true;
-        if (entry.via == DayVia.migratedIn || entry.via == DayVia.scheduledIn) {
-          return true;
-        }
-        if (TaskDayQuery.isInboxCaptureOn(item, day) &&
-            dateOnly(day) == dateOnly(reference)) {
-          return true;
-        }
-        return false;
+        return _openEntryBelongsToDay(
+          item,
+          day,
+          entry,
+          reference: reference,
+        );
       }
-      return true;
+      // Completions still surface via live schedule / completedAt.
+      // Other closed outcomes are diary-only.
+      if (isDiaryOnlyOutcome(entry.outcome)) return false;
     }
     return TaskDayQuery.belongsToDay(item, day, now: reference);
+  }
+
+  /// Whether a closed day-log row should keep the task out of chip Tareas «Hoy».
+  static bool suppressesLiveHoy(DayEntry? entry) {
+    return entry != null && isDiaryOnlyOutcome(entry.outcome);
   }
 
   /// Normal list row (checkbox, black title) vs dimmed audit replay row.
@@ -59,9 +122,7 @@ abstract final class DayViewQuery {
   }) {
     if (item.type != NoteType.task) return true;
     final reference = now ?? DateTime.now();
-    if (dateOnly(day).isBefore(dateOnly(reference))) {
-      return false;
-    }
+    if (isReplayDay(day, now: reference)) return false;
     if (entry?.outcome == DayOutcome.open) return true;
     if (entry == null) return true;
     return TaskDayQuery.isScheduledOn(item, day);

@@ -10,6 +10,7 @@ import 'package:todos_app/features/notes/data/task_reminders_service.dart';
 import 'package:todos_app/features/notes/domain/date_only.dart';
 import 'package:todos_app/features/notes/domain/day_entry.dart';
 import 'package:todos_app/features/notes/domain/note_item.dart';
+import 'package:todos_app/features/notes/domain/notes_query.dart';
 
 void main() {
   late Directory tempDir;
@@ -284,6 +285,29 @@ void main() {
       DayOutcome.scheduled,
     );
     expect(dayEntries.findForNoteDay('t', today)?.targetDay, tomorrow);
+
+    // PRD §8.2: leaves today's work list; still on tomorrow; diary keeps origin.
+    final now = DateTime.now();
+    final todayEntry = dayEntries.findForNoteDay('t', today)!;
+    final tomorrowEntry = dayEntries.findForNoteDay('t', tomorrow)!;
+    expect(
+      NotesQuery.ofDayFrom(
+        [after],
+        today,
+        now: now,
+        dayEntriesByNoteId: {after.id: todayEntry},
+      ),
+      isEmpty,
+    );
+    expect(
+      NotesQuery.ofDayFrom(
+        [after],
+        tomorrow,
+        now: now,
+        dayEntriesByNoteId: {after.id: tomorrowEntry},
+      ).map((e) => e.id),
+      ['t'],
+    );
   });
 
   test('saveTaskFromEditor closes origin and opens destination when due moves',
