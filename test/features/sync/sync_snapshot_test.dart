@@ -170,4 +170,28 @@ void main() {
       );
     },
   );
+
+  test('comment snapshot produces create mutation', () {
+    final comment = {
+      'id': 'c1',
+      'noteId': 'n1',
+      'body': 'Hola',
+      'createdAt': '2026-08-19T10:00:00.000',
+    };
+    final mutations = buildSyncPushMutations(
+      previous: {
+        'note': {},
+        'comment': {},
+      },
+      current: {
+        'note': {},
+        'comment': {'c1': comment},
+      },
+      mutationBuilder: _fakeMutation,
+    );
+    expect(mutations, hasLength(1));
+    expect(mutations.single['entityType'], 'comment');
+    expect(mutations.single['operation'], 'CREATE');
+    expect(mutations.single['payload'], comment);
+  });
 }

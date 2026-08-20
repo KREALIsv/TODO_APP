@@ -60,6 +60,16 @@ void main() {
     );
   });
 
+  test('hideCommentAuditDetails defaults to false and persists', () async {
+    expect(settings.hideCommentAuditDetails, isFalse);
+
+    await settings.setHideCommentAuditDetails(true);
+    expect(settings.hideCommentAuditDetails, isTrue);
+
+    await settings.setHideCommentAuditDetails(false);
+    expect(settings.hideCommentAuditDetails, isFalse);
+  });
+
   test('showHeatmapDayNumbers defaults to true and persists', () async {
     expect(settings.showHeatmapDayNumbers, isTrue);
     expect(settings.showHeatmapDayNumbersLabel, 'Visibles');

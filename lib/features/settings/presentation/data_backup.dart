@@ -7,11 +7,15 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/io/share_bytes_file.dart';
 import '../../notes/data/attachments_repository.dart';
+import '../../notes/data/comments_repository.dart';
 import '../../notes/data/day_entries_repository.dart';
+import '../../notes/data/note_audit_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
 import '../../notes/domain/day_entry.dart';
 import '../../notes/domain/note_attachment.dart';
+import '../../notes/domain/note_audit_event.dart';
+import '../../notes/domain/note_comment.dart';
 import '../../notes/domain/note_item.dart';
 
 enum ImportResult { success, cancelled, invalid }
@@ -28,6 +32,8 @@ class BackupPayload {
     this.tags,
     this.dayEntries = const [],
     this.attachments = const [],
+    this.comments = const [],
+    this.noteAudits = const [],
   });
 
   final int version;
@@ -35,6 +41,8 @@ class BackupPayload {
   final Map<String, dynamic>? tags;
   final List<Map<String, dynamic>> dayEntries;
   final List<Map<String, dynamic>> attachments;
+  final List<Map<String, dynamic>> comments;
+  final List<Map<String, dynamic>> noteAudits;
 }
 
 /// Suggested filename for exported backups (`wodo_backup_2026-07-21T12-00-00.json`).
@@ -48,8 +56,12 @@ String encodeBackup({
   required TagsRepository tags,
   required DayEntriesRepository dayEntries,
   AttachmentsRepository? attachments,
+  CommentsRepository? comments,
+  NoteAuditRepository? noteAudits,
 }) {
   final attachmentsRepo = attachments ?? AttachmentsRepository.instance;
+  final commentsRepo = comments ?? CommentsRepository.instance;
+  final auditsRepo = noteAudits ?? NoteAuditRepository.instance;
   return jsonEncode({
     'version': backupFormatVersion,
     'exportedAt': DateTime.now().toIso8601String(),
@@ -58,6 +70,8 @@ String encodeBackup({
     'tags': tags.exportSnapshot(),
     'dayEntries': dayEntries.exportAllMaps(),
     'attachments': attachmentsRepo.exportAllMaps(),
+    'comments': commentsRepo.exportAllMaps(),
+    'noteAudits': auditsRepo.exportAllMaps(),
   });
 }
 
@@ -96,6 +110,41 @@ List<Map<String, dynamic>>? _parseDayEntryMaps(List<dynamic>? list) {
       return null;
     }
     final item = DayEntry.fromMap(map);
+    result.add(item.toMap());
+  }
+  return result;
+}
+
+List<Map<String, dynamic>>? _parseCommentMaps(List<dynamic>? list) {
+  if (list == null) return const [];
+  final result = <Map<String, dynamic>>[];
+  for (final entry in list) {
+    if (entry is! Map) return null;
+    final map = Map<String, dynamic>.from(entry);
+    if (map['id'] == null ||
+        map['noteId'] == null ||
+        map['createdAt'] == null) {
+      return null;
+    }
+    final item = NoteComment.fromMap(map);
+    result.add(item.toMap());
+  }
+  return result;
+}
+
+List<Map<String, dynamic>>? _parseNoteAuditMaps(List<dynamic>? list) {
+  if (list == null) return const [];
+  final result = <Map<String, dynamic>>[];
+  for (final entry in list) {
+    if (entry is! Map) return null;
+    final map = Map<String, dynamic>.from(entry);
+    if (map['id'] == null ||
+        map['noteId'] == null ||
+        map['kind'] == null ||
+        map['createdAt'] == null) {
+      return null;
+    }
+    final item = NoteAuditEvent.fromMap(map);
     result.add(item.toMap());
   }
   return result;
@@ -155,12 +204,18 @@ BackupPayload? parseBackup(String raw) {
       if (dayEntries == null) return null;
       final attachments = _parseAttachmentMaps(map['attachments'] as List?);
       if (attachments == null) return null;
+      final comments = _parseCommentMaps(map['comments'] as List?);
+      if (comments == null) return null;
+      final noteAudits = _parseNoteAuditMaps(map['noteAudits'] as List?);
+      if (noteAudits == null) return null;
       return BackupPayload(
         version: intVersion,
         notes: notes,
         tags: _parseTagsSnapshot(map['tags']),
         dayEntries: dayEntries,
         attachments: attachments,
+        comments: comments,
+        noteAudits: noteAudits,
       );
     }
 
@@ -191,12 +246,16 @@ Future<void> exportNotesData(
   TagsRepository? tags,
   DayEntriesRepository? dayEntries,
   AttachmentsRepository? attachments,
+  CommentsRepository? comments,
+  NoteAuditRepository? noteAudits,
 }) async {
   final payload = encodeBackup(
     notes: notes,
     tags: tags ?? TagsRepository.instance,
     dayEntries: dayEntries ?? DayEntriesRepository.instance,
     attachments: attachments ?? AttachmentsRepository.instance,
+    comments: comments ?? CommentsRepository.instance,
+    noteAudits: noteAudits ?? NoteAuditRepository.instance,
   );
   await _shareBackupFile(payload);
 }
@@ -226,12 +285,18 @@ Future<void> applyBackupPayload({
   required TagsRepository tags,
   required DayEntriesRepository dayEntries,
   AttachmentsRepository? attachments,
+  CommentsRepository? comments,
+  NoteAuditRepository? noteAudits,
 }) async {
   final attachmentsRepo = attachments ?? AttachmentsRepository.instance;
+  final commentsRepo = comments ?? CommentsRepository.instance;
+  final auditsRepo = noteAudits ?? NoteAuditRepository.instance;
   final notesSnapshot = notes.exportAllMaps();
   final tagsSnapshot = tags.exportSnapshot();
   final daySnapshot = dayEntries.exportAllMaps();
   final attachmentsSnapshot = attachmentsRepo.exportAllMaps();
+  final commentsSnapshot = commentsRepo.exportAllMaps();
+  final auditsSnapshot = auditsRepo.exportAllMaps();
 
   try {
     await notes.replaceAllFromMaps(payload.notes);
@@ -245,9 +310,13 @@ Future<void> applyBackupPayload({
     if (payload.version >= 2) {
       await dayEntries.replaceAllFromMaps(payload.dayEntries);
       await attachmentsRepo.replaceAllFromMaps(payload.attachments);
+      await commentsRepo.replaceAllFromMaps(payload.comments);
+      await auditsRepo.replaceAllFromMaps(payload.noteAudits);
     } else {
       await dayEntries.resetAll();
       await attachmentsRepo.resetAll();
+      await commentsRepo.resetAll();
+      await auditsRepo.resetAll();
     }
 
     await notes.syncAllReminders();
@@ -256,6 +325,8 @@ Future<void> applyBackupPayload({
     await tags.replaceSnapshot(tagsSnapshot);
     await dayEntries.replaceAllFromMaps(daySnapshot);
     await attachmentsRepo.replaceAllFromMaps(attachmentsSnapshot);
+    await commentsRepo.replaceAllFromMaps(commentsSnapshot);
+    await auditsRepo.replaceAllFromMaps(auditsSnapshot);
     rethrow;
   }
 }
@@ -310,14 +381,20 @@ Future<void> resetAllAppContent({
   TagsRepository? tags,
   DayEntriesRepository? dayEntries,
   AttachmentsRepository? attachments,
+  CommentsRepository? comments,
+  NoteAuditRepository? noteAudits,
 }) async {
   final notesRepo = notes ?? NotesRepository.instance;
   final tagsRepo = tags ?? TagsRepository.instance;
   final dayRepo = dayEntries ?? DayEntriesRepository.instance;
   final attachmentsRepo = attachments ?? AttachmentsRepository.instance;
+  final commentsRepo = comments ?? CommentsRepository.instance;
+  final auditsRepo = noteAudits ?? NoteAuditRepository.instance;
 
   await notesRepo.resetAll();
   await tagsRepo.resetToDefaults();
   await dayRepo.resetAll();
   await attachmentsRepo.resetAll();
+  await commentsRepo.resetAll();
+  await auditsRepo.resetAll();
 }

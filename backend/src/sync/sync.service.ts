@@ -246,6 +246,11 @@ export class SyncService {
           });
         }
         break;
+
+      case 'comment':
+      case 'noteAudit':
+        // Materialized in sync_mutations (pull source). No dedicated table in v1.
+        break;
     }
   }
 

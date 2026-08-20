@@ -11,7 +11,9 @@ import '../domain/note_item.dart';
 import '../domain/task_dates.dart';
 import '../../sync/domain/sync_conflict.dart';
 import 'attachments_repository.dart';
+import 'comments_repository.dart';
 import 'day_entries_repository.dart';
+import 'note_audit_repository.dart';
 import 'task_reminders_service.dart';
 
 class NotesRepository {
@@ -27,6 +29,8 @@ class NotesRepository {
   TaskRemindersService _reminders = TaskRemindersService.instance;
   DayEntriesRepository _dayEntries = DayEntriesRepository.instance;
   AttachmentsRepository _attachments = AttachmentsRepository.instance;
+  CommentsRepository _comments = CommentsRepository.instance;
+  NoteAuditRepository _audits = NoteAuditRepository.instance;
 
   Future<void> init() async {
     _box = await Hive.openBox<Map>(_boxName);
@@ -64,6 +68,16 @@ class NotesRepository {
   @visibleForTesting
   set attachmentsForTests(AttachmentsRepository repo) {
     _attachments = repo;
+  }
+
+  @visibleForTesting
+  set commentsForTests(CommentsRepository repo) {
+    _comments = repo;
+  }
+
+  @visibleForTesting
+  set auditsForTests(NoteAuditRepository repo) {
+    _audits = repo;
   }
 
   ValueListenable<Box<Map>> listenable() => _box.listenable();
@@ -209,6 +223,7 @@ class NotesRepository {
   Future<void> add(NoteItem item) async {
     await _box.put(item.id, item.toMap());
     await _syncReminder(item);
+    await _recordAudits(previous: null, next: item);
     if (item.type != NoteType.task) return;
 
     final now = DateTime.now();
@@ -232,8 +247,10 @@ class NotesRepository {
   }
 
   Future<void> update(NoteItem item) async {
+    final previous = getById(item.id);
     await _box.put(item.id, item.toMap());
     await _syncReminder(item);
+    await _recordAudits(previous: previous, next: item);
   }
 
   /// Persists a task edited in [NoteEditorScreen] and mirrors day-entry writers
@@ -289,6 +306,16 @@ class NotesRepository {
 
   Future<void> delete(String id) async {
     await _cancelReminder(id);
+    try {
+      await _comments.deleteForNote(id);
+    } catch (e, st) {
+      debugPrint('Comment cleanup failed for $id: $e\n$st');
+    }
+    try {
+      await _audits.deleteForNote(id);
+    } catch (e, st) {
+      debugPrint('Audit cleanup failed for $id: $e\n$st');
+    }
     try {
       await _attachments.deleteForNote(id);
     } catch (e, st) {
@@ -601,6 +628,17 @@ class NotesRepository {
       ),
       'cancelTaskOnDay',
     );
+  }
+
+  Future<void> _recordAudits({
+    required NoteItem? previous,
+    required NoteItem next,
+  }) async {
+    try {
+      await _audits.recordDiff(previous: previous, next: next);
+    } catch (e, st) {
+      debugPrint('Note audit record failed: $e\n$st');
+    }
   }
 
   Future<void> _syncDayEntry(

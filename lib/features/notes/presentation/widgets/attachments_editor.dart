@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../../global/themes/app_colors.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../../../global/widgets/app_loading.dart';
 import '../../../../global/widgets/outlined_add_chip.dart';
@@ -38,7 +37,6 @@ class AttachmentsEditor extends StatefulWidget {
 }
 
 class _AttachmentsEditorState extends State<AttachmentsEditor> {
-  final _picker = ImagePicker();
   bool _busy = false;
 
   AttachmentsRepository get _repo =>
@@ -48,19 +46,12 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final file = await _picker.pickImage(
-        source: source,
-        maxWidth: AttachmentsRepository.maxDecodeEdge.toDouble(),
-        imageQuality: 85,
-      );
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
-      final created = await _repo.addImage(
+      final created = await pickAndStoreImage(
         noteId: widget.noteId,
-        bytes: bytes,
-        fileName: file.name,
-        mimeType: file.mimeType ?? 'image/jpeg',
+        source: source,
+        attachments: _repo,
       );
+      if (created == null) return;
       if (!mounted) return;
       widget.onAttachmentAdded?.call(created.id);
       if (widget.coverAttachmentId == null) {
@@ -90,35 +81,9 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
   }
 
   Future<void> _showAddSheet() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_camera_outlined),
-                title: const Text('Tomar foto'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _addFrom(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined),
-                title: const Text('Elegir de la galería'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _addFrom(ImageSource.gallery);
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
+    await showAddImageSourceSheet(
+      context,
+      onSelected: _addFrom,
     );
   }
 
@@ -264,44 +229,17 @@ class _AttachmentsEditorState extends State<AttachmentsEditor> {
 
   Future<void> _showThumbMenu(NoteAttachment item) async {
     final isCover = item.id == widget.coverAttachmentId;
-    await showModalBottomSheet<void>(
+    await showAttachmentCoverMenu(
       context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(
-                  isCover ? Icons.star_outline : Icons.star,
-                ),
-                title: Text(
-                  isCover ? 'Quitar portada' : 'Usar como portada',
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  applyCoverAttachmentChange(
-                    noteId: widget.noteId,
-                    coverAttachmentId: isCover ? null : item.id,
-                    onCoverChanged: widget.onCoverChanged,
-                  );
-                },
-              ),
-              ListTile(
-                leading:
-                    const Icon(Icons.delete_outline, color: AppColors.error),
-                title: const Text('Eliminar'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _deleteAttachment(item);
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
+      isCover: isCover,
+      onToggleCover: () {
+        applyCoverAttachmentChange(
+          noteId: widget.noteId,
+          coverAttachmentId: isCover ? null : item.id,
+          onCoverChanged: widget.onCoverChanged,
         );
       },
+      onDelete: () => _deleteAttachment(item),
     );
   }
 }

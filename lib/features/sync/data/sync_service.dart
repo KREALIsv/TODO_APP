@@ -10,7 +10,9 @@ import 'package:uuid/uuid.dart';
 import '../../settings/presentation/data_backup.dart';
 import '../../auth/data/auth_service.dart';
 import '../../auth/domain/auth_session_expired_exception.dart';
+import '../../notes/data/comments_repository.dart';
 import '../../notes/data/day_entries_repository.dart';
+import '../../notes/data/note_audit_repository.dart';
 import '../../notes/data/notes_repository.dart';
 import '../../notes/data/tags_repository.dart';
 import '../../notes/domain/note_item.dart';
@@ -39,6 +41,8 @@ class SyncService extends ChangeNotifier {
   final NotesRepository _notes = NotesRepository.instance;
   final TagsRepository _tags = TagsRepository.instance;
   final DayEntriesRepository _dayEntries = DayEntriesRepository.instance;
+  final CommentsRepository _comments = CommentsRepository.instance;
+  final NoteAuditRepository _noteAudits = NoteAuditRepository.instance;
 
   late Box<dynamic> _box;
   Timer? _debounce;
@@ -68,6 +72,8 @@ class SyncService extends ChangeNotifier {
     _notes.changes.addListener(_scheduleSync);
     _tags.changes.addListener(_scheduleSync);
     _dayEntries.changes.addListener(_scheduleSync);
+    _comments.changes.addListener(_scheduleSync);
+    _noteAudits.changes.addListener(_scheduleSync);
     DeviceIdentity.instance.addListener(_onSyncEligibilityChanged);
     Timer.periodic(const Duration(seconds: 30), (_) => syncNow());
     _onAuthChanged();
@@ -123,7 +129,19 @@ class SyncService extends ChangeNotifier {
     final dayEntries = <String, Map<String, dynamic>>{
       for (final entry in _dayEntries.getAll()) entry.id: entry.toMap(),
     };
-    return {'note': notes, 'tag': tags, 'dayEntry': dayEntries};
+    final comments = <String, Map<String, dynamic>>{
+      for (final item in _comments.getAll()) item.id: item.toMap(),
+    };
+    final noteAudits = <String, Map<String, dynamic>>{
+      for (final item in _noteAudits.getAll()) item.id: item.toMap(),
+    };
+    return {
+      'note': notes,
+      'tag': tags,
+      'dayEntry': dayEntries,
+      'comment': comments,
+      'noteAudit': noteAudits,
+    };
   }
 
   Future<void> _push(
@@ -229,6 +247,12 @@ class SyncService extends ChangeNotifier {
         case 'dayEntry':
           await _dayEntries.deleteFromSync(entityId);
           break;
+        case 'comment':
+          await _comments.deleteFromSync(entityId);
+          break;
+        case 'noteAudit':
+          await _noteAudits.deleteFromSync(entityId);
+          break;
       }
       return;
     }
@@ -255,6 +279,12 @@ class SyncService extends ChangeNotifier {
         break;
       case 'dayEntry':
         await _dayEntries.saveFromSync(payload);
+        break;
+      case 'comment':
+        await _comments.saveFromSync(payload);
+        break;
+      case 'noteAudit':
+        await _noteAudits.saveFromSync(payload);
         break;
     }
   }

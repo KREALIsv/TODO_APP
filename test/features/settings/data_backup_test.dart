@@ -4,9 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 
 import 'package:todos_app/features/notes/data/attachments_repository.dart';
+import 'package:todos_app/features/notes/data/comments_repository.dart';
 import 'package:todos_app/features/notes/data/day_entries_repository.dart';
+import 'package:todos_app/features/notes/data/note_audit_repository.dart';
 import 'package:todos_app/features/notes/data/notes_repository.dart';
 import 'package:todos_app/features/notes/data/tags_repository.dart';
+import 'package:todos_app/features/notes/domain/note_audit_event.dart';
 import 'package:todos_app/features/notes/domain/date_only.dart';
 import 'package:todos_app/features/notes/domain/day_entry.dart';
 import 'package:todos_app/features/notes/domain/note_item.dart';
@@ -261,5 +264,58 @@ void main() {
     expect(notes.getAll(), isEmpty);
     expect(dayEntries.getAll(), isEmpty);
     expect(tags.getColorId('SYVEX'), isNull);
+  });
+
+  test('backup roundtrip restores comments and audits', () async {
+    final comments = CommentsRepository.instance;
+    final audits = NoteAuditRepository.instance;
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    await comments.initWithBox(await Hive.openBox<Map>('comments_$stamp'));
+    await audits.initWithBox(await Hive.openBox<Map>('audits_$stamp'));
+
+    await notes.add(_task(id: 't1'));
+    await comments.add(noteId: 't1', body: 'avance');
+    await audits.addAll([
+      NoteAuditEvent(
+        id: 'a1',
+        noteId: 't1',
+        kind: NoteAuditKind.titleChanged,
+        createdAt: DateTime(2026, 8, 19, 10),
+        summary: 'Título actualizado',
+      ),
+    ]);
+
+    final exported = parseBackup(
+      encodeBackup(
+        notes: notes,
+        tags: tags,
+        dayEntries: dayEntries,
+        comments: comments,
+        noteAudits: audits,
+      ),
+    )!;
+    expect(exported.comments, hasLength(1));
+    expect(exported.noteAudits, hasLength(1));
+
+    await resetAllAppContent(
+      notes: notes,
+      tags: tags,
+      dayEntries: dayEntries,
+      comments: comments,
+      noteAudits: audits,
+    );
+    expect(comments.forNote('t1'), isEmpty);
+    expect(audits.forNote('t1'), isEmpty);
+
+    await applyBackupPayload(
+      payload: exported,
+      notes: notes,
+      tags: tags,
+      dayEntries: dayEntries,
+      comments: comments,
+      noteAudits: audits,
+    );
+    expect(comments.forNote('t1').single.body, 'avance');
+    expect(audits.forNote('t1').single.kind, NoteAuditKind.titleChanged);
   });
 }

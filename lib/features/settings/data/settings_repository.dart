@@ -12,6 +12,7 @@ class SettingsRepository extends ChangeNotifier {
   static const String _themeModeKey = 'themeMode';
   static const String _listBackgroundIdKey = 'listBackgroundId';
   static const String _showHeatmapDayNumbersKey = 'showHeatmapDayNumbers';
+  static const String _hideCommentAuditDetailsKey = 'hideCommentAuditDetails';
 
   late Box _box;
 
@@ -77,6 +78,18 @@ class SettingsRepository extends ChangeNotifier {
 
   Future<void> setShowHeatmapDayNumbers(bool value) async {
     await _box.put(_showHeatmapDayNumbersKey, value);
+    notifyListeners();
+  }
+
+  /// When true, the comments feed hides DayEntry and audit rows.
+  bool get hideCommentAuditDetails {
+    final raw = _box.get(_hideCommentAuditDetailsKey);
+    if (raw is bool) return raw;
+    return false;
+  }
+
+  Future<void> setHideCommentAuditDetails(bool value) async {
+    await _box.put(_hideCommentAuditDetailsKey, value);
     notifyListeners();
   }
 

@@ -5,8 +5,8 @@ export class SyncMutationDto {
   clientMutationId!: string;
 
   @IsString()
-  @IsIn(['note', 'tag', 'dayEntry'])
-  entityType!: 'note' | 'tag' | 'dayEntry';
+  @IsIn(['note', 'tag', 'dayEntry', 'comment', 'noteAudit'])
+  entityType!: 'note' | 'tag' | 'dayEntry' | 'comment' | 'noteAudit';
 
   @IsString()
   entityId!: string;

@@ -76,7 +76,7 @@ class _TaskDayHistorySectionState extends State<TaskDayHistorySection> {
                 ),
               ),
               for (final entry in visible)
-                _TaskDayHistoryTile(
+                TaskDayHistoryTile(
                   entry: entry,
                   onTap: widget.onDayTap == null
                       ? null
@@ -110,8 +110,9 @@ class _TaskDayHistorySectionState extends State<TaskDayHistorySection> {
   }
 }
 
-class _TaskDayHistoryTile extends StatelessWidget {
-  const _TaskDayHistoryTile({
+class TaskDayHistoryTile extends StatelessWidget {
+  const TaskDayHistoryTile({
+    super.key,
     required this.entry,
     this.onTap,
   });

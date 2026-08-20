@@ -22,6 +22,7 @@ class AttachmentViewerScreen extends StatefulWidget {
     required this.coverAttachmentId,
     required this.onCoverChanged,
     this.repository,
+    this.items,
   });
 
   final String noteId;
@@ -29,6 +30,10 @@ class AttachmentViewerScreen extends StatefulWidget {
   final String? coverAttachmentId;
   final ValueChanged<String?> onCoverChanged;
   final AttachmentsRepository? repository;
+
+  /// When set, the viewer pages through this list (e.g. comment images).
+  /// Defaults to [AttachmentsRepository.forNote].
+  final List<NoteAttachment>? items;
 
   @override
   State<AttachmentViewerScreen> createState() => _AttachmentViewerScreenState();
@@ -75,6 +80,16 @@ class _AttachmentViewerScreenState extends State<AttachmentViewerScreen> {
   void _resetZoom() {
     _transform.value = Matrix4.identity();
     if (_zoomed) setState(() => _zoomed = false);
+  }
+
+  List<NoteAttachment> _resolveItems() {
+    if (widget.items != null) {
+      return [
+        for (final item in widget.items!)
+          if (_repo.getById(item.id) != null) item,
+      ];
+    }
+    return _repo.forNote(widget.noteId);
   }
 
   void _close() {
@@ -142,7 +157,7 @@ class _AttachmentViewerScreenState extends State<AttachmentViewerScreen> {
       );
       if (!deleted || !mounted) return;
 
-      final remaining = _repo.forNote(widget.noteId);
+      final remaining = _resolveItems();
       if (remaining.isEmpty) {
         _close();
         return;
@@ -173,7 +188,7 @@ class _AttachmentViewerScreenState extends State<AttachmentViewerScreen> {
         child: ValueListenableBuilder<Box<Map>>(
           valueListenable: _repo.listenable(),
           builder: (context, box, _) {
-            final items = _repo.forNote(widget.noteId);
+            final items = _resolveItems();
             if (items.isEmpty) {
               return Scaffold(
                 appBar: AppBar(leading: BackButton(onPressed: _close)),
@@ -245,10 +260,22 @@ class _AttachmentViewerScreenState extends State<AttachmentViewerScreen> {
                       final bytes = _repo.bytesFor(items[i].id);
                       if (bytes == null) {
                         return Center(
-                          child: Icon(
-                            Icons.broken_image_outlined,
-                            color: AppSurface.mutedIcon(context),
-                            size: 48,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.broken_image_outlined,
+                                color: AppSurface.mutedIcon(context),
+                                size: 48,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Imagen no sincronizada',
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: AppSurface.secondary(context),
+                                ),
+                              ),
+                            ],
                           ),
                         );
                       }
