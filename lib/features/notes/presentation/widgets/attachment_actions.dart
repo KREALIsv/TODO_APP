@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../global/themes/app_colors.dart';
 import '../../../../global/widgets/app_alerts.dart';
 import '../../data/attachments_repository.dart';
 import '../../data/notes_repository.dart';
@@ -152,4 +153,54 @@ Future<bool> confirmAndDeleteAttachment(
   }
 
   return true;
+}
+
+/// Shared cover/delete sheet used by Adjuntos and comment images.
+Future<void> showAttachmentCoverMenu({
+  required BuildContext context,
+  required bool isCover,
+  required VoidCallback onToggleCover,
+  required VoidCallback onDelete,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(isCover ? Icons.star_outline : Icons.star),
+              title: Text(isCover ? 'Quitar portada' : 'Usar como portada'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                onToggleCover();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: AppColors.error),
+              title: const Text('Eliminar'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                onDelete();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+/// Bumps the note's `updatedAt` after comment CRUD (no repo `touchUpdatedAt`).
+Future<void> bumpNoteUpdatedAt(
+  String noteId, {
+  NotesRepository? notes,
+}) async {
+  final notesRepo = notes ?? NotesRepository.instance;
+  final note = notesRepo.getById(noteId);
+  if (note == null) return;
+  await notesRepo.update(note.copyWith(updatedAt: DateTime.now()));
 }

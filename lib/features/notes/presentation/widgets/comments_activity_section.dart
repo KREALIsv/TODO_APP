@@ -24,6 +24,8 @@ class CommentsActivitySection extends StatelessWidget {
     required this.enabled,
     required this.noteType,
     this.onDayTap,
+    this.coverAttachmentId,
+    this.onCoverChanged,
     this.comments,
     this.audits,
     this.dayEntries,
@@ -36,6 +38,8 @@ class CommentsActivitySection extends StatelessWidget {
   final bool enabled;
   final NoteType noteType;
   final ValueChanged<DateTime>? onDayTap;
+  final String? coverAttachmentId;
+  final ValueChanged<String?>? onCoverChanged;
   final CommentsRepository? comments;
   final NoteAuditRepository? audits;
   final DayEntriesRepository? dayEntries;
@@ -67,9 +71,7 @@ class CommentsActivitySection extends StatelessWidget {
         commentId: comment.id,
       );
     }
-    final note = _notes.getById(noteId);
-    if (note == null) return;
-    await _notes.update(note.copyWith(updatedAt: DateTime.now()));
+    await bumpNoteUpdatedAt(noteId, notes: _notes);
   }
 
   @override
@@ -130,7 +132,6 @@ class CommentsActivitySection extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             CommentComposer(
-              noteId: noteId,
               enabled: enabled,
               noteType: noteType,
               onSubmit: _submit,
@@ -154,6 +155,8 @@ class CommentsActivitySection extends StatelessWidget {
                       attachments: _attachments,
                       notes: _notes,
                       enabled: enabled,
+                      coverAttachmentId: coverAttachmentId,
+                      onCoverChanged: onCoverChanged,
                     ),
                   CommentFeedKind.dayEntry => TaskDayHistoryTile(
                       entry: item.dayEntry!,

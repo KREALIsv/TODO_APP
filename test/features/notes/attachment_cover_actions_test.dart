@@ -107,4 +107,29 @@ void main() {
     expect(draftCover, isNull);
     expect(notes.getById('draft-only'), isNull);
   });
+
+  test('bumpNoteUpdatedAt updates an existing note', () async {
+    final now = DateTime(2026, 8, 5, 12);
+    await notes.add(
+      NoteItem(
+        id: 'n1',
+        type: NoteType.note,
+        title: 'Nota',
+        body: '',
+        pinned: false,
+        completed: false,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+
+    await bumpNoteUpdatedAt('n1', notes: notes);
+
+    expect(notes.getById('n1')!.updatedAt.isAfter(now), isTrue);
+  });
+
+  test('bumpNoteUpdatedAt is a no-op when the note is missing', () async {
+    await bumpNoteUpdatedAt('missing', notes: notes);
+    expect(notes.getById('missing'), isNull);
+  });
 }

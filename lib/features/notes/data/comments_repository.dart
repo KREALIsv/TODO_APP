@@ -59,6 +59,7 @@ class CommentsRepository {
   }
 
   NoteComment? getById(String id) {
+    if (!_ready) return null;
     final raw = _box.get(id);
     if (raw == null) return null;
     return NoteComment.fromMap(Map<dynamic, dynamic>.from(raw));
@@ -76,10 +77,7 @@ class CommentsRepository {
     DateTime? now,
     String? id,
   }) async {
-    final trimmed = body.trim();
-    if (trimmed.length > NoteComment.maxBodyLength) {
-      throw StateError('El comentario es demasiado largo');
-    }
+    final trimmed = _validatedBody(body);
     final created = now ?? DateTime.now();
     final comment = NoteComment(
       id: id ?? _uuid.v4(),
@@ -96,10 +94,7 @@ class CommentsRepository {
     if (current == null) {
       throw StateError('Comentario no encontrado');
     }
-    final trimmed = body.trim();
-    if (trimmed.length > NoteComment.maxBodyLength) {
-      throw StateError('El comentario es demasiado largo');
-    }
+    final trimmed = _validatedBody(body);
     final next = current.copyWith(
       body: trimmed,
       editedAt: now ?? DateTime.now(),
@@ -151,4 +146,12 @@ class CommentsRepository {
 
   @visibleForTesting
   Future<void> clear() => resetAll();
+
+  String _validatedBody(String body) {
+    final trimmed = body.trim();
+    if (trimmed.length > NoteComment.maxBodyLength) {
+      throw StateError('El comentario es demasiado largo');
+    }
+    return trimmed;
+  }
 }

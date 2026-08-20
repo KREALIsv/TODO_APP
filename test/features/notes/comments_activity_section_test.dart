@@ -13,7 +13,6 @@ void main() {
       const MaterialApp(
         home: Scaffold(
           body: CommentComposer(
-            noteId: 'draft',
             enabled: false,
             noteType: NoteType.note,
             onSubmit: _unusedSubmit,
@@ -37,7 +36,6 @@ void main() {
       const MaterialApp(
         home: Scaffold(
           body: CommentComposer(
-            noteId: 'draft',
             enabled: false,
             noteType: NoteType.task,
             onSubmit: _unusedSubmit,
@@ -57,7 +55,6 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: CommentComposer(
-            noteId: 'n1',
             enabled: true,
             noteType: NoteType.note,
             onSubmit: ({required body, required images}) async {
@@ -84,7 +81,6 @@ void main() {
       const MaterialApp(
         home: Scaffold(
           body: CommentComposer(
-            noteId: 'n1',
             enabled: true,
             noteType: NoteType.note,
             onSubmit: _unusedSubmit,

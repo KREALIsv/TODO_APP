@@ -3,9 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_surface.dart';
-import '../../../../global/themes/app_colors.dart';
 import '../../../../global/themes/tokens.dart';
 import '../../../../global/widgets/app_alerts.dart';
+import '../../../../global/widgets/app_loading.dart';
 import '../../data/attachments_repository.dart';
 import '../../data/comments_repository.dart';
 import '../../data/notes_repository.dart';
@@ -23,6 +23,8 @@ class CommentTile extends StatelessWidget {
     this.attachments,
     this.notes,
     this.enabled = true,
+    this.coverAttachmentId,
+    this.onCoverChanged,
   });
 
   final NoteComment comment;
@@ -30,11 +32,18 @@ class CommentTile extends StatelessWidget {
   final AttachmentsRepository? attachments;
   final NotesRepository? notes;
   final bool enabled;
+  final String? coverAttachmentId;
+  final ValueChanged<String?>? onCoverChanged;
 
   CommentsRepository get _comments => comments ?? CommentsRepository.instance;
   AttachmentsRepository get _attachments =>
       attachments ?? AttachmentsRepository.instance;
   NotesRepository get _notes => notes ?? NotesRepository.instance;
+
+  String? get _coverId =>
+      coverAttachmentId ?? _notes.getById(comment.noteId)?.coverAttachmentId;
+
+  ValueChanged<String?> get _onCoverChanged => onCoverChanged ?? (_) {};
 
   Future<void> _edit(BuildContext context) async {
     final controller = TextEditingController(text: comment.body);
@@ -74,7 +83,7 @@ class CommentTile extends StatelessWidget {
       return;
     }
     await _comments.updateBody(comment.id, trimmed);
-    await _touchNote();
+    await bumpNoteUpdatedAt(comment.noteId, notes: _notes);
   }
 
   Future<void> _delete(BuildContext context) async {
@@ -92,18 +101,16 @@ class CommentTile extends StatelessWidget {
         images.any((item) => item.id == note.coverAttachmentId);
     await _comments.delete(comment.id);
     if (note == null) return;
-    await _notes.update(
-      note.copyWith(
-        coverAttachmentId: coverWasCommentImage ? null : note.coverAttachmentId,
-        updatedAt: DateTime.now(),
-      ),
-    );
-  }
-
-  Future<void> _touchNote() async {
-    final note = _notes.getById(comment.noteId);
-    if (note == null) return;
-    await _notes.update(note.copyWith(updatedAt: DateTime.now()));
+    if (coverWasCommentImage) {
+      await applyCoverAttachmentChange(
+        noteId: comment.noteId,
+        coverAttachmentId: null,
+        onCoverChanged: _onCoverChanged,
+        notes: _notes,
+      );
+      return;
+    }
+    await bumpNoteUpdatedAt(comment.noteId, notes: _notes);
   }
 
   Future<void> _openViewer(
@@ -111,14 +118,13 @@ class CommentTile extends StatelessWidget {
     List<NoteAttachment> images,
     int index,
   ) async {
-    final note = _notes.getById(comment.noteId);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AttachmentViewerScreen(
           noteId: comment.noteId,
           initialIndex: index,
-          coverAttachmentId: note?.coverAttachmentId,
-          onCoverChanged: (_) {},
+          coverAttachmentId: _coverId,
+          onCoverChanged: _onCoverChanged,
           repository: _attachments,
           items: images,
         ),
@@ -130,48 +136,26 @@ class CommentTile extends StatelessWidget {
     BuildContext context,
     NoteAttachment item,
   ) async {
-    final note = _notes.getById(comment.noteId);
-    final isCover = item.id == note?.coverAttachmentId;
-    await showModalBottomSheet<void>(
+    final isCover = item.id == _coverId;
+    await showAttachmentCoverMenu(
       context: context,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(isCover ? Icons.star_outline : Icons.star),
-                title: Text(isCover ? 'Quitar portada' : 'Usar como portada'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  applyCoverAttachmentChange(
-                    noteId: comment.noteId,
-                    coverAttachmentId: isCover ? null : item.id,
-                    onCoverChanged: (_) {},
-                    notes: _notes,
-                  );
-                },
-              ),
-              ListTile(
-                leading:
-                    const Icon(Icons.delete_outline, color: AppColors.error),
-                title: const Text('Eliminar'),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  await confirmAndDeleteAttachment(
-                    context,
-                    item: item,
-                    coverAttachmentId: note?.coverAttachmentId,
-                    onCoverChanged: (_) {},
-                    attachments: _attachments,
-                    notes: _notes,
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
+      isCover: isCover,
+      onToggleCover: () {
+        applyCoverAttachmentChange(
+          noteId: comment.noteId,
+          coverAttachmentId: isCover ? null : item.id,
+          onCoverChanged: _onCoverChanged,
+          notes: _notes,
+        );
+      },
+      onDelete: () {
+        confirmAndDeleteAttachment(
+          context,
+          item: item,
+          coverAttachmentId: _coverId,
+          onCoverChanged: _onCoverChanged,
+          attachments: _attachments,
+          notes: _notes,
         );
       },
     );
@@ -308,11 +292,14 @@ class _CommentImagePreview extends StatelessWidget {
                       ),
                     ),
                   )
-                : Image.memory(
-                    bytes!,
-                    fit: BoxFit.cover,
+                : SizedBox(
                     width: double.infinity,
                     height: 140,
+                    child: AppMemoryImage(
+                      bytes: bytes!,
+                      fit: BoxFit.cover,
+                      height: 140,
+                    ),
                   ),
           ),
         ),

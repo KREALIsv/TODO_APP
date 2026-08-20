@@ -14,13 +14,11 @@ import 'attachment_actions.dart';
 class CommentComposer extends StatefulWidget {
   const CommentComposer({
     super.key,
-    required this.noteId,
     required this.enabled,
     required this.noteType,
     required this.onSubmit,
   });
 
-  final String noteId;
   final bool enabled;
   final NoteType noteType;
   final Future<void> Function({
@@ -167,8 +165,8 @@ class _CommentComposerState extends State<CommentComposer> {
                       children: [
                         ClipRRect(
                           borderRadius: ThemeTokens.borderRadius,
-                          child: Image.memory(
-                            image.bytes,
+                          child: AppMemoryImage(
+                            bytes: image.bytes,
                             width: 64,
                             height: 64,
                             fit: BoxFit.cover,

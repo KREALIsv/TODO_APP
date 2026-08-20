@@ -502,6 +502,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           noteId: _noteId,
           enabled: _isEditing,
           noteType: _type,
+          coverAttachmentId: _coverAttachmentId,
+          onCoverChanged: (id) => setState(() => _coverAttachmentId = id),
         ),
         if (isTask && _isEditing && _showRemoveFromDay) ...[
           const SizedBox(height: 16),
