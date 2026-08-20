@@ -36,7 +36,7 @@ class NotesQuery {
     if (!useGroupedTasksLayout(filter: filter, searchQuery: searchQuery)) {
       return false;
     }
-    return dateOnly(day).isAfter(dateOnly(now ?? DateTime.now()));
+    return DayViewQuery.isPlanDay(day, now: now);
   }
 
   static List<NoteItem> apply({
@@ -61,12 +61,9 @@ class NotesQuery {
   /// Unpinned items that belong to [day] (local calendar day).
   ///
   /// Notes: created or updated that day.
-  /// Tasks (PRD-day-review §8.2):
-  /// - today / future → live schedule only ([TaskDayQuery] + open day-log);
-  /// - past → day-log replay (closed outcomes like migrated/scheduled stay).
-  ///
-  /// When [dayEntriesByNoteId] is provided, task membership is decided only by
-  /// [DayViewQuery.taskBelongsToDay] (no second pass via [belongsToDay]).
+  /// Tasks always go through [DayViewQuery.taskBelongsToDay] (PRD §8.2):
+  /// - today / future → live schedule + open day-log;
+  /// - past → full day-log replay when an entry exists.
   static List<NoteItem> ofDayFrom(
     List<NoteItem> items,
     DateTime day, {
@@ -77,12 +74,12 @@ class NotesQuery {
     return items
         .where((item) {
           if (item.pinned) return false;
-          if (item.type == NoteType.task && dayEntriesByNoteId != null) {
+          if (item.type == NoteType.task) {
             return DayViewQuery.taskBelongsToDay(
               item,
               day,
               now: reference,
-              entry: dayEntriesByNoteId[item.id],
+              entry: dayEntriesByNoteId?[item.id],
             );
           }
           return belongsToDay(item, day, now: reference);

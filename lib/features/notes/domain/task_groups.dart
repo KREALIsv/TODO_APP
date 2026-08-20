@@ -1,4 +1,6 @@
 import 'date_only.dart';
+import 'day_entry.dart';
+import 'day_view_query.dart';
 import 'note_item.dart';
 import 'task_day_query.dart';
 import 'task_dates.dart';
@@ -46,7 +48,15 @@ class TaskGroupsQuery {
   }
 
   /// Groups active tasks (caller should pass non-archived tasks only).
-  static TaskGroups from(List<NoteItem> tasks, {DateTime? now}) {
+  ///
+  /// When [dayEntriesByNoteId] includes today's diary-only outcomes
+  /// (scheduled / migrated / cancelled / backlogged), those tasks are kept
+  /// out of «Hoy» — same live gate as [DayViewQuery.taskBelongsToDay].
+  static TaskGroups from(
+    List<NoteItem> tasks, {
+    DateTime? now,
+    Map<String, DayEntry>? dayEntriesByNoteId,
+  }) {
     final reference = now ?? DateTime.now();
     final todayDay = dateOnly(reference);
 
@@ -58,7 +68,11 @@ class TaskGroupsQuery {
     for (final item in tasks) {
       if (item.type != NoteType.task || item.isArchived) continue;
 
-      if (TaskDayQuery.belongsToHoy(item, now: reference)) {
+      final todayEntry = dayEntriesByNoteId?[item.id];
+      final inHoy = TaskDayQuery.belongsToHoy(item, now: reference) &&
+          !DayViewQuery.suppressesLiveHoy(todayEntry);
+
+      if (inHoy) {
         today.add(item);
         continue;
       }

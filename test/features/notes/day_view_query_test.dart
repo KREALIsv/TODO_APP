@@ -340,11 +340,78 @@ void main() {
       );
     });
 
+    test('past open day-log row stays in diary even without live schedule', () {
+      final today = DateTime(2026, 8, 19, 12);
+      final past = DateTime(2026, 8, 18);
+      final task = NoteItem(
+        id: 'orphan',
+        type: NoteType.task,
+        title: 'Pendiente huérfana',
+        body: '',
+        pinned: false,
+        completed: false,
+        createdAt: past,
+        updatedAt: today,
+        dueAt: today,
+      );
+      final openOnPast = DayEntry(
+        id: 'e-open-past',
+        noteId: 'orphan',
+        day: past,
+        via: DayVia.due,
+        outcome: DayOutcome.open,
+        createdAt: past,
+      );
+
+      expect(
+        DayViewQuery.taskBelongsToDay(
+          task,
+          past,
+          now: today,
+          entry: openOnPast,
+        ),
+        isTrue,
+      );
+      expect(
+        NotesQuery.ofDayFrom(
+          [task],
+          past,
+          now: today,
+          dayEntriesByNoteId: {task.id: openOnPast},
+        ).map((e) => e.id),
+        ['orphan'],
+      );
+    });
+
+    test('cardEntryForDay hides diary-only outcomes on live days', () {
+      final today = DateTime(2026, 8, 19, 12);
+      final scheduled = DayEntry(
+        id: 'e',
+        noteId: 'n',
+        day: today,
+        via: DayVia.manual,
+        outcome: DayOutcome.scheduled,
+        targetDay: DateTime(2026, 8, 20),
+        outcomeAt: today,
+        createdAt: today,
+      );
+      expect(
+        DayViewQuery.cardEntryForDay(scheduled, today, now: today),
+        isNull,
+      );
+      expect(
+        DayViewQuery.cardEntryForDay(scheduled, today, now: DateTime(2026, 8, 21)),
+        scheduled,
+      );
+    });
+
     test('isReplayDay is true only for past calendar days', () {
       final now = DateTime(2026, 8, 19, 12);
       expect(DayViewQuery.isReplayDay(DateTime(2026, 8, 18), now: now), isTrue);
       expect(DayViewQuery.isReplayDay(DateTime(2026, 8, 19), now: now), isFalse);
       expect(DayViewQuery.isReplayDay(DateTime(2026, 8, 20), now: now), isFalse);
+      expect(DayViewQuery.isPlanDay(DateTime(2026, 8, 20), now: now), isTrue);
+      expect(DayViewQuery.isPlanDay(DateTime(2026, 8, 19), now: now), isFalse);
     });
   });
 
